@@ -9,8 +9,10 @@
     "data": [
         "security/ir.model.access.csv",
         "security/dojo_members_security.xml",
+        "data/sequences.xml",
         "views/dojo_member_views.xml",
     ],
+    "post_init_hook": "post_init_hook",
     "application": True,
     "auto_install": True,
     "installable": True,

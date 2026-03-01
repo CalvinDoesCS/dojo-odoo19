@@ -59,6 +59,31 @@
         sequence="40"
     />
 
+    <record id="view_dojo_member_form_inherit_member_number" model="ir.ui.view">
+        <field name="name">dojo.member.form.member_number</field>
+        <field name="model">dojo.member</field>
+        <field name="inherit_id" ref="dojo_base.view_dojo_member_form"/>
+        <field name="priority">5</field>
+        <field name="arch" type="xml">
+            <xpath expr="//group//group[1]" position="after">
+                <group>
+                    <field name="member_number" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_dojo_member_list_inherit_member_number" model="ir.ui.view">
+        <field name="name">dojo.member.list.member_number</field>
+        <field name="model">dojo.member</field>
+        <field name="inherit_id" ref="dojo_base.view_dojo_member_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="member_number" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
     <record id="view_dojo_member_form_inherit_emergency" model="ir.ui.view">
         <field name="name">dojo.member.form.emergency</field>
         <field name="model">dojo.member</field>

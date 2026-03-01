@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================================================
+         Kiosk Config — list + form views
+    ================================================================ -->
+    <record id="view_dojo_kiosk_config_list" model="ir.ui.view">
+        <field name="name">dojo.kiosk.config.list</field>
+        <field name="model">dojo.kiosk.config</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_kiosk_config_form" model="ir.ui.view">
+        <field name="name">dojo.kiosk.config.form</field>
+        <field name="model">dojo.kiosk.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Front Desk Kiosk"/></h1>
+                    </div>
+                    <group>
+                        <group string="Kiosk Settings">
+                            <field name="pin_code"
+                                password="True"
+                                placeholder="6-digit PIN"
+                                help="Exactly 6 digits. Used to unlock Instructor Mode on the kiosk tablet."/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Company">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Actions
+    ================================================================ -->
+    <record id="action_dojo_kiosk_config" model="ir.actions.act_window">
+        <field name="name">Kiosk Settings</field>
+        <field name="res_model">dojo.kiosk.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_open_kiosk" model="ir.actions.act_url">
+        <field name="name">Open Kiosk</field>
+        <field name="url">/kiosk</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ================================================================
+         Menu items — nested under the existing app menu
+    ================================================================ -->
+    <menuitem
+        id="menu_dojo_kiosk_open"
+        name="Open Kiosk"
+        parent="dojo_members.menu_dojo_members_root"
+        action="action_open_kiosk"
+        sequence="90"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"
+    />
+
+    <menuitem
+        id="menu_dojo_kiosk_config"
+        name="Kiosk Settings"
+        parent="dojo_members.menu_dojo_members_root"
+        action="action_dojo_kiosk_config"
+        sequence="95"
+        groups="dojo_base.group_dojo_admin"
+    />
+</odoo>

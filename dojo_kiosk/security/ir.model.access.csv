@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_dojo_kiosk_config_admin,dojo.kiosk.config admin,model_dojo_kiosk_config,dojo_base.group_dojo_admin,1,1,1,1

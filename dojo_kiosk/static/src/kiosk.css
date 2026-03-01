@@ -1,0 +1,1510 @@
+/* ============================================================
+   Dojo Kiosk — Clean, minimal tablet UI
+   Palette: White surface · #1a1a1a text · #4f6ef7 accent (sparingly)
+   Status: #22c55e (green) · #f59e0b (amber) · #ef4444 (red)
+============================================================ */
+
+/* --- Reset / base ----------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    font-size: 16px;
+    color: #1a1a1a;
+    background: #f5f5f7;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.dojo-kiosk-body {
+    overflow: hidden;
+}
+
+/* --- Root -------------------------------------------------- */
+#kiosk-root, .k-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Header ----------------------------------------------- */
+.k-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #fff;
+    border-bottom: 1px solid #e8e8e8;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.k-header__logo {
+    font-weight: 700;
+    font-size: 18px;
+    color: #1a1a1a;
+    letter-spacing: -0.3px;
+    margin-right: 4px;
+}
+
+.k-header__session-select {
+    flex: 1;
+    min-width: 200px;
+    max-width: 340px;
+    padding: 8px 12px;
+    border: 1px solid #d4d4d4;
+    border-radius: 8px;
+    background: #fafafa;
+    font-size: 14px;
+    color: #1a1a1a;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 32px;
+    cursor: pointer;
+    outline: none;
+}
+
+.k-header__session-select:focus {
+    border-color: #4f6ef7;
+    box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+}
+
+.k-search {
+    flex: 1;
+    min-width: 180px;
+    max-width: 280px;
+    position: relative;
+}
+
+.k-search__input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    border: 1px solid #d4d4d4;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fafafa;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.k-search__input:focus {
+    border-color: #4f6ef7;
+    box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+}
+
+.k-search__icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+    font-size: 14px;
+}
+
+.k-header__spacer {
+    flex: 1;
+}
+
+/* Instructor mode badge */
+.k-instructor-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #c2410c;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.k-instructor-badge:hover {
+    background: #ffedd5;
+}
+
+.k-instructor-badge .k-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f97316;
+}
+
+/* Unlock instructor button */
+.k-unlock-btn {
+    padding: 8px 14px;
+    border: 1px solid #d4d4d4;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.15s;
+}
+
+.k-unlock-btn:hover {
+    border-color: #999;
+    color: #1a1a1a;
+}
+
+/* --- Main content ------------------------------------------ */
+.k-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* No session selected */
+.k-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    gap: 10px;
+}
+
+.k-empty__icon {
+    font-size: 48px;
+    opacity: .4;
+}
+
+.k-empty__text {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* --- Roster grid ------------------------------------------ */
+.k-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 14px;
+}
+
+.k-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 14px 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #ebebeb;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    position: relative;
+}
+
+.k-tile:hover {
+    border-color: #c0c0c0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    transform: translateY(-1px);
+}
+
+.k-tile:active {
+    transform: translateY(0);
+}
+
+/* Checked-in state */
+.k-tile--present {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+}
+
+.k-tile--absent {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.k-tile--late {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+/* Avatar wrapper */
+.k-avatar-wrap {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.k-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+    display: block;
+}
+
+.k-avatar-placeholder {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #9ca3af;
+}
+
+/* Status dot */
+.k-status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+.k-status-dot--present { background: #22c55e; }
+.k-status-dot--late    { background: #f59e0b; }
+.k-status-dot--absent  { background: #ef4444; }
+.k-status-dot--excused { background: #a855f7; }
+
+.k-tile__name {
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    color: #374151;
+    line-height: 1.3;
+    max-width: 88px;
+    word-break: break-word;
+}
+
+/* --- Search results list (in-line below search) ----------- */
+.k-search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.1);
+    z-index: 200;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.k-search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.1s;
+}
+
+.k-search-result-item:last-child {
+    border-bottom: none;
+}
+
+.k-search-result-item:hover {
+    background: #f8f8f8;
+}
+
+.k-search-result-item img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+}
+
+.k-search-result-item__name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.k-search-result-item__sub {
+    font-size: 12px;
+    color: #888;
+}
+
+/* --- Modal overlay --------------------------------------- */
+.k-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 400;
+    backdrop-filter: blur(2px);
+}
+
+.k-modal {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    width: min(480px, 94vw);
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 28px;
+    position: relative;
+}
+
+.k-modal__close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: #f0f0f0;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    transition: background 0.15s;
+}
+
+.k-modal__close:hover {
+    background: #e0e0e0;
+}
+
+/* --- Member profile card --------------------------------- */
+.k-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.k-profile__avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+    border: 3px solid #f0f0f0;
+}
+
+.k-profile__avatar-placeholder {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 700;
+    color: #9ca3af;
+    border: 3px solid #f0f0f0;
+}
+
+.k-profile__name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.2;
+    margin-top: 4px;
+}
+
+.k-profile__belt {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+.k-profile__stats {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin: 12px 0 4px;
+    width: 100%;
+}
+
+.k-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 70px;
+}
+
+.k-stat__value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.k-stat__label {
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* Issue flags */
+.k-issues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin: 8px 0;
+}
+
+.k-issue-flag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+/* Profile action buttons */
+.k-profile__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 16px;
+}
+
+.k-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 20px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+.k-btn:active {
+    transform: scale(.98);
+}
+
+.k-btn--primary {
+    background: #1a1a1a;
+    color: #fff;
+}
+
+.k-btn--primary:hover {
+    opacity: .87;
+}
+
+.k-btn--secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+.k-btn--secondary:hover {
+    background: #e9ecef;
+}
+
+.k-btn--danger {
+    background: #fff;
+    color: #ef4444;
+    border: 1px solid #fecaca;
+}
+
+.k-btn--danger:hover {
+    background: #fef2f2;
+}
+
+.k-btn--success {
+    background: #22c55e;
+    color: #fff;
+}
+
+.k-btn--success:hover {
+    opacity: .9;
+}
+
+.k-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+/* --- Instructor attendance row --------------------------- */
+.k-attrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.k-attrow:last-child {
+    border-bottom: none;
+}
+
+.k-attrow__avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+    flex-shrink: 0;
+}
+
+.k-attrow__name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.k-att-toggle {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.k-att-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #fff;
+    color: #666;
+    border: none;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    border-left: 1px solid #e5e7eb;
+}
+
+.k-att-btn:first-child {
+    border-left: none;
+}
+
+.k-att-btn--active-present {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.k-att-btn--active-late {
+    background: #fef9c3;
+    color: #854d0e;
+}
+
+.k-att-btn--active-absent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* --- PIN modal ------------------------------------------- */
+.k-pin-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.k-pin-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 24px;
+}
+
+.k-pin-boxes {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.k-pin-box {
+    width: 46px;
+    height: 58px;
+    border: 2px solid #d4d4d4;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+    transition: border-color 0.15s;
+    background: #fafafa;
+}
+
+.k-pin-box--active {
+    border-color: #4f6ef7;
+    background: #f0f3ff;
+}
+
+.k-pin-box--filled {
+    border-color: #1a1a1a;
+    background: #fff;
+}
+
+.k-pin-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-width: 260px;
+    margin: 0 auto;
+}
+
+.k-pin-key {
+    padding: 16px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.1s;
+    color: #1a1a1a;
+}
+
+.k-pin-key:hover {
+    background: #f3f4f6;
+}
+
+.k-pin-key:active {
+    background: #e5e7eb;
+}
+
+.k-pin-key--backspace {
+    font-size: 18px;
+    color: #6b7280;
+}
+
+.k-pin-key--wide {
+    grid-column: span 2;
+}
+
+.k-pin-error {
+    text-align: center;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 12px;
+    min-height: 20px;
+}
+
+/* --- Check-in confirmation ------------------------------ */
+.k-confirm-screen {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 500;
+    text-align: center;
+    padding: 40px;
+}
+
+.k-confirm-screen--error {
+    background: #fef2f2;
+}
+
+.k-confirm-icon {
+    font-size: 72px;
+    line-height: 1;
+}
+
+.k-confirm-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.k-confirm-session {
+    font-size: 16px;
+    color: #555;
+}
+
+.k-confirm-status {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.k-confirm-status--late {
+    color: #d97706;
+}
+
+.k-confirm-status--present {
+    color: #16a34a;
+}
+
+.k-confirm-status--error {
+    color: #dc2626;
+}
+
+.k-confirm-returning {
+    font-size: 13px;
+    color: #aaa;
+    margin-top: 16px;
+}
+
+/* --- Scrollbar ------------------------------------------ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 3px; }
+
+/* --- Loading spinner ------------------------------------ */
+.k-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #4f6ef7;
+    border-radius: 50%;
+    animation: k-spin 0.7s linear infinite;
+}
+
+@keyframes k-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   Mode tabs
+============================================================ */
+.k-mode-tabs {
+    display: flex;
+    gap: 2px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.k-mode-tab {
+    padding: 7px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.k-mode-tab:hover {
+    color: #1a1a1a;
+}
+
+.k-mode-tab--active {
+    background: #fff;
+    color: #1a1a1a;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+
+/* ============================================================
+   Scan center — barcode icon + search
+============================================================ */
+.k-scan-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 40px;
+    gap: 24px;
+}
+
+.k-barcode-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    animation: k-fade-in 0.3s ease;
+}
+
+.k-barcode-svg {
+    width: 180px;
+    height: auto;
+    color: #c8c8c8;
+}
+
+.k-scan-hint {
+    font-size: 15px;
+    color: #bbb;
+    font-weight: 500;
+    text-align: center;
+    margin: 0;
+}
+
+/* Search input in scan mode */
+.k-scan-search-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+}
+
+.k-scan-search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.k-scan-input {
+    width: 100%;
+    padding: 14px 44px 14px 48px;
+    border: 2px solid #e5e7eb;
+    border-radius: 14px;
+    font-size: 17px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+
+.k-scan-input:focus {
+    border-color: #4f6ef7;
+    box-shadow: 0 0 0 4px rgba(79,110,247,.1);
+}
+
+.k-scan-clear {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+}
+
+.k-scan-clear:hover { background: #d1d5db; }
+
+.k-scan-no-results {
+    font-size: 15px;
+    color: #aaa;
+    margin: 0;
+    text-align: center;
+}
+
+/* ============================================================
+   Member search result cards (scan mode body)
+============================================================ */
+.k-member-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    width: 100%;
+    max-width: 900px;
+    animation: k-fade-in 0.2s ease;
+}
+
+.k-search-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 12px 14px;
+    background: #fff;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    text-align: center;
+}
+
+.k-search-card:hover {
+    border-color: #c0c0c0;
+    box-shadow: 0 4px 14px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+}
+
+.k-search-card:active { transform: translateY(0); }
+
+.k-search-card__avatar-wrap {
+    position: relative;
+    width: 72px;
+    height: 72px;
+}
+
+.k-search-card__avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+    display: block;
+}
+
+.k-search-card__placeholder {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 700;
+    color: #9ca3af;
+}
+
+.k-search-card__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.k-search-card__sub {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+}
+
+.k-search-card__belt {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+/* ============================================================
+   Sessions mode list
+============================================================ */
+.k-sessions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+}
+
+.k-session-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+
+.k-session-card__header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #f3f3f3;
+}
+
+.k-session-card__title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+}
+
+.k-session-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.k-session-card__time {
+    font-size: 13px;
+    color: #555;
+    font-weight: 500;
+}
+
+.k-session-card__instructor {
+    font-size: 13px;
+    color: #777;
+}
+
+.k-session-card__count {
+    font-size: 12px;
+    color: #aaa;
+    margin-left: auto;
+}
+
+.k-session-card__loading {
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+}
+
+.k-session-card__empty {
+    padding: 20px 20px;
+    font-size: 13px;
+    color: #bbb;
+    text-align: center;
+}
+
+.k-session-card__faces {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 12px;
+}
+
+.k-session-card__footer {
+    padding: 12px 20px;
+    border-top: 1px solid #f3f3f3;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ============================================================
+   Session face tiles
+============================================================ */
+.k-face-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.1s;
+    position: relative;
+}
+
+.k-face-tile:hover {
+    background: #f5f5f7;
+    transform: translateY(-1px);
+}
+
+.k-face-tile:active { transform: translateY(0); }
+
+.k-face-tile--present { background: #f0fdf4; }
+.k-face-tile--present:hover { background: #dcfce7; }
+
+.k-face-tile--late { background: #fffbeb; }
+.k-face-tile--late:hover { background: #fef3c7; }
+
+.k-face-tile--absent { background: #fef2f2; }
+.k-face-tile--absent:hover { background: #fee2e2; }
+
+.k-face-wrap {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+}
+
+.k-face-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e5e7eb;
+    display: block;
+}
+
+.k-face-placeholder {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #9ca3af;
+}
+
+.k-face-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: #374151;
+    text-align: center;
+    line-height: 1.3;
+    max-width: 72px;
+    word-break: break-word;
+}
+
+/* ============================================================
+   Small button variant
+============================================================ */
+.k-btn--sm {
+    padding: 8px 16px;
+    font-size: 13px;
+    width: auto;
+}
+
+/* ============================================================
+   Fade-in animation
+============================================================ */
+@keyframes k-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Profile modal — wider + refactored layout ──────────────────────────── */
+.k-modal--profile {
+    max-width: 520px;
+    width: 95%;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    color: #1a1a2e;
+}
+.k-modal--profile > .k-modal__close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+}
+.k-profile__head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 24px 16px;
+    background: #f9f9fb;
+    border-bottom: 1px solid #e8e8e8;
+}
+.k-profile__avatar-wrap { flex-shrink: 0; }
+.k-profile__head-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.k-profile__head .k-profile__name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+.k-profile__head .k-profile__belt {
+    font-size: 0.85rem;
+    color: #555;
+}
+
+/* membership badge */
+.k-membership-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    background: #f3f4f6;
+    color: #555;
+    border: 1px solid #e5e7eb;
+}
+.k-membership-badge--active  { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.k-membership-badge--paused  { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+.k-membership-badge--cancelled { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+.k-membership-badge--lead    { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+
+/* ─── Profile/Household tabs ─────────────────────────────────────────────── */
+.k-profile-tabs {
+    display: flex;
+    border-bottom: 1px solid #e8e8e8;
+    background: #fafafa;
+}
+.k-profile-tab {
+    flex: 1;
+    padding: 11px 0;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+}
+.k-profile-tab--active {
+    color: #1a1a2e;
+    border-bottom-color: #f97316;
+}
+
+/* ─── Profile tab content ────────────────────────────────────────────────── */
+.k-modal--profile .k-profile__stats {
+    display: flex;
+    gap: 0;
+    padding: 16px 24px 0;
+}
+.k-modal--profile .k-profile__stats .k-stat {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+}
+.k-modal--profile .k-issues { padding: 0 24px; margin-top: 12px; }
+.k-modal--profile .k-profile__actions { padding: 12px 24px 24px; }
+
+/* ─── Attendance section (in profile modal) ──────────────────────────────── */
+.k-att-section { margin-bottom: 16px; }
+.k-att-section__label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #666;
+    margin-bottom: 8px;
+}
+.k-att-toggle--lg {
+    display: flex;
+    gap: 8px;
+}
+.k-att-btn--lg {
+    flex: 1;
+    padding: 10px 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: #f3f4f6;
+    border: 1.5px solid #e5e7eb;
+    color: #374151;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.k-att-btn--lg:hover { background: #e5e7eb; color: #1a1a2e; }
+.k-att-btn--lg.k-att-btn--active-present {
+    background: #dcfce7; border-color: #16a34a; color: #166534;
+}
+.k-att-btn--lg.k-att-btn--active-late {
+    background: #fef9c3; border-color: #ca8a04; color: #854d0e;
+}
+.k-att-btn--lg.k-att-btn--active-absent {
+    background: #fee2e2; border-color: #dc2626; color: #991b1b;
+}
+.k-profile__roster-row {
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
+}
+.k-profile__roster-row .k-btn { flex: 1; }
+
+/* ─── Household tab ──────────────────────────────────────────────────────── */
+.k-hh { padding: 16px 24px 24px; }
+.k-hh__name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+}
+.k-hh__section-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #555;
+    margin: 0 0 8px;
+}
+.k-hh__members { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.k-hh__member-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: #f9f9fb;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+}
+.k-hh__member-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(249,115,22,0.2);
+    color: #f97316;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.k-hh__member-name { font-size: 0.9rem; font-weight: 600; color: #1a1a2e; }
+.k-hh__member-role { font-size: 0.75rem; color: #777; text-transform: capitalize; }
+
+/* Emergency contacts */
+.k-hh__contacts { display: flex; flex-direction: column; gap: 8px; }
+.k-hh__contact {
+    padding: 10px 12px;
+    background: #f9f9fb;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.k-hh__contact-header { display: flex; align-items: center; gap: 8px; }
+.k-hh__contact-name { font-weight: 600; color: #1a1a2e; font-size: 0.9rem; }
+.k-hh__contact-primary {
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: rgba(249,115,22,0.2);
+    color: #f97316;
+    padding: 1px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.k-hh__contact-rel { font-size: 0.78rem; color: #777; }
+.k-hh__contact-phone {
+    font-size: 0.85rem;
+    color: #60a5fa;
+    text-decoration: none;
+}
+.k-hh__contact-phone:hover { text-decoration: underline; }
+
+/* ── Warning Banner ───────────────────────────────────────────────────────── */
+.k-warning-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #fff1f0;
+    border: 2px solid #f87171;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 10px 16px 4px;
+}
+.k-warning-banner__icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.k-warning-banner__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.k-warning-banner__item {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #b91c1c;
+    line-height: 1.3;
+}
+
+/* ── Profile info rows (DOB, plan, email, phone) ─────────────────────────── */
+.k-profile-info {
+    margin: 8px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fafafa;
+}
+.k-info-row {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-bottom: 1px solid #efefef;
+    gap: 8px;
+}
+.k-info-row:last-child { border-bottom: none; }
+.k-info-row__label {
+    min-width: 90px;
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.k-info-row__value {
+    font-size: 0.88rem;
+    color: #1a1a2e;
+    font-weight: 500;
+    word-break: break-word;
+}
+
+/* ── Appointments (upcoming classes) ─────────────────────────────────────── */
+.k-appointments {
+    margin: 8px 16px 4px;
+    background: #f0f7ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.k-appointments__title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 7px 12px 5px;
+    border-bottom: 1px solid #bfdbfe;
+    background: #dbeafe;
+}
+.k-appt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 12px;
+    border-bottom: 1px solid #e0edff;
+    gap: 8px;
+}
+.k-appt-row:last-child { border-bottom: none; }
+.k-appt-row__name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    flex: 1;
+}
+.k-appt-row__time {
+    font-size: 0.8rem;
+    color: #3b82f6;
+    white-space: nowrap;
+}

@@ -1,0 +1,481 @@
+"""
+Kiosk service methods — all business logic for the kiosk SPA lives here.
+Methods are designed to be called from the kiosk HTTP controller via sudo().
+"""
+from datetime import datetime, timedelta
+
+from odoo import api, fields, models
+
+
+class DojoKioskService(models.AbstractModel):
+    _name = "dojo.kiosk.service"
+    _description = "Dojo Kiosk Service"
+
+    # -------------------------------------------------------------------------
+    # Session helpers
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_todays_sessions(self):
+        """Return open sessions for today, ordered by start time."""
+        now = fields.Datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        sessions = self.env["dojo.class.session"].search([
+            ("state", "=", "open"),
+            ("start_datetime", ">=", fields.Datetime.to_string(today_start)),
+            ("start_datetime", "<=", fields.Datetime.to_string(today_end)),
+            ("company_id", "in", [self.env.company.id, False]),
+        ], order="start_datetime asc")
+
+        result = []
+        for s in sessions:
+            result.append({
+                "id": s.id,
+                "name": s.name,
+                "template_name": s.template_id.name if s.template_id else "",
+                "start": fields.Datetime.to_string(s.start_datetime),
+                "end": fields.Datetime.to_string(s.end_datetime),
+                "seats_taken": s.seats_taken,
+                "capacity": s.capacity,
+                "instructor": s.instructor_profile_id.name if s.instructor_profile_id else "",
+            })
+        return result
+
+    # -------------------------------------------------------------------------
+    # Roster helpers
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_session_roster(self, session_id):
+        """Return the enrolled roster for a session with attendance state."""
+        session = self.env["dojo.class.session"].browse(session_id)
+        if not session.exists():
+            return []
+
+        enrollments = session.enrollment_ids.filtered(
+            lambda e: e.status == "registered"
+        )
+
+        # Build log map so we can correctly surface "late" (enrollment only tracks
+        # present/absent/excused, but the attendance log stores the full status)
+        logs = self.env["dojo.attendance.log"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "in", enrollments.mapped("member_id").ids),
+        ])
+        log_by_member = {l.member_id.id: l.status for l in logs}
+
+        result = []
+        for enr in enrollments:
+            member = enr.member_id
+            # Prefer the log status (supports "late"); fall back to enrollment state
+            att_state = log_by_member.get(member.id) or enr.attendance_state
+            result.append(self._member_roster_entry(member, enr, att_state))
+        return result
+
+    def _member_roster_entry(self, member, enrollment=None, attendance_state=None):
+        """Compact dict for a roster tile."""
+        if attendance_state is None:
+            attendance_state = enrollment.attendance_state if enrollment else "pending"
+        return {
+            "member_id": member.id,
+            "name": member.name,
+            "member_number": member.member_number or "",
+            "image_url": "/web/image/dojo.member/%d/image_128" % member.id,
+            "belt_rank": member.current_rank_id.name if member.current_rank_id else "",
+            "belt_color": member.current_rank_id.color if member.current_rank_id else "",
+            "attendance_state": attendance_state,
+        }
+
+    # -------------------------------------------------------------------------
+    # Member lookup
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def lookup_member_by_barcode(self, barcode):
+        """Find a member by member_number (barcode scan)."""
+        member = self.env["dojo.member"].search(
+            [("member_number", "=", barcode), ("active", "=", True)], limit=1
+        )
+        if not member:
+            return None
+        return self._member_profile_dict(member)
+
+    @api.model
+    def search_members(self, query, limit=20):
+        """Search members by name, email, or phone for the kiosk search bar."""
+        if not query or len(query.strip()) < 2:
+            return []
+        domain = [
+            ("active", "=", True),
+            "|", "|",
+            ("name", "ilike", query.strip()),
+            ("email", "ilike", query.strip()),
+            ("phone", "ilike", query.strip()),
+        ]
+        members = self.env["dojo.member"].search(domain, limit=limit, order="name asc")
+        return [self._member_profile_dict(m) for m in members]
+
+    # -------------------------------------------------------------------------
+    # Member profile + issue flags
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_member_profile(self, member_id, session_id=None):
+        """Full member profile for the profile card modal."""
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return None
+        return self._member_profile_dict(member, session_id=session_id)
+
+    def _member_profile_dict(self, member, session_id=None):
+        issues = self._compute_issue_flags(member)
+
+        # Current enrollment in the requested session
+        attendance_state = "pending"
+        enrolled = False
+        if session_id:
+            enr = self.env["dojo.class.enrollment"].search([
+                ("session_id", "=", session_id),
+                ("member_id", "=", member.id),
+                ("status", "=", "registered"),
+            ], limit=1)
+            enrolled = bool(enr)
+            # Use attendance log status so "late" is preserved
+            log = self.env["dojo.attendance.log"].search([
+                ("session_id", "=", session_id),
+                ("member_id", "=", member.id),
+            ], limit=1)
+            attendance_state = log.status if log else (enr.attendance_state if enr else "pending")
+
+        # Total attendance count
+        total_attendance = self.env["dojo.attendance.log"].search_count([
+            ("member_id", "=", member.id),
+            ("status", "in", ["present", "late"]),
+        ])
+
+        allowed = member.sessions_allowed_per_week  # 0 = unlimited
+        used = member.sessions_used_this_week
+
+        # Upcoming enrolled sessions (appointments)
+        now = fields.Datetime.now()
+        upcoming_enrs = self.env["dojo.class.enrollment"].search([
+            ("member_id", "=", member.id),
+            ("status", "=", "registered"),
+        ])
+        # Filter future sessions and sort in Python (related field ops not supported in ORM order/search)
+        future_enrs = [
+            e for e in upcoming_enrs
+            if e.session_id and e.session_id.start_datetime and e.session_id.start_datetime >= now
+        ]
+        future_enrs.sort(key=lambda e: e.session_id.start_datetime)
+        appointments = []
+        for enr in future_enrs[:7]:
+            s = enr.session_id
+            appointments.append({
+                "session_id": s.id,
+                "name": s.template_id.name if s.template_id else "",
+                "start": fields.Datetime.to_string(s.start_datetime) if s.start_datetime else "",
+                "end": fields.Datetime.to_string(s.end_datetime) if s.end_datetime else "",
+            })
+
+        # Active plan name
+        plan_name = ""
+        sub = member.active_subscription_id
+        if sub and sub.plan_id:
+            plan_name = sub.plan_id.name or ""
+
+        # Household + emergency contacts
+        hh = member.household_id
+        household = None
+        if hh:
+            contacts = []
+            for ec in member.emergency_contact_ids:
+                contacts.append({
+                    "name": ec.name or "",
+                    "relationship": ec.relationship or "",
+                    "phone": ec.phone or "",
+                    "email": ec.email or "",
+                    "is_primary": bool(ec.is_primary),
+                })
+            household = {
+                "id": hh.id,
+                "name": hh.name or "",
+                "members": [
+                    {"id": m.id, "name": m.name or "", "role": m.role or ""}
+                    for m in hh.member_ids
+                ],
+                "emergency_contacts": contacts,
+            }
+
+        return {
+            "member_id": member.id,
+            "name": member.name,
+            "email": member.email or "",
+            "phone": member.phone or "",
+            "role": member.role or "",
+            "member_number": member.member_number or "",
+            "image_url": "/web/image/dojo.member/%d/image_128" % member.id,
+            "date_of_birth": fields.Date.to_string(member.date_of_birth) if member.date_of_birth else "",
+            "membership_state": member.membership_state,
+            "belt_rank": member.current_rank_id.name if member.current_rank_id else "",
+            "belt_color": member.current_rank_id.color if member.current_rank_id else "",
+            "total_attendance": total_attendance,
+            "sessions_used_this_week": used,
+            "sessions_allowed_per_week": allowed,
+            "issues": issues,
+            "enrolled_in_session": enrolled,
+            "attendance_state": attendance_state,
+            "appointments": appointments,
+            "plan_name": plan_name,
+            "household": household,
+        }
+
+    def _compute_issue_flags(self, member):
+        flags = []
+        if member.membership_state == "cancelled":
+            flags.append({"code": "membership_cancelled", "label": "Membership Cancelled"})
+        elif member.membership_state == "paused":
+            flags.append({"code": "membership_on_hold", "label": "Membership On Hold"})
+        elif member.membership_state == "lead":
+            flags.append({"code": "membership_lead", "label": "Not Yet Active"})
+
+        sub = member.active_subscription_id
+        if not sub:
+            flags.append({"code": "no_subscription", "label": "No Active Subscription"})
+        elif sub.state in ("expired", "cancelled"):
+            flags.append({"code": "membership_expired", "label": "Membership Expired"})
+
+        allowed = member.sessions_allowed_per_week
+        used = member.sessions_used_this_week
+        if allowed > 0 and used >= allowed:
+            flags.append({"code": "credits_exhausted", "label": "Ran Out of Credits"})
+
+        return flags
+
+    # -------------------------------------------------------------------------
+    # Check-in
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def checkin_member(self, member_id, session_id):
+        """
+        Atomic check-in:
+        1. Validate eligibility.
+        2. Find or create enrollment (registered).
+        3. Create attendance log (present / late).
+        4. Sync enrollment.attendance_state.
+        Returns dict with success flag, message, and updated profile.
+        """
+        member = self.env["dojo.member"].browse(member_id)
+        session = self.env["dojo.class.session"].browse(session_id)
+
+        if not member.exists() or not session.exists():
+            return {"success": False, "error": "Member or session not found."}
+
+        # --- Eligibility ---
+        if member.membership_state in ("cancelled", "paused", "lead"):
+            return {
+                "success": False,
+                "error": "Membership is not active. Please see the front desk.",
+            }
+
+        if not member.active_subscription_id:
+            return {
+                "success": False,
+                "error": "No active subscription found. Please see the front desk.",
+            }
+
+        if session.state != "open":
+            return {"success": False, "error": "This session is not currently open."}
+
+        allowed = member.sessions_allowed_per_week
+        used = member.sessions_used_this_week
+        if allowed > 0 and used >= allowed:
+            return {
+                "success": False,
+                "error": "Weekly session limit reached. Please see the front desk.",
+            }
+
+        # --- Course roster check ---
+        template = session.template_id
+        if template.course_member_ids and member not in template.course_member_ids:
+            return {
+                "success": False,
+                "error": "You are not enrolled in this course. Please see the front desk.",
+            }
+
+        # --- Capacity check ---
+        if session.capacity > 0 and session.seats_taken >= session.capacity:
+            return {"success": False, "error": "This session is full."}
+
+        # --- Find or create enrollment ---
+        existing_log = self.env["dojo.attendance.log"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+        ], limit=1)
+        if existing_log:
+            return {
+                "success": False,
+                "error": "Already checked in to this session.",
+            }
+
+        enrollment = self.env["dojo.class.enrollment"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+            ("status", "=", "registered"),
+        ], limit=1)
+
+        if not enrollment:
+            enrollment = self.env["dojo.class.enrollment"].create({
+                "session_id": session_id,
+                "member_id": member_id,
+                "status": "registered",
+                "attendance_state": "pending",
+            })
+
+        # --- Determine present / late ---
+        now = fields.Datetime.now()
+        status = "late" if now > session.start_datetime else "present"
+
+        log = self.env["dojo.attendance.log"].create({
+            "session_id": session_id,
+            "member_id": member_id,
+            "enrollment_id": enrollment.id,
+            "status": status,
+            "checkin_datetime": now,
+        })
+
+        # Sync enrollment
+        enrollment.attendance_state = "present"
+
+        return {
+            "success": True,
+            "status": status,
+            "log_id": log.id,
+            "member": self._member_profile_dict(member, session_id=session_id),
+            "session_name": session.name,
+        }
+
+    # -------------------------------------------------------------------------
+    # Instructor — attendance
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def mark_attendance(self, session_id, member_id, attendance_status):
+        """
+        Instructor-side: mark a member present / late / absent / excused.
+        Creates or updates the attendance log and enrollment state.
+        """
+        valid = ("present", "late", "absent", "excused")
+        if attendance_status not in valid:
+            return {"success": False, "error": "Invalid status."}
+
+        session = self.env["dojo.class.session"].browse(session_id)
+        member = self.env["dojo.member"].browse(member_id)
+        if not session.exists() or not member.exists():
+            return {"success": False, "error": "Session or member not found."}
+
+        log = self.env["dojo.attendance.log"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+        ], limit=1)
+
+        if log:
+            log.status = attendance_status
+        else:
+            log = self.env["dojo.attendance.log"].create({
+                "session_id": session_id,
+                "member_id": member_id,
+                "status": attendance_status,
+                "checkin_datetime": fields.Datetime.now(),
+            })
+
+        # Sync enrollment
+        enrollment = self.env["dojo.class.enrollment"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+            ("status", "=", "registered"),
+        ], limit=1)
+        if enrollment:
+            enrollment.attendance_state = (
+                "present" if attendance_status in ("present", "late") else attendance_status
+            )
+
+        return {"success": True, "log_id": log.id}
+
+    # -------------------------------------------------------------------------
+    # Instructor — roster management
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def roster_add(self, session_id, member_id):
+        """Add a member to the session roster (creates enrollment)."""
+        session = self.env["dojo.class.session"].browse(session_id)
+        member = self.env["dojo.member"].browse(member_id)
+        if not session.exists() or not member.exists():
+            return {"success": False, "error": "Session or member not found."}
+
+        existing = self.env["dojo.class.enrollment"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+        ], limit=1)
+        if existing:
+            if existing.status != "registered":
+                existing.status = "registered"
+            return {"success": True, "enrollment_id": existing.id}
+
+        if session.capacity > 0 and session.seats_taken >= session.capacity:
+            return {"success": False, "error": "Session is at full capacity."}
+
+        enr = self.env["dojo.class.enrollment"].create({
+            "session_id": session_id,
+            "member_id": member_id,
+            "status": "registered",
+            "attendance_state": "pending",
+        })
+        return {"success": True, "enrollment_id": enr.id}
+
+    @api.model
+    def roster_remove(self, session_id, member_id):
+        """Remove a member from the session roster."""
+        enrollment = self.env["dojo.class.enrollment"].search([
+            ("session_id", "=", session_id),
+            ("member_id", "=", member_id),
+        ], limit=1)
+        if enrollment:
+            enrollment.status = "cancelled"
+        return {"success": True}
+
+    # -------------------------------------------------------------------------
+    # Instructor — session close
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def close_session(self, session_id):
+        """Mark a session as done."""
+        session = self.env["dojo.class.session"].browse(session_id)
+        if not session.exists():
+            return {"success": False, "error": "Session not found."}
+        session.state = "done"
+        return {"success": True}
+
+    # -------------------------------------------------------------------------
+    # PIN verification
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def verify_pin(self, pin, config_id=None):
+        """
+        Verify the 6-digit instructor PIN.
+        If config_id is provided (per-tablet URL), only that config's PIN is accepted.
+        Otherwise any active config for the current company matches.
+        """
+        domain = [("active", "=", True), ("pin_code", "=", pin)]
+        if config_id:
+            domain.append(("id", "=", int(config_id)))
+        else:
+            domain.append(("company_id", "in", [self.env.company.id, False]))
+        config = self.env["dojo.kiosk.config"].search(domain, limit=1)
+        return {"success": bool(config)}
