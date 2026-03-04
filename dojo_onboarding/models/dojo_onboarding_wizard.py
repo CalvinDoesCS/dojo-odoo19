@@ -14,6 +14,7 @@ class DojoOnboardingWizard(models.TransientModel):
             ('household',      '2. Household'),
             ('guardian_setup', '3. Guardian Setup'),
             ('enrollment',     '4. Program Enrollment'),
+            ('auto_enroll',    '4b. Auto-Enroll Schedule'),
             ('subscription',   '5. Subscription'),
             ('portal_access',  '6. Portal Access'),
         ],
@@ -84,12 +85,40 @@ class DojoOnboardingWizard(models.TransientModel):
         domain="[('active', '=', True)]",
         help='The program / curriculum this member is enrolling in (required).',
     )
+    template_ids = fields.Many2many(
+        'dojo.class.template',
+        string='Add to Class Rosters',
+        domain="[('recurrence_active', '=', True)]",
+        help='Add this member to recurring class template rosters so they are auto-enrolled in future sessions.',
+    )
     session_ids = fields.Many2many(
         'dojo.class.session',
         string='Specific Sessions (optional)',
         domain="[('state', '=', 'open')]",
         help='Optionally pre-register the member in specific upcoming sessions.',
     )
+
+    # ── Step 4b: Auto-Enroll Preferences ─────────────────────────────────────
+    auto_enroll_active = fields.Boolean(
+        'Enable Auto-Enroll',
+        default=True,
+        help='If enabled, the member will be auto-enrolled in sessions based on the chosen days and mode.',
+    )
+    auto_enroll_mode = fields.Selection(
+        [
+            ('permanent', 'Permanent (Never Remove)'),
+            ('weekly_limited', 'This Week Only'),
+        ],
+        string='Recurrence Mode',
+        default='permanent',
+    )
+    auto_enroll_mon = fields.Boolean('Mon')
+    auto_enroll_tue = fields.Boolean('Tue')
+    auto_enroll_wed = fields.Boolean('Wed')
+    auto_enroll_thu = fields.Boolean('Thu')
+    auto_enroll_fri = fields.Boolean('Fri')
+    auto_enroll_sat = fields.Boolean('Sat')
+    auto_enroll_sun = fields.Boolean('Sun')
 
     # ── Step 4: Subscription ─────────────────────────────────────────────────
     plan_id = fields.Many2one(
@@ -127,7 +156,7 @@ class DojoOnboardingWizard(models.TransientModel):
     created_member_id = fields.Many2one('dojo.member', string='Created Member', readonly=True)
 
     # ── Step helpers ─────────────────────────────────────────────────────────
-    _STEP_ORDER = ['member_info', 'household', 'guardian_setup', 'enrollment', 'subscription', 'portal_access']
+    _STEP_ORDER = ['member_info', 'household', 'guardian_setup', 'enrollment', 'auto_enroll', 'subscription', 'portal_access']
 
     def _reopen_wizard(self):
         """Return an action that re-opens this transient record (keeps state)."""
@@ -184,6 +213,9 @@ class DojoOnboardingWizard(models.TransientModel):
         next_step = self._STEP_ORDER[idx + 1] if idx < len(self._STEP_ORDER) - 1 else self.step
         if next_step == 'guardian_setup' and not self.create_new_household:
             next_step = 'enrollment'
+        # Skip auto_enroll step if no recurring templates were selected
+        if next_step == 'auto_enroll' and not self.template_ids:
+            next_step = 'subscription'
         self.step = next_step
         return self._reopen_wizard()
 
@@ -194,6 +226,9 @@ class DojoOnboardingWizard(models.TransientModel):
         # Skip guardian_setup when going back if we're not on the new-household path
         if prev_step == 'guardian_setup' and not self.create_new_household:
             prev_step = 'household'
+        # Skip auto_enroll when going back if no templates selected
+        if prev_step == 'auto_enroll' and not self.template_ids:
+            prev_step = 'enrollment'
         self.step = prev_step
         return self._reopen_wizard()
 
@@ -291,7 +326,30 @@ class DojoOnboardingWizard(models.TransientModel):
                 'status': 'registered',
                 'attendance_state': 'pending',
             })
+        # ── Course roster assignment + auto-enroll preferences ───────────────────
+        if self.template_ids:
+            # Add member to each template's course roster
+            for tmpl in self.template_ids:
+                if member not in tmpl.course_member_ids:
+                    tmpl.write({'course_member_ids': [(4, member.id)]})
 
+            # Create auto-enroll preference (if active option was chosen)
+            if self.auto_enroll_active:
+                Pref = self.env['dojo.course.auto.enroll']
+                for tmpl in self.template_ids:
+                    Pref.create({
+                        'member_id': member.id,
+                        'template_id': tmpl.id,
+                        'active': True,
+                        'mode': self.auto_enroll_mode or 'permanent',
+                        'pref_mon': self.auto_enroll_mon,
+                        'pref_tue': self.auto_enroll_tue,
+                        'pref_wed': self.auto_enroll_wed,
+                        'pref_thu': self.auto_enroll_thu,
+                        'pref_fri': self.auto_enroll_fri,
+                        'pref_sat': self.auto_enroll_sat,
+                        'pref_sun': self.auto_enroll_sun,
+                    })
         # ── Subscription (required) ───────────────────────────────────────────
         sub_start = self.subscription_start_date or fields.Date.today()
         period = self.plan_id.billing_period

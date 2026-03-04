@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         Auto-Enroll Preferences — standalone list + form
+    ================================================================ -->
+
+    <record id="view_dojo_auto_enroll_list" model="ir.ui.view">
+        <field name="name">dojo.course.auto.enroll.list</field>
+        <field name="model">dojo.course.auto.enroll</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="member_id"/>
+                <field name="template_id"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="mode"/>
+                <field name="date_from"
+                    optional="show"
+                    string="From"/>
+                <field name="date_to"
+                    optional="show"
+                    string="To"/>
+                <field name="pref_mon" optional="show"/>
+                <field name="pref_tue" optional="show"/>
+                <field name="pref_wed" optional="show"/>
+                <field name="pref_thu" optional="show"/>
+                <field name="pref_fri" optional="show"/>
+                <field name="pref_sat" optional="show"/>
+                <field name="pref_sun" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_auto_enroll_form" model="ir.ui.view">
+        <field name="name">dojo.course.auto.enroll.form</field>
+        <field name="model">dojo.course.auto.enroll</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Member &amp; Template">
+                            <field name="member_id"
+                                options="{'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="template_id"
+                                options="{'no_quick_create': True, 'no_create_edit': True}"/>
+                        </group>
+                        <group string="Preference">
+                            <field name="active" widget="boolean_toggle"
+                                string="Auto-Enroll Active"/>
+                            <field name="mode" invisible="not active"/>
+                            <field name="date_from"
+                                invisible="not active or mode != 'multiday'"
+                                string="From"/>
+                            <field name="date_to"
+                                invisible="not active or mode != 'multiday'"
+                                string="To"/>
+                        </group>
+                    </group>
+                    <group string="Preferred Days" invisible="not active">
+                        <group>
+                            <field name="pref_mon"/>
+                            <field name="pref_tue"/>
+                            <field name="pref_wed"/>
+                            <field name="pref_thu"/>
+                        </group>
+                        <group>
+                            <field name="pref_fri"/>
+                            <field name="pref_sat"/>
+                            <field name="pref_sun"/>
+                        </group>
+                        <p class="text-muted oe_form_info"
+                            style="grid-column: span 2; margin-top: 4px;">
+                            Leave all days un-ticked to enroll on every day the template runs.
+                        </p>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_dojo_auto_enroll" model="ir.actions.act_window">
+        <field name="name">Auto-Enroll Preferences</field>
+        <field name="res_model">dojo.course.auto.enroll</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_dojo_auto_enroll"
+        name="Auto-Enroll"
+        parent="menu_dojo_classes_root"
+        action="action_dojo_auto_enroll"
+        sequence="40"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <!-- ================================================================
+         Class Template form extension — "Auto-Enroll Preferences" tab
+    ================================================================ -->
+
+    <record id="view_dojo_class_template_auto_enroll_inherit" model="ir.ui.view">
+        <field name="name">dojo.class.template.form.auto.enroll</field>
+        <field name="model">dojo.class.template</field>
+        <field name="inherit_id" ref="dojo_classes.view_dojo_class_template_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook/page[.//field[@name='course_member_ids']]" position="after">
+                <page string="Auto-Enroll Preferences">
+                    <field name="auto_enroll_pref_ids" context="{'default_template_id': id}">
+                        <list editable="bottom">
+                            <field name="member_id"
+                                options="{'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="active" widget="boolean_toggle" string="Active"/>
+                            <field name="mode"/>
+                            <field name="date_from"
+                                string="From"
+                                column_invisible="True"/>
+                            <field name="date_to"
+                                string="To"
+                                column_invisible="True"/>
+                            <field name="pref_mon"/>
+                            <field name="pref_tue"/>
+                            <field name="pref_wed"/>
+                            <field name="pref_thu"/>
+                            <field name="pref_fri"/>
+                            <field name="pref_sat"/>
+                            <field name="pref_sun"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Member form extension — "Auto-Enroll" tab (inherits dojo_members form)
+    ================================================================ -->
+
+    <record id="view_dojo_member_auto_enroll_inherit" model="ir.ui.view">
+        <field name="name">dojo.member.form.auto.enroll</field>
+        <field name="model">dojo.member</field>
+        <field name="inherit_id" ref="dojo_base.view_dojo_member_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Auto-Enroll">
+                    <field name="auto_enroll_pref_ids"
+                        context="{'default_member_id': id}">
+                        <list editable="bottom">
+                            <field name="template_id"
+                                options="{'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="active" widget="boolean_toggle" string="Active"/>
+                            <field name="mode"/>
+                            <field name="date_from" string="From"/>
+                            <field name="date_to" string="To"/>
+                            <field name="pref_mon"/>
+                            <field name="pref_tue"/>
+                            <field name="pref_wed"/>
+                            <field name="pref_thu"/>
+                            <field name="pref_fri"/>
+                            <field name="pref_sat"/>
+                            <field name="pref_sun"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

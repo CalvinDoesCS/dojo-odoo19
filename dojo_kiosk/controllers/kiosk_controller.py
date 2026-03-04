@@ -170,6 +170,18 @@ class KioskController(http.Controller):
         svc = request.env["dojo.kiosk.service"].sudo()
         return svc.get_member_profile(member_id, session_id=session_id)
 
+    @http.route("/kiosk/member/enrolled_sessions", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
+    def kiosk_enrolled_sessions(self, member_id=None, date=None, token=None, **kw):
+        if not member_id:
+            return []
+        if token:
+            try:
+                self._require_token(token)
+            except AccessError:
+                return []
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.get_enrolled_sessions_today(member_id, date=date)
+
     # ------------------------------------------------------------------
     # Check-in / Check-out
     # ------------------------------------------------------------------
@@ -246,6 +258,42 @@ class KioskController(http.Controller):
                 return {"success": False, "error": "Invalid kiosk token."}
         svc = request.env["dojo.kiosk.service"].sudo()
         return svc.roster_add(session_id, member_id)
+
+    @http.route(
+        "/kiosk/instructor/roster/bulk_add",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_roster_bulk_add(
+        self, session_id=None, member_ids=None,
+        override_capacity=False, override_settings=False,
+        enroll_type="single", date_from=None, date_to=None,
+        pref_mon=False, pref_tue=False, pref_wed=False, pref_thu=False,
+        pref_fri=False, pref_sat=False, pref_sun=False,
+        token=None, **kw
+    ):
+        if not session_id or not member_ids:
+            return {"success": False, "error": "session_id and member_ids are required."}
+        if token:
+            try:
+                self._require_token(token)
+            except AccessError:
+                return {"success": False, "error": "Invalid kiosk token."}
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.bulk_roster_add(
+            session_id, member_ids,
+            override_capacity=override_capacity,
+            override_settings=override_settings,
+            enroll_type=enroll_type,
+            date_from=date_from,
+            date_to=date_to,
+            pref_mon=bool(pref_mon),
+            pref_tue=bool(pref_tue),
+            pref_wed=bool(pref_wed),
+            pref_thu=bool(pref_thu),
+            pref_fri=bool(pref_fri),
+            pref_sat=bool(pref_sat),
+            pref_sun=bool(pref_sun),
+        )
 
     @http.route(
         "/kiosk/instructor/roster/remove",

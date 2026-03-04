@@ -97,19 +97,19 @@
                             </t>
 
                             <!-- Stat chips -->
-                            <div class="dojo-hero-stats d-flex flex-wrap gap-2 mt-3">
-                                <span class="badge rounded-pill border dojo-hero-chip text-center">
+                            <div class="dojo-hero-stats d-flex flex-wrap gap-3 mt-3">
+                                <span class="badge rounded-pill border dojo-hero-chip text-center text-dark">
                                     <span class="d-block fs-6 fw-bold text-primary" t-out="attendance_count"/>
-                                    <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;">Sessions</span>
+                                    <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;color:#000!important;">Sessions</span>
                                 </span>
-                                <span class="badge rounded-pill border dojo-hero-chip text-center">
+                                <span class="badge rounded-pill border dojo-hero-chip text-center text-dark">
                                     <span class="d-block fs-6 fw-bold text-success" t-out="upcoming_count"/>
-                                    <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;">Upcoming</span>
+                                    <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;color:#000!important;">Upcoming</span>
                                 </span>
                                 <t t-if="is_parent">
-                                    <a href="/my/dojo/invoices" class="badge rounded-pill border dojo-hero-chip text-center text-decoration-none">
+                                    <a href="/my/dojo/invoices" class="badge rounded-pill border dojo-hero-chip text-center text-dark text-decoration-none">
                                         <span class="d-block fs-6 fw-bold text-warning"><i class="fa fa-file-text-o"/></span>
-                                        <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;">Billing</span>
+                                        <span class="d-block" style="font-size:0.7rem;font-weight:normal;opacity:.75;color:#000!important;">Billing</span>
                                     </a>
                                 </t>
                             </div>

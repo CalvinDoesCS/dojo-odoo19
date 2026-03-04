@@ -171,6 +171,7 @@
         id="menu_dojo_belt_root"
         name="Belt Progression"
         sequence="40"
+        web_icon="dojo_belt_progression,static/description/icon.png"
     />
     <menuitem
         id="menu_dojo_belt_tests"

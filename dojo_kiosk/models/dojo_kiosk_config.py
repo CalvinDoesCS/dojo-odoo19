@@ -44,6 +44,17 @@ class DojoKioskConfig(models.Model):
         string="Theme",
         default="dark",
     )
+    view_mode = fields.Selection(
+        [("search_only", "Search Only"), ("both", "Barcode + Search")],
+        string="Student Check-in View",
+        default="search_only",
+        help="Determines the check-in interface shown to students.",
+    )
+    show_title = fields.Boolean(
+        string="Show Dojo Title",
+        default=True,
+        help="Show the 'Dojo' title in the kiosk header.",
+    )
     announcement_ids = fields.One2many(
         "dojo.kiosk.announcement",
         "config_id",

@@ -40,7 +40,14 @@ class DojoClassEnrollment(models.Model):
 
     @api.constrains('session_id', 'member_id', 'status')
     def _check_course_membership(self):
-        """Enforce that the member is on the course roster before allowing registration."""
+        """Enforce that the member is on the course roster before allowing registration.
+
+        Set context key ``skip_course_membership_check=True`` to bypass this
+        constraint (e.g. when the instructor explicitly overrides roster settings
+        from the kiosk).
+        """
+        if self.env.context.get('skip_course_membership_check'):
+            return
         for rec in self:
             if rec.status != 'registered':
                 continue

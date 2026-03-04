@@ -42,6 +42,8 @@
                                 placeholder="6-digit PIN"
                                 help="Exactly 6 digits. Used to unlock Instructor Mode on the kiosk tablet."/>
                             <field name="theme_mode"/>
+                            <field name="view_mode"/>
+                            <field name="show_title"/>
                             <field name="active"/>
                         </group>
                         <group string="Company">
@@ -90,6 +92,7 @@
         name="Kiosk"
         sequence="10"
         groups="dojo_base.group_dojo_admin"
+        web_icon="dojo_kiosk,static/description/icon.png"
     />
 
     <!-- Kiosks list (launch URLs from here) -->

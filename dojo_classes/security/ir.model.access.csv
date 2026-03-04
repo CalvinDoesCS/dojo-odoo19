@@ -15,3 +15,6 @@ access_dojo_program_user,dojo.program user,model_dojo_program,base.group_user,1,
 access_dojo_program_admin,dojo.program admin,model_dojo_program,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_program_instructor,dojo.program instructor,model_dojo_program,dojo_base.group_dojo_instructor,1,0,0,0
 access_dojo_program_parent,dojo.program parent,model_dojo_program,dojo_base.group_dojo_parent_student,1,0,0,0
+access_dojo_auto_enroll_admin,dojo.course.auto.enroll admin,model_dojo_course_auto_enroll,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_auto_enroll_instructor,dojo.course.auto.enroll instructor,model_dojo_course_auto_enroll,dojo_base.group_dojo_instructor,1,1,0,0
+access_dojo_auto_enroll_parent,dojo.course.auto.enroll parent,model_dojo_course_auto_enroll,dojo_base.group_dojo_parent_student,1,1,1,1

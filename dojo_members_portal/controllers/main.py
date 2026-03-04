@@ -326,6 +326,198 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
+    # ── Auto-Enroll Preferences ────────────────────────────────────────────
+
+    @http.route('/my/dojo/json/auto-enroll', type='http', auth='user')
+    def portal_json_auto_enroll(self, member_id=None, **kwargs):
+        """Return auto-enroll status for ALL active recurring class templates.
+
+        Each entry represents one (member, template) pair.  If the member has an
+        explicit preference record it is returned; otherwise a virtual default entry
+        (active=True, permanent, no specific days) is synthesised so the UI always
+        shows every available recurring class.
+        """
+        member_ids = self._resolve_view_member_ids(member_id)
+        household_members = request.env['dojo.member'].sudo().browse(member_ids)
+        # Parents are guardians, not class participants — only query students.
+        household_members = household_members.filtered(
+            lambda m: m.role in ('student', 'both')
+        )
+        if not household_members:
+            return request.make_response(
+                json.dumps({'preferences': []}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        # All active recurring templates
+        all_templates = request.env['dojo.class.template'].sudo().search([
+            ('recurrence_active', '=', True),
+        ])
+
+        # Existing explicit preferences (include inactive/opted-out via active_test=False)
+        prefs = request.env['dojo.course.auto.enroll'].with_context(
+            active_test=False,
+        ).sudo().search([('member_id', 'in', member_ids)])
+        pref_by_key = {(p.member_id.id, p.template_id.id): p for p in prefs}
+
+        # Which templates is each member already on the roster for?
+        enrolled_by_member = {m.id: set(m.enrolled_template_ids.ids) for m in household_members}
+
+        def _row(m, tmpl, pref=None):
+            enrolled = tmpl.id in enrolled_by_member.get(m.id, set())
+            if pref:
+                return {
+                    'id': pref.id,
+                    'member_id': m.id,
+                    'member_name': m.name or '',
+                    'template_id': tmpl.id,
+                    'template_name': tmpl.name or '',
+                    'program_name': tmpl.program_id.name if tmpl.program_id else '',
+                    'enrolled': enrolled,
+                    'active': pref.active,
+                    'mode': pref.mode,
+                    'date_from': fields.Date.to_string(pref.date_from) if pref.date_from else None,
+                    'date_to': fields.Date.to_string(pref.date_to) if pref.date_to else None,
+                    'tmpl_rec_mon': tmpl.rec_mon, 'tmpl_rec_tue': tmpl.rec_tue,
+                    'tmpl_rec_wed': tmpl.rec_wed, 'tmpl_rec_thu': tmpl.rec_thu,
+                    'tmpl_rec_fri': tmpl.rec_fri, 'tmpl_rec_sat': tmpl.rec_sat,
+                    'tmpl_rec_sun': tmpl.rec_sun,
+                    'pref_mon': pref.pref_mon, 'pref_tue': pref.pref_tue,
+                    'pref_wed': pref.pref_wed, 'pref_thu': pref.pref_thu,
+                    'pref_fri': pref.pref_fri, 'pref_sat': pref.pref_sat,
+                    'pref_sun': pref.pref_sun,
+                    'has_pref': True,
+                }
+            else:
+                return {
+                    'id': None,
+                    'member_id': m.id,
+                    'member_name': m.name or '',
+                    'template_id': tmpl.id,
+                    'template_name': tmpl.name or '',
+                    'program_name': tmpl.program_id.name if tmpl.program_id else '',
+                    'enrolled': enrolled,
+                    'active': enrolled,   # default: on if already rostered, off if not
+                    'mode': 'permanent',
+                    'date_from': None,
+                    'date_to': None,
+                    'tmpl_rec_mon': tmpl.rec_mon, 'tmpl_rec_tue': tmpl.rec_tue,
+                    'tmpl_rec_wed': tmpl.rec_wed, 'tmpl_rec_thu': tmpl.rec_thu,
+                    'tmpl_rec_fri': tmpl.rec_fri, 'tmpl_rec_sat': tmpl.rec_sat,
+                    'tmpl_rec_sun': tmpl.rec_sun,
+                    'pref_mon': False, 'pref_tue': False,
+                    'pref_wed': False, 'pref_thu': False,
+                    'pref_fri': False, 'pref_sat': False,
+                    'pref_sun': False,
+                    'has_pref': False,
+                }
+
+        data = []
+        for m in household_members:
+            for tmpl in all_templates:
+                pref = pref_by_key.get((m.id, tmpl.id))
+                data.append(_row(m, tmpl, pref))
+
+        return request.make_response(
+            json.dumps({'preferences': data}),
+            headers=[('Content-Type', 'application/json')],
+        )
+
+    @http.route('/my/dojo/auto-enroll', type='http', auth='user', methods=['POST'], csrf=False)
+    def portal_post_auto_enroll(self, **post):
+        """Create or update a single auto-enroll preference.
+
+        Expected JSON body keys:
+            member_id       int   (required)
+            template_id     int   (required)
+            active          bool
+            mode            str   'permanent' | 'multiday'
+            date_from       str   ISO date, required for 'multiday'
+            date_to         str   ISO date, required for 'multiday'
+            pref_mon … pref_sun  bool
+        """
+        try:
+            body = json.loads(request.httprequest.data or '{}')
+        except Exception:
+            body = {}
+
+        # Validate caller has household rights over the target member
+        member = self._get_current_member()
+        if not member:
+            return request.make_response(
+                json.dumps({'success': False, 'error': 'not_authenticated'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+        try:
+            target_member_id = int(body.get('member_id') or 0)
+            template_id = int(body.get('template_id') or 0)
+        except (TypeError, ValueError):
+            return request.make_response(
+                json.dumps({'success': False, 'error': 'invalid_ids'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+        household_ids = self._get_household_member_ids()
+        if target_member_id not in household_ids:
+            return request.make_response(
+                json.dumps({'success': False, 'error': 'access_denied'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        Pref = request.env['dojo.course.auto.enroll'].with_context(active_test=False).sudo()
+        existing = Pref.search([
+            ('member_id', '=', target_member_id),
+            ('template_id', '=', template_id),
+        ], limit=1)
+
+        vals = {
+            'active': bool(body.get('active', True)),
+            'mode': body.get('mode', 'permanent'),
+            'pref_mon': bool(body.get('pref_mon', False)),
+            'pref_tue': bool(body.get('pref_tue', False)),
+            'pref_wed': bool(body.get('pref_wed', False)),
+            'pref_thu': bool(body.get('pref_thu', False)),
+            'pref_fri': bool(body.get('pref_fri', False)),
+            'pref_sat': bool(body.get('pref_sat', False)),
+            'pref_sun': bool(body.get('pref_sun', False)),
+        }
+        if vals['mode'] == 'multiday':
+            if body.get('date_from'):
+                try:
+                    vals['date_from'] = fields.Date.from_string(body['date_from'])
+                except Exception:
+                    pass
+            if body.get('date_to'):
+                try:
+                    vals['date_to'] = fields.Date.from_string(body['date_to'])
+                except Exception:
+                    pass
+
+        try:
+            if existing:
+                existing.write(vals)
+                pref_id = existing.id
+            else:
+                vals['member_id'] = target_member_id
+                vals['template_id'] = template_id
+                pref = Pref.create(vals)
+                pref_id = pref.id
+
+            # Sync roster membership: opt-in → add to course_member_ids if not already there
+            tmpl = request.env['dojo.class.template'].sudo().browse(template_id)
+            enrolled_ids = tmpl.course_member_ids.ids
+            if vals['active'] and target_member_id not in enrolled_ids:
+                tmpl.write({'course_member_ids': [(4, target_member_id)]})
+        except Exception as e:
+            return request.make_response(
+                json.dumps({'success': False, 'error': str(e)}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        return request.make_response(
+            json.dumps({'success': True, 'pref_id': pref_id}),
+            headers=[('Content-Type', 'application/json')],
+        )
+
     @http.route('/my/dojo/json/attendance', type='http', auth='user')
     def portal_json_attendance(self, member_id=None, **kwargs):
         member_ids = self._resolve_view_member_ids(member_id)

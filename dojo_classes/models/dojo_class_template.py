@@ -120,18 +120,32 @@ class DojoClassTemplate(models.Model):
         current = start
         Session = self.env["dojo.class.session"]
         Enrollment = self.env["dojo.class.enrollment"]
+
+        # Bulk-fetch all auto-enroll preferences for this template keyed by member_id.
+        # We fetch with active_test=False so opted-out (active=False) records are included.
+        pref_by_member = {
+            pref.member_id.id: pref
+            for pref in self.env["dojo.course.auto.enroll"].with_context(
+                active_test=False
+            ).search([("template_id", "=", self.id)])
+        }
+
         while current <= end:
             if current.weekday() in active_weekdays and current not in existing_dates:
                 start_dt = datetime(current.year, current.month, current.day, hour, minute)
                 end_dt = start_dt + duration
+                # Resolve instructor: prefer the dedicated recurrence_instructor_id,
+                # then fall back to the first entry in instructor_profile_ids.
+                # Use active_test=False so an archived instructor is still readable.
+                instructor_id = (
+                    self.with_context(active_test=False).recurrence_instructor_id.id
+                    or (self.instructor_profile_ids[0].id if self.instructor_profile_ids else False)
+                )
                 session = Session.create(
                     {
                         "template_id": self.id,
                         "company_id": self.company_id.id,
-                        "instructor_profile_id": (
-                            self.recurrence_instructor_id.id
-                            or (self.instructor_profile_ids.id if len(self.instructor_profile_ids) == 1 else False)
-                        ),
+                        "instructor_profile_id": instructor_id,
                         "start_datetime": start_dt,
                         "end_datetime": end_dt,
                         "capacity": self.max_capacity,
@@ -140,15 +154,25 @@ class DojoClassTemplate(models.Model):
                         "recurrence_template_id": self.id,
                     }
                 )
-                # Enroll course members automatically
+                # Auto-enroll course members, respecting each member's preference.
+                # No preference record  → enroll on all days (backward-compatible default).
+                # active=False          → skip (explicit opt-out).
+                # active=True           → defer to should_enroll_on_date().
                 for member in self.course_member_ids:
-                    Enrollment.create(
-                        {
-                            "session_id": session.id,
-                            "member_id": member.id,
-                            "status": "registered",
-                        }
-                    )
+                    pref = pref_by_member.get(member.id)
+                    if pref is None:
+                        # No preference: enroll (default)
+                        enroll = True
+                    else:
+                        enroll = pref.should_enroll_on_date(current)
+                    if enroll:
+                        Enrollment.create(
+                            {
+                                "session_id": session.id,
+                                "member_id": member.id,
+                                "status": "registered",
+                            }
+                        )
             current += timedelta(days=1)
 
     def action_generate_sessions(self):
@@ -167,7 +191,10 @@ class DojoClassTemplate(models.Model):
 
     def write(self, vals):
         """When members are removed from course_member_ids, cancel their future registered
-        enrollments for sessions generated from this template."""
+        enrollments for sessions generated from this template.
+        When recurrence_instructor_id changes, update the instructor on all future
+        generated sessions so the change takes immediate effect.
+        """
         removed_per_template = {}
         if 'course_member_ids' in vals:
             for tmpl in self:
@@ -175,8 +202,25 @@ class DojoClassTemplate(models.Model):
 
         res = super().write(vals)
 
+        now = fields.Datetime.now()
+
+        # ── Propagate instructor change to existing future sessions ──────────
+        if 'recurrence_instructor_id' in vals:
+            for tmpl in self:
+                tmpl_nc = tmpl.with_context(active_test=False)
+                new_instructor_id = tmpl_nc.recurrence_instructor_id.id or (
+                    tmpl.instructor_profile_ids[0].id if tmpl.instructor_profile_ids else False
+                )
+                future_sessions = self.env['dojo.class.session'].search([
+                    ('template_id', '=', tmpl.id),
+                    ('generated_from_recurrence', '=', True),
+                    ('start_datetime', '>=', now),
+                    ('state', 'not in', ['done', 'cancelled']),
+                ])
+                if future_sessions:
+                    future_sessions.write({'instructor_profile_id': new_instructor_id})
+
         if removed_per_template:
-            now = fields.Datetime.now()
             for tmpl in self:
                 if tmpl.id not in removed_per_template:
                     continue

@@ -12,38 +12,44 @@
                 <div class="alert alert-info py-2 mb-3" role="status">
                     <!-- 6-step path: creating a new household -->
                     <span invisible="step != 'member_info' or not create_new_household">
-                        <b>Step 1/6:</b> Member Info  ›  Household  ›  Guardian Setup  ›  Enrollment  ›  Subscription  ›  Portal Access
+                        <b>Step 1:</b> Member Info  ›  Household  ›  Guardian Setup  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'household' or not create_new_household">
-                        ✓ Member Info  ›  <b>Step 2/6: Household</b>  ›  Guardian Setup  ›  Enrollment  ›  Subscription  ›  Portal Access
+                        ✓ Member Info  ›  <b>Step 2: Household</b>  ›  Guardian Setup  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'guardian_setup'">
-                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3/6: Guardian Setup</b>  ›  Enrollment  ›  Subscription  ›  Portal Access
+                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3: Guardian Setup</b>  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'enrollment' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  <b>Step 4/6: Enrollment</b>  ›  Subscription  ›  Portal Access
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  <b>Step 4: Enrollment</b>  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    </span>
+                    <span invisible="step != 'auto_enroll' or not create_new_household">
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  <b>Step 4b: Auto-Enroll</b>  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'subscription' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  <b>Step 5/6: Subscription</b>  ›  Portal Access
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  <b>Step 5: Subscription</b>  ›  Portal Access
                     </span>
                     <span invisible="step != 'portal_access' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Subscription  ›  <b>Step 6/6: Portal Access</b>
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 6: Portal Access</b>
                     </span>
                     <!-- 5-step path: joining an existing household -->
                     <span invisible="step != 'member_info' or create_new_household">
-                        <b>Step 1/5:</b> Member Info  ›  Household  ›  Enrollment  ›  Subscription  ›  Portal Access
+                        <b>Step 1:</b> Member Info  ›  Household  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'household' or create_new_household">
-                        ✓ Member Info  ›  <b>Step 2/5: Household</b>  ›  Enrollment  ›  Subscription  ›  Portal Access
+                        ✓ Member Info  ›  <b>Step 2: Household</b>  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'enrollment' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3/5: Enrollment</b>  ›  Subscription  ›  Portal Access
+                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3: Enrollment</b>  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    </span>
+                    <span invisible="step != 'auto_enroll' or create_new_household">
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  <b>Step 3b: Auto-Enroll</b>  ›  Subscription  ›  Portal Access
                     </span>
                     <span invisible="step != 'subscription' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  <b>Step 4/5: Subscription</b>  ›  Portal Access
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  <b>Step 4: Subscription</b>  ›  Portal Access
                     </span>
                     <span invisible="step != 'portal_access' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Subscription  ›  <b>Step 5/5: Portal Access</b>
+                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 5: Portal Access</b>
                     </span>
                 </div>
 
@@ -145,10 +151,50 @@
                                domain="[('state', '=', 'open')]"
                                placeholder="Select open sessions (optional)…"/>
                     </group>
+                    <group colspan="2" invisible="not program_id">
+                        <label for="template_ids"/>
+                        <field name="template_ids" widget="many2many_tags"
+                               domain="[('recurrence_active', '=', True)]"
+                               placeholder="Add to recurring class rosters (optional)…"
+                               help="Add this member to recurring class templates. The next step lets you choose which days to auto-enrol."/>
+                    </group>
                     <div class="alert alert-warning small py-1 px-2" invisible="program_id"
                          colspan="2" role="alert">
                         <i class="fa fa-exclamation-circle me-1"/>
                         A program is required to continue.
+                    </div>
+                </group>
+
+                <!-- ── Step 4b: Auto-Enroll Schedule ────────────────────── -->
+                <group string="Auto-Enroll Schedule" invisible="step != 'auto_enroll'">
+                    <div class="alert alert-info small py-1 px-2 mb-2" colspan="2" role="alert">
+                        <i class="fa fa-calendar-check-o me-1"/>
+                        The system can automatically enrol this member into recurring sessions.
+                        Choose which days of the week they are available.
+                        Leave all days un-ticked to always enrol on every day the class runs.
+                    </div>
+                    <group>
+                        <field name="auto_enroll_active" widget="boolean_toggle"
+                               string="Enable Auto-Enroll"/>
+                        <field name="auto_enroll_mode" invisible="not auto_enroll_active"/>
+                    </group>
+                    <group string="Preferred Days" invisible="not auto_enroll_active">
+                        <group>
+                            <field name="auto_enroll_mon"/>
+                            <field name="auto_enroll_tue"/>
+                            <field name="auto_enroll_wed"/>
+                            <field name="auto_enroll_thu"/>
+                        </group>
+                        <group>
+                            <field name="auto_enroll_fri"/>
+                            <field name="auto_enroll_sat"/>
+                            <field name="auto_enroll_sun"/>
+                        </group>
+                    </group>
+                    <div class="text-muted small ps-1" invisible="auto_enroll_active" colspan="2">
+                        Auto-enroll is disabled. The member will not be automatically enrolled
+                        in recurring sessions — they can still sign up for individual sessions
+                        through the portal.
                     </div>
                 </group>
 

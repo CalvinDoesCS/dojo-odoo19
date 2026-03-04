@@ -46,9 +46,178 @@ class DojoKioskService(models.AbstractModel):
             "config_id": config.id,
             "name": config.name,
             "theme_mode": config.theme_mode or "dark",
+            "view_mode": config.view_mode or "search_only",
+            "show_title": config.show_title,
             "announcements": announcements,
             "sessions": sessions,
         }
+
+    @api.model
+    def get_enrolled_sessions_today(self, member_id, date=None):
+        """Return today's open sessions where the member has a registered enrollment."""
+        if date:
+            try:
+                from datetime import datetime as _dt
+                target = _dt.strptime(date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                target = fields.Datetime.now()
+        else:
+            target = fields.Datetime.now()
+
+        today_start = target.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = target.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        enrollments = self.env["dojo.class.enrollment"].search([
+            ("member_id", "=", member_id),
+            ("status", "=", "registered"),
+            ("session_id.state", "=", "open"),
+            ("session_id.start_datetime", ">=", fields.Datetime.to_string(today_start)),
+            ("session_id.start_datetime", "<=", fields.Datetime.to_string(today_end)),
+        ])
+
+        # Deduplicate by session
+        seen = set()
+        result = []
+        for enr in enrollments.sorted(key=lambda e: e.session_id.start_datetime):
+            s = enr.session_id
+            if s.id in seen:
+                continue
+            seen.add(s.id)
+            result.append({
+                "id": s.id,
+                "name": s.name,
+                "template_name": s.template_id.name if s.template_id else "",
+                "program_name": s.template_id.program_id.name if (s.template_id and s.template_id.program_id) else "",
+                "program_color": s.template_id.program_id.color if (s.template_id and s.template_id.program_id) else "",
+                "start": fields.Datetime.to_string(s.start_datetime),
+                "end": fields.Datetime.to_string(s.end_datetime),
+                "instructor": s.instructor_profile_id.name if s.instructor_profile_id else "",
+                "attendance_state": enr.attendance_state,
+            })
+        return result
+
+    @api.model
+    def bulk_roster_add(
+        self, session_id, member_ids,
+        override_capacity=False, override_settings=False, enroll_type="single",
+        date_from=None, date_to=None,
+        pref_mon=False, pref_tue=False, pref_wed=False, pref_thu=False,
+        pref_fri=False, pref_sat=False, pref_sun=False,
+    ):
+        """Add multiple members to a session roster at once.
+
+        enroll_type:
+          'single'    — one-time session enrollment only.
+          'multiday'  — session enrollment + multiday auto-enroll pref
+                        (covers sessions within the specified date_from/date_to range).
+          'permanent' — session enrollment + permanent auto-enroll pref
+                        (enrolled into every future session for this template, never removed).
+
+        override_settings:
+          When True, the course-membership constraint is bypassed and (for multiday /
+          permanent) the member is added to the template's course_member_ids so
+          future cron enrollments also succeed.
+
+        override_capacity:
+          When True, ignore the per-session capacity limit.
+        """
+        from datetime import date as _date
+
+        session = self.env["dojo.class.session"].browse(session_id)
+        if not session.exists():
+            return {"success": False, "error": "Session not found."}
+
+        template = session.template_id
+
+        # Context used when creating enrollments
+        enroll_ctx = dict(self.env.context)
+        if override_settings:
+            enroll_ctx["skip_course_membership_check"] = True
+        EnrollModel = self.env["dojo.class.enrollment"].with_context(**enroll_ctx)
+        AutoEnroll = self.env["dojo.course.auto.enroll"]
+
+        added = []
+        skipped = []
+        for member_id in (member_ids or []):
+            member = self.env["dojo.member"].browse(member_id)
+            if not member.exists():
+                skipped.append(member_id)
+                continue
+
+            # ── 1. Add to course_member_ids if override_settings + recurring type ──
+            if override_settings and enroll_type in ("multiday", "permanent") and template:
+                if member not in template.course_member_ids:
+                    template.course_member_ids = [(4, member.id)]
+
+            # ── 2. Session enrollment ───────────────────────────────────────────
+            existing = EnrollModel.search([
+                ("session_id", "=", session_id),
+                ("member_id", "=", member_id),
+            ], limit=1)
+            if existing:
+                if existing.status != "registered":
+                    existing.status = "registered"
+                    added.append(member_id)
+                else:
+                    # Already registered — still apply auto-enroll pref below
+                    added.append(member_id)
+            else:
+                if not override_capacity and session.capacity > 0 and session.seats_taken >= session.capacity:
+                    skipped.append(member_id)
+                    continue
+
+                EnrollModel.create({
+                    "session_id": session_id,
+                    "member_id": member_id,
+                    "status": "registered",
+                    "attendance_state": "pending",
+                })
+                added.append(member_id)
+
+            # ── 3. Auto-enroll preference (multiday / permanent) ───────────────────
+            if enroll_type in ("multiday", "permanent") and template:
+                pref_mode = "multiday" if enroll_type == "multiday" else "permanent"
+                day_vals = {
+                    "pref_mon": pref_mon, "pref_tue": pref_tue, "pref_wed": pref_wed,
+                    "pref_thu": pref_thu, "pref_fri": pref_fri, "pref_sat": pref_sat,
+                    "pref_sun": pref_sun,
+                }
+                pref = AutoEnroll.with_context(active_test=False).search([
+                    ("member_id", "=", member_id),
+                    ("template_id", "=", template.id),
+                ], limit=1)
+                if pref:
+                    # Upgrade mode if changing from limited to permanent
+                    write_vals = {"active": True, **day_vals}
+                    if enroll_type == "permanent" and pref.mode != "permanent":
+                        write_vals["mode"] = "permanent"
+                        write_vals["date_from"] = False
+                        write_vals["date_to"] = False
+                    elif enroll_type == "multiday" and pref.mode != "multiday":
+                        write_vals["mode"] = "multiday"
+                        write_vals["date_from"] = date_from or fields.Date.today()
+                        write_vals["date_to"] = date_to or fields.Date.today()
+                    elif enroll_type == "multiday" and pref.mode == "multiday":
+                        # Update the date range even if already multiday
+                        if date_from:
+                            write_vals["date_from"] = date_from
+                        if date_to:
+                            write_vals["date_to"] = date_to
+                    pref.write(write_vals)
+                else:
+                    create_vals = {
+                        "member_id": member_id,
+                        "template_id": template.id,
+                        "active": True,
+                        "mode": pref_mode,
+                        **day_vals,
+                    }
+                    if pref_mode == "multiday":
+                        create_vals["date_from"] = date_from or fields.Date.today()
+                        create_vals["date_to"] = date_to or fields.Date.today()
+                    AutoEnroll.create(create_vals)
+
+        return {"success": True, "added": added, "skipped": skipped}
 
     @api.model
     def get_announcements(self, token):
@@ -141,6 +310,8 @@ class DojoKioskService(models.AbstractModel):
             "belt_rank": member.current_rank_id.name if member.current_rank_id else "",
             "belt_color": member.current_rank_id.color if member.current_rank_id else "",
             "attendance_state": attendance_state,
+            "membership_state": member.membership_state if hasattr(member, "membership_state") else "",
+            "issues": self._compute_issue_flags(member),
         }
 
     # -------------------------------------------------------------------------

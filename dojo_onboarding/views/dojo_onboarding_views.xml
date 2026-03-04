@@ -70,7 +70,8 @@
     <menuitem id="menu_dojo_onboarding_root"
               name="Onboarding"
               sequence="5"
-              groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
+              groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"
+              web_icon="dojo_onboarding,static/description/icon.png"/>/>
 
     <menuitem id="menu_dojo_onboarding_new"
               name="New Member"

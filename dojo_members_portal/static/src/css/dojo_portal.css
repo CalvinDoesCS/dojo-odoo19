@@ -117,8 +117,9 @@ body.dojo-overlay-open {
     box-shadow: 0 2px 10px rgba(0, 0, 0, .15);
 }
 .dojo-hero-chip {
-    min-width: 64px;
-    padding: 0.4rem 0.75rem;
+    min-width: 72px;
+    padding: 0.6rem 1.1rem;
+    color: #212529 !important;
 }
 .dojo-hero-chip.text-decoration-none:hover {
     background: var(--bs-light);

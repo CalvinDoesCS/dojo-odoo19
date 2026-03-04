@@ -748,8 +748,105 @@
         return html;
     }
 
+    /* ── Auto-Enroll Preferences section ────────────────────────────────── */
+    var DAYS = [
+        { key: 'mon', label: 'Mon' }, { key: 'tue', label: 'Tue' },
+        { key: 'wed', label: 'Wed' }, { key: 'thu', label: 'Thu' },
+        { key: 'fri', label: 'Fri' }, { key: 'sat', label: 'Sat' },
+        { key: 'sun', label: 'Sun' },
+    ];
+    function autoEnrollSectionHtml(prefs, selectedStudentId) {
+        // Filter to selected student if one is chosen
+        var filtered = prefs;
+        if (selectedStudentId) {
+            filtered = prefs.filter(function(p){ return p.member_id === selectedStudentId; });
+        }
+        var html = '<div class="mb-4">';
+        html += '<p class="text-muted small mb-3">Toggle a class on to be automatically added to its sessions. Choose which days you want and whether to enrol permanently or just this week.</p>';
+        if (!filtered.length) {
+            html += '<div class="alert alert-info"><i class="fa fa-info-circle me-2"></i>No recurring classes are available yet.</div>';
+            html += '</div>';
+            return html;
+        }
+        filtered.forEach(function(p) {
+            var key = p.member_id + '_' + p.template_id;
+            var isEnrolled = p.enrolled || p.active;
+            html += '<div class="card mb-3 dojo-auto-enroll-card" '
+                  + 'data-member-id="' + p.member_id + '" '
+                  + 'data-template-id="' + p.template_id + '">';
+            if (isEnrolled) {
+                html += '<div style="height:3px;background:#198754;border-radius:4px 4px 0 0"></div>';
+            } else {
+                html += '<div style="height:3px;background:#dee2e6;border-radius:4px 4px 0 0"></div>';
+            }
+            html += '<div class="card-body p-3">';
+            // Header row: name + on/off toggle
+            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+            html += '<div>';
+            html += '<span class="fw-semibold">' + esc(p.template_name) + '</span>';
+            if (p.program_name) html += ' <span class="badge bg-secondary ms-1">' + esc(p.program_name) + '</span>';
+            if (!p.active && p.has_pref) html += ' <span class="badge bg-danger ms-1">Opted out</span>';
+            if (p.member_name && !selectedStudentId) html += '<div class="text-muted small">' + esc(p.member_name) + '</div>';
+            html += '</div>';
+            html += '<div class="form-check form-switch mb-0">';
+            html += '<input class="form-check-input dojo-ae-active" type="checkbox" role="switch" '
+                  + 'id="ae-active-' + key + '" '
+                  + (p.active ? 'checked' : '') + ' data-key="' + key + '">';
+            html += '<label class="form-check-label" for="ae-active-' + key + '">' + (p.active ? 'On' : 'Off') + '</label>';
+            html += '</div></div>';
+            // Detailed controls (hidden when off)
+            html += '<div class="dojo-ae-details" id="ae-details-' + key + '" style="' + (p.active ? '' : 'display:none') + '">';
+            html += '<hr class="my-2">';
+            // Mode picker
+            html += '<div class="d-flex gap-2 mb-3 align-items-center">';
+            html += '<span class="text-muted small me-1">Mode:</span>';
+            html += '<button class="btn btn-sm dojo-ae-mode-btn ' + (p.mode !== 'multiday' ? 'btn-primary' : 'btn-outline-secondary') + '" '
+                  + 'data-key="' + key + '" data-mode="permanent"><i class="fa fa-infinity me-1"></i>Never Remove</button>';
+            html += '<button class="btn btn-sm dojo-ae-mode-btn ' + (p.mode === 'multiday' ? 'btn-primary' : 'btn-outline-secondary') + '" '
+                  + 'data-key="' + key + '" data-mode="multiday"><i class="fa fa-calendar-o me-1"></i>Multiday Range</button>';
+            html += '</div>';
+            // Date range inputs (visible only for multiday mode)
+            var isMultiday = p.mode === 'multiday';
+            html += '<div class="dojo-ae-date-range d-flex flex-wrap gap-2 align-items-center mb-3" id="ae-daterange-' + key + '" style="' + (isMultiday ? '' : 'display:none') + '">';
+            html += '<span class="text-muted small">From:</span>';
+            html += '<input type="date" class="form-control form-control-sm dojo-ae-date-from" id="ae-datefrom-' + key + '" style="max-width:150px" value="' + esc(p.date_from || '') + '">';
+            html += '<span class="text-muted small">To:</span>';
+            html += '<input type="date" class="form-control form-control-sm dojo-ae-date-to" id="ae-dateto-' + key + '" style="max-width:150px" value="' + esc(p.date_to || '') + '">';
+            html += '</div>';
+            // Day checkboxes
+            html += '<div class="mb-1"><span class="text-muted small">Days:</span></div>';
+            html += '<div class="d-flex flex-wrap gap-2 mb-3">';
+            DAYS.forEach(function(d) {
+                var tmplActive = p['tmpl_rec_' + d.key];
+                var prefChecked = p['pref_' + d.key];
+                var allEmpty = !DAYS.some(function(x){ return p['pref_' + x.key]; });
+                var isChecked = allEmpty ? tmplActive : prefChecked;
+                html += '<label class="btn btn-sm ' + (isChecked ? 'btn-primary' : 'btn-outline-secondary') + ' dojo-ae-day-btn'
+                      + (tmplActive ? '' : ' disabled') + '" '
+                      + 'title="' + (tmplActive ? d.label : 'Class doesn\'t run on ' + d.label) + '">';
+                html += '<input type="checkbox" class="d-none dojo-ae-day-chk" '
+                      + 'data-key="' + key + '" data-day="' + d.key + '" '
+                      + (isChecked ? 'checked' : '') + ' '
+                      + (tmplActive ? '' : 'disabled') + '>';
+                html += d.label + '</label>';
+            });
+            html += '</div>';
+            html += '<p class="text-muted small mb-2">Leave all days un-ticked to enrol on every day the class runs.</p>';
+            html += '</div>'; // .dojo-ae-details
+            // Save button always visible
+            html += '<div class="mt-2">';
+            html += '<button class="btn btn-sm btn-success dojo-ae-save-btn" data-key="' + key + '">';
+            html += '<i class="fa fa-check me-1"></i>Save</button>';
+            html += '<span class="dojo-ae-saved-msg ms-2 text-success small" id="ae-saved-' + key + '" style="display:none"><i class="fa fa-check-circle me-1"></i>Saved!</span>';
+            html += '</div>';
+            html += '</div></div>'; // .card-body .card
+        });
+        html += '</div>';
+        return html;
+    }
+
     /* ── Classes tab (merged schedule + enrollments) ────────────────────── */
-    function classesTabHtml(enrollments, sessions, isParent, members) {
+    function classesTabHtml(enrollments, sessions, isParent, members, autoEnrollPrefs, selectedStudentId) {
         var now = new Date();
         function dt(iso) { return iso ? new Date(iso.indexOf('T') !== -1 ? iso + 'Z' : iso) : null; }
         var active = (enrollments || []).filter(function(e){ return e.status !== 'cancelled'; });
@@ -826,18 +923,21 @@
         students     = students     || [];
         isStudentOnly = !!isStudentOnly;
         var TABS = [
-            { key:"programs",   icon:"fa-graduation-cap", label:"Programs"     },
-            { key:"classes",    icon:"fa-calendar",       label:"Classes"      },
-            { key:"attendance", icon:"fa-check-circle",   label:"Attendance"   },
-            { key:"household",  icon:"fa-home",           label:"My Household" },
+            { key:"programs",    icon:"fa-graduation-cap", label:"Programs"     },
+            { key:"classes",     icon:"fa-calendar",       label:"Classes"      },
+            { key:"auto_enroll", svg:'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.15em" class="me-1"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>', label:"Auto-Enroll"  },
+            { key:"attendance",  icon:"fa-check-circle",   label:"Attendance"   },
+            { key:"household",   icon:"fa-home",           label:"My Household" },
         ];
         if (isParent) TABS.push({ key:"billing", icon:"fa-credit-card", label:"Billing" });
         var navHtml = TABS.map(function(t){
             var active = state.activeTab === t.key ? " active" : "";
-            var cnt = t.key==="programs"?state.programs.length : t.key==="classes"?(state.enrollments||[]).filter(function(e){return e.status!=='cancelled';}).length : t.key==="attendance"?state.logs.length : t.key==="billing"?(state.billing?(state.billing.invoices||[]).length:0) : 0;
+            var aeEnrolled = t.key==="auto_enroll" ? (state.autoEnrollPrefs||[]).filter(function(p){ return p.active; }).length : 0;
+            var cnt = t.key==="programs"?state.programs.length : t.key==="classes"?(state.enrollments||[]).filter(function(e){return e.status!=='cancelled';}).length : t.key==="attendance"?state.logs.length : t.key==="billing"?(state.billing?(state.billing.invoices||[]).length:0) : aeEnrolled;
             var badge = cnt ? '<span class="badge bg-secondary ms-1">' + cnt + '</span>' : "";
+            var iconHtml = t.svg ? t.svg : '<i class="fa ' + t.icon + ' me-1"></i>';
             return '<li class="nav-item"><button type="button" role="tab" class="nav-link' + active +
-                   ' dojo-tab-btn" data-tab="' + t.key + '"><i class="fa ' + t.icon + ' me-1"></i>' + t.label + badge + '</button></li>';
+                   ' dojo-tab-btn" data-tab="' + t.key + '">' + iconHtml + t.label + badge + '</button></li>';
         }).join("");
 
         var body;
@@ -851,7 +951,14 @@
                 body = programsTabHtml(state.programs, state.beltHistory, _memberId, isParent);
             }
         } else if (state.activeTab === "classes") {
-            body = classesTabHtml(state.enrollments, state.sessions, isParent, members);
+            body = classesTabHtml(state.enrollments, state.sessions, isParent, members, state.autoEnrollPrefs, state.selectedStudentId);
+        } else if (state.activeTab === "auto_enroll") {
+            if (isParent && !state.selectedStudentId && students.length > 0) {
+                body = '<div class="alert alert-info mt-2"><i class="fa fa-info-circle me-2"></i>'
+                     + 'Select a student using the switcher above to manage their auto-enroll preferences.</div>';
+            } else {
+                body = autoEnrollSectionHtml(state.autoEnrollPrefs, state.selectedStudentId || null);
+            }
         } else if (state.activeTab === "attendance") {
             body = state.logs.length
                 ? '<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">' + state.logs.map(attendanceCard).join("") + '</div>'
@@ -885,6 +992,7 @@
                 fetchJson('/my/dojo/json/programs'     + qs),
                 studentId ? fetchJson('/my/dojo/json/belt?member_id='         + studentId) : Promise.resolve(null),
                 studentId ? fetchJson('/my/dojo/json/belt-history?member_id=' + studentId) : Promise.resolve(null),
+                fetchJson('/my/dojo/json/auto-enroll' + qs),
             ]).then(function(r) {
                 state.sessions            = r[0].sessions    || [];
                 state.enrollments         = r[1].enrollments || [];
@@ -892,6 +1000,7 @@
                 state.programs            = r[3].programs    || [];
                 state.selectedStudentBelt = r[4];
                 state.beltHistory         = r[5] ? (r[5].history || []) : [];
+                state.autoEnrollPrefs     = r[6] ? (r[6].preferences || []) : [];
                 state.loading = false;
                 render(root, state, isParent, members, students, isStudentOnly);
             });
@@ -922,6 +1031,111 @@
                             render(root, state, isParent, members, students, isStudentOnly);
                         } else { btn.disabled = false; btn.textContent = 'Cancel'; alert(res.error || 'Could not cancel.'); }
                     }).catch(function(){ btn.disabled = false; btn.textContent = 'Cancel'; });
+            });
+        });
+
+        /* ── Auto-Enroll: helper to read current card state ── */
+        function readCardState(key) {
+            var card = root.querySelector('.dojo-auto-enroll-card[data-member-id]');
+            // Find card by key (member_id_template_id)
+            var cards = root.querySelectorAll('.dojo-auto-enroll-card');
+            var found = null;
+            cards.forEach(function(c){ if (c.dataset.memberId + '_' + c.dataset.templateId === key) found = c; });
+            if (!found) return null;
+            var days = {};
+            DAYS.forEach(function(d) {
+                var chk = found.querySelector('.dojo-ae-day-chk[data-day="' + d.key + '"]');
+                days['pref_' + d.key] = chk ? chk.checked : false;
+            });
+            var modeActive = found.querySelector('.dojo-ae-mode-btn.btn-primary');
+            var cardKey = found.dataset.memberId + '_' + found.dataset.templateId;
+            var dateFromEl = document.getElementById('ae-datefrom-' + cardKey);
+            var dateToEl   = document.getElementById('ae-dateto-'   + cardKey);
+            return {
+                member_id:   parseInt(found.dataset.memberId, 10),
+                template_id: parseInt(found.dataset.templateId, 10),
+                active:      found.querySelector('.dojo-ae-active').checked,
+                mode:        modeActive ? modeActive.dataset.mode : 'permanent',
+                date_from:   dateFromEl ? dateFromEl.value : '',
+                date_to:     dateToEl   ? dateToEl.value   : '',
+                pref_mon: days.pref_mon, pref_tue: days.pref_tue,
+                pref_wed: days.pref_wed, pref_thu: days.pref_thu,
+                pref_fri: days.pref_fri, pref_sat: days.pref_sat,
+                pref_sun: days.pref_sun,
+            };
+        }
+
+        /* ── Auto-Enroll: active toggle ── */
+        root.querySelectorAll('.dojo-ae-active').forEach(function(chk) {
+            chk.addEventListener('change', function() {
+                var key = chk.dataset.key;
+                var details = document.getElementById('ae-details-' + key);
+                if (details) details.style.display = chk.checked ? '' : 'none';
+                var lbl = chk.nextElementSibling;
+                if (lbl) lbl.textContent = chk.checked ? 'On' : 'Off';
+            });
+        });
+
+        /* ── Auto-Enroll: mode buttons ── */
+        root.querySelectorAll('.dojo-ae-mode-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var key = btn.dataset.key;
+                root.querySelectorAll('.dojo-ae-mode-btn[data-key="' + key + '"]').forEach(function(b) {
+                    b.classList.remove('btn-primary');
+                    b.classList.add('btn-outline-secondary');
+                });
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-primary');
+                // Show/hide date range row based on selected mode
+                var dateRange = document.getElementById('ae-daterange-' + key);
+                if (dateRange) {
+                    dateRange.style.display = btn.dataset.mode === 'multiday' ? '' : 'none';
+                }
+            });
+        });
+
+        /* ── Auto-Enroll: day checkboxes ── */
+        root.querySelectorAll('.dojo-ae-day-chk').forEach(function(chk) {
+            chk.addEventListener('change', function() {
+                var lbl = chk.closest('label');
+                if (lbl) {
+                    if (chk.checked) { lbl.classList.remove('btn-outline-secondary'); lbl.classList.add('btn-primary'); }
+                    else             { lbl.classList.remove('btn-primary'); lbl.classList.add('btn-outline-secondary'); }
+                }
+            });
+        });
+
+        /* ── Auto-Enroll: save button ── */
+        root.querySelectorAll('.dojo-ae-save-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var key = btn.dataset.key;
+                var payload = readCardState(key);
+                if (!payload) return;
+                btn.disabled = true;
+                fetch('/my/dojo/auto-enroll', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }).then(function(r){ return r.json(); })
+                  .then(function(res) {
+                    btn.disabled = false;
+                    if (res.success) {
+                        // Update state.autoEnrollPrefs to reflect saved values
+                        var existing = state.autoEnrollPrefs.find(function(p){
+                            return p.member_id === payload.member_id && p.template_id === payload.template_id;
+                        });
+                        if (existing) {
+                            Object.assign(existing, payload, { has_pref: true });
+                        } else {
+                            state.autoEnrollPrefs.push(Object.assign({}, payload, { has_pref: true }));
+                        }
+                        var msg = document.getElementById('ae-saved-' + key);
+                        if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
+                    } else {
+                        alert(res.error || 'Could not save preference.');
+                    }
+                  }).catch(function(){ btn.disabled = false; alert('Network error saving preference.'); });
             });
         });
 
@@ -1121,6 +1335,7 @@
             studentPrograms:    [],
             household:          null,
             billing:            null,
+            autoEnrollPrefs:    [],
             selectedStudentId:  null,
             selectedStudentBelt: null,
             loading:            true,
@@ -1138,6 +1353,7 @@
             fetchJson("/my/dojo/json/programs"),
             fetchJson("/my/dojo/json/belt-history"),
             isParent ? fetchJson("/my/dojo/json/billing") : Promise.resolve(null),
+            fetchJson("/my/dojo/json/auto-enroll"),
         ]).then(function(results){
             state.sessions        = results[0].sessions    || [];
             state.enrollments     = results[1].enrollments || [];
@@ -1147,6 +1363,7 @@
             state.studentPrograms = results[4].students    || [];
             state.beltHistory     = results[5].history     || [];
             state.billing         = results[6];
+            state.autoEnrollPrefs = results[7] ? (results[7].preferences || []) : [];
             state.loading         = false;
             render(root, state, isParent, members, students, isStudentOnly);
         });

@@ -35,6 +35,18 @@
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
     </record>
 
+    <!-- Auto-enroll preferences: portal users see only their own (or household) records -->
+    <record id="rule_dojo_auto_enroll_parent_own" model="ir.rule">
+        <field name="name">Auto-Enroll Preference Own Household</field>
+        <field name="model_id" ref="model_dojo_course_auto_enroll"/>
+        <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
+        <field name="domain_force">[('member_id.household_id.member_ids.partner_id', 'in', [user.partner_id.id])]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
     <record id="rule_dojo_class_enrollment_parent_self_or_household" model="ir.rule">
         <field name="name">Class Enrollment Parent Self or Household</field>
         <field name="model_id" ref="model_dojo_class_enrollment"/>

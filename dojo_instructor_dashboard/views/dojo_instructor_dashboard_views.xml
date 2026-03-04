@@ -301,7 +301,8 @@
               name="My Dashboard"
               sequence="3"
               action="action_instructor_dashboard_client"
-              groups="dojo_base.group_dojo_instructor"/>
+              groups="dojo_base.group_dojo_instructor"
+              web_icon="dojo_instructor_dashboard,static/description/icon.png"/>
 
     <!-- Admin OWL client action -->
     <record id="action_admin_dashboard_client" model="ir.actions.client">
@@ -314,6 +315,7 @@
               name="Admin Dashboard"
               sequence="2"
               action="action_admin_dashboard_client"
-              groups="dojo_base.group_dojo_admin"/>
+              groups="dojo_base.group_dojo_admin"
+              web_icon="dojo_instructor_dashboard,static/description/icon.png"/>
 
 </odoo>
