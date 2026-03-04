@@ -110,14 +110,14 @@ class KioskController(http.Controller):
     # ------------------------------------------------------------------
 
     @http.route("/kiosk/sessions", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
-    def kiosk_sessions(self, token=None, **kw):
+    def kiosk_sessions(self, token=None, date=None, **kw):
         if token:
             try:
                 self._require_token(token)
             except AccessError:
                 return []
         svc = request.env["dojo.kiosk.service"].sudo()
-        return svc.get_todays_sessions()
+        return svc.get_todays_sessions(date=date)
 
     @http.route("/kiosk/roster", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
     def kiosk_roster(self, session_id=None, token=None, **kw):
@@ -280,6 +280,36 @@ class KioskController(http.Controller):
                 return {"success": False, "error": "Invalid kiosk token."}
         svc = request.env["dojo.kiosk.service"].sudo()
         return svc.close_session(session_id)
+
+    @http.route(
+        "/kiosk/instructor/session/delete",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_session_delete(self, session_id=None, token=None, **kw):
+        if not session_id:
+            return {"success": False, "error": "session_id is required."}
+        if token:
+            try:
+                self._require_token(token)
+            except AccessError:
+                return {"success": False, "error": "Invalid kiosk token."}
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.delete_session(session_id)
+
+    @http.route(
+        "/kiosk/instructor/session/update",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_session_update(self, session_id=None, capacity=None, token=None, **kw):
+        if not session_id:
+            return {"success": False, "error": "session_id is required."}
+        if token:
+            try:
+                self._require_token(token)
+            except AccessError:
+                return {"success": False, "error": "Invalid kiosk token."}
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.update_session(session_id, capacity=capacity)
 
 
 # ------------------------------------------------------------------

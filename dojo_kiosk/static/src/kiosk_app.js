@@ -55,6 +55,13 @@ function formatDateTime(dtStr) {
     return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + timeStr;
 }
 
+function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0");
+}
+
 // ─── PinModal ─────────────────────────────────────────────────────────────────
 
 class PinModal extends Component {
@@ -263,12 +270,15 @@ class MemberProfileCard extends Component {
                 <div class="k-profile-tabs">
                     <button t-attf-class="k-profile-tab #{state.tab === 'profile' ? 'k-profile-tab--active' : ''}"
                         t-on-click="() => this.state.tab = 'profile'">Profile</button>
+                    <button t-attf-class="k-profile-tab #{state.tab === 'progress' ? 'k-profile-tab--active' : ''}"
+                        t-on-click="() => this.state.tab = 'progress'">Progress</button>
                     <button t-attf-class="k-profile-tab #{state.tab === 'household' ? 'k-profile-tab--active' : ''}"
                         t-on-click="() => this.state.tab = 'household'">Household</button>
                 </div>
 
                 <!-- ══ Profile tab ══ -->
                 <t t-if="state.tab === 'profile'">
+                    <div class="k-profile__scroll-body">
                     <!-- Warning banner — shown prominently for both student and instructor -->
                     <t t-if="props.member.issues &amp;&amp; props.member.issues.length">
                         <div class="k-warning-banner">
@@ -339,6 +349,7 @@ class MemberProfileCard extends Component {
                             </t>
                         </div>
                     </t>
+                    </div><!-- /k-profile__scroll-body -->
 
                     <div class="k-profile__actions">
                         <t t-if="props.instructorMode">
@@ -389,8 +400,45 @@ class MemberProfileCard extends Component {
                     </div>
                 </t>
 
+                <!-- ══ Progress tab ══ -->
+                <t t-if="state.tab === 'progress'">
+                    <div class="k-profile__scroll-body">
+                    <div class="k-progress">
+                        <div class="k-progress__stat">
+                            <span class="k-progress__stat-value" t-esc="props.member.attendance_since_last_rank || 0"/>
+                            <span class="k-progress__stat-label">Classes Since Last Belt Test</span>
+                        </div>
+                        <t t-if="props.member.programs &amp;&amp; props.member.programs.length">
+                            <div class="k-progress__programs-title">Programs</div>
+                            <t t-foreach="props.member.programs" t-as="prog" t-key="prog.program_name">
+                                <div class="k-progress__prog-row">
+                                    <div class="k-progress__prog-name" t-esc="prog.program_name"/>
+                                    <div class="k-progress__prog-right">
+                                        <t t-if="prog.rank_name">
+                                            <span class="k-progress__rank-badge"
+                                                t-attf-style="background:#{prog.rank_color || '#e5e7eb'};color:#{contrastColor(prog.rank_color)};"
+                                                t-esc="prog.rank_name"/>
+                                        </t>
+                                        <span class="k-progress__att-count">
+                                            <t t-esc="prog.attendance_count"/> classes
+                                        </span>
+                                    </div>
+                                </div>
+                            </t>
+                        </t>
+                        <t t-else="">
+                            <div class="k-empty" style="padding:24px 0;">
+                                <div class="k-empty__icon">🥋</div>
+                                <div class="k-empty__text">No rank history</div>
+                            </div>
+                        </t>
+                    </div>
+                    </div><!-- /k-profile__scroll-body -->
+                </t>
+
                 <!-- ══ Household tab ══ -->
                 <t t-if="state.tab === 'household'">
+                    <div class="k-profile__scroll-body">
                     <t t-if="props.member.household">
                         <div class="k-hh">
                             <div class="k-hh__name">🏠 <t t-esc="props.member.household.name"/></div>
@@ -435,6 +483,7 @@ class MemberProfileCard extends Component {
                             <div class="k-empty__text">No household on file</div>
                         </div>
                     </t>
+                    </div><!-- /k-profile__scroll-body -->
                 </t>
 
             </div>
@@ -455,6 +504,15 @@ class MemberProfileCard extends Component {
     onCheckout() { this.props.onCheckout(this.props.member, this.props.sessionId); }
     onRosterAdd() { this.props.onRosterAdd(this.props.member, this.props.sessionId); this.props.onClose(); }
     onRosterRemove() { this.props.onRosterRemove(this.props.member, this.props.sessionId); this.props.onClose(); }
+    contrastColor(hexColor) {
+        if (!hexColor || hexColor.length < 6) return "#1a1a1a";
+        const hex = hexColor.replace("#", "");
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return lum > 0.5 ? "#1a1a1a" : "#ffffff";
+    }
 }
 
 // ─── AttendanceRow (instructor list in scan mode) ─────────────────────────────
@@ -590,18 +648,274 @@ class SessionCard extends Component {
 
             <t t-if="props.instructorMode">
                 <div class="k-session-card__footer">
-                    <button class="k-btn k-btn--secondary k-btn--sm"
+                    <button class="k-btn k-session-action k-session-action--add"
+                        t-on-click="() => props.onAddMember(props.session)">
+                        + Add Member
+                    </button>
+                    <button class="k-btn k-session-action k-session-action--edit"
+                        t-on-click="() => props.onEdit(props.session)">
+                        ✎ Edit
+                    </button>
+                    <button class="k-btn k-session-action k-session-action--done"
                         t-on-click="() => props.onClose(props.session.id)">
-                        ✓ Mark Session Done
+                        ✓ Mark Done
+                    </button>
+                    <button class="k-btn k-session-action k-session-action--delete"
+                        t-on-click="() => props.onDelete(props.session.id)">
+                        🗑 Delete
                     </button>
                 </div>
             </t>
         </div>
     `;
 
-    static props = ["session", "roster", "loading", "instructorMode", "onSelect", "onClose"];
+    static props = ["session", "roster", "loading", "instructorMode", "onSelect", "onClose", "onDelete", "onEdit", "onAddMember"];
     static components = { SessionFaceTile };
     formatTime(dt) { return formatTime(dt); }
+}
+
+// ─── SessionEditModal ─────────────────────────────────────────────────────────
+
+class SessionEditModal extends Component {
+    static template = xml`
+        <div class="k-modal-backdrop" t-on-click.self="props.onClose">
+            <div class="k-modal k-modal--edit-session">
+                <div class="k-modal__header">
+                    <span class="k-modal__title">Edit Session</span>
+                    <button class="k-modal__close" t-on-click="props.onClose">✕</button>
+                </div>
+                <div class="k-modal__body">
+                    <div class="k-field">
+                        <label class="k-field__label">Session</label>
+                        <div class="k-field__value" t-esc="props.session.template_name"/>
+                    </div>
+                    <div class="k-field">
+                        <label class="k-field__label">Time</label>
+                        <div class="k-field__value">
+                            <t t-esc="formatTime(props.session.start)"/> – <t t-esc="formatTime(props.session.end)"/>
+                        </div>
+                    </div>
+                    <div class="k-field">
+                        <label class="k-field__label">Capacity</label>
+                        <input class="k-field__input"
+                            type="number"
+                            min="0"
+                            t-att-value="state.capacity"
+                            t-on-input="onCapacityInput"
+                            placeholder="Unlimited"/>
+                    </div>
+                    <t t-if="state.error">
+                        <div class="k-field-error" t-esc="state.error"/>
+                    </t>
+                </div>
+                <div class="k-modal__footer">
+                    <button class="k-btn k-btn--secondary" t-on-click="props.onClose">Cancel</button>
+                    <button class="k-btn k-btn--primary" t-on-click="save" t-att-disabled="state.saving">
+                        <t t-if="state.saving">Saving…</t>
+                        <t t-else="">Save</t>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    static props = ["session", "onClose", "onSaved"];
+
+    setup() {
+        this.state = useState({
+            capacity: this.props.session.capacity || "",
+            saving: false,
+            error: "",
+        });
+    }
+
+    formatTime(dt) { return formatTime(dt); }
+
+    onCapacityInput(ev) {
+        this.state.capacity = ev.target.value;
+        this.state.error = "";
+    }
+
+    async save() {
+        this.state.saving = true;
+        this.state.error = "";
+        try {
+            const cap = this.state.capacity === "" ? null : parseInt(this.state.capacity, 10);
+            const result = await jsonPost("/kiosk/instructor/session/update", {
+                session_id: this.props.session.id,
+                capacity: cap,
+            });
+            if (result.success) {
+                this.props.onSaved();
+            } else {
+                this.state.error = result.error || "Failed to save.";
+            }
+        } catch (e) {
+            this.state.error = "Network error.";
+        } finally {
+            this.state.saving = false;
+        }
+    }
+}
+
+// ─── AddMemberModal ───────────────────────────────────────────────────────────
+
+class AddMemberModal extends Component {
+    static template = xml`
+        <div class="k-modal-backdrop" t-on-click.self="props.onClose">
+            <div class="k-modal k-modal--add-member">
+                <div class="k-modal__header">
+                    <span class="k-modal__title">Add Member to Session</span>
+                    <button class="k-modal__close" t-on-click="props.onClose">✕</button>
+                </div>
+                <div class="k-modal__body">
+                    <div class="k-am-search">
+                        <input class="k-field__input"
+                            type="text"
+                            placeholder="Search member name…"
+                            autofocus="true"
+                            t-model="state.query"
+                            t-on-input="onInput"
+                            autocomplete="off"/>
+                    </div>
+                    <t t-if="state.loading">
+                        <div class="k-am-loading"><div class="k-spinner"/></div>
+                    </t>
+                    <t t-elif="state.results.length">
+                        <div class="k-am-results">
+                            <t t-foreach="state.results" t-as="m" t-key="m.member_id">
+                                <div class="k-am-result" t-on-click="() => this.addMember(m)">
+                                    <img class="k-am-result__avatar"
+                                        t-att-src="m.image_url"
+                                        t-att-alt="m.name"
+                                        t-on-error="(ev) => ev.target.style.display='none'"/>
+                                    <div class="k-am-result__info">
+                                        <span class="k-am-result__name" t-esc="m.name"/>
+                                        <t t-if="m.belt_rank">
+                                            <span class="k-am-result__belt" t-esc="m.belt_rank"/>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                    <t t-elif="state.query.length >= 2 and !state.loading">
+                        <div class="k-am-empty">No members found</div>
+                    </t>
+                    <t t-if="state.error">
+                        <div class="k-field-error" t-esc="state.error"/>
+                    </t>
+                </div>
+                <div class="k-modal__footer">
+                    <button class="k-btn k-btn--secondary" t-on-click="props.onClose">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    static props = ["session", "onClose", "onAdded"];
+
+    setup() {
+        this.state = useState({
+            query: "",
+            results: [],
+            loading: false,
+            error: "",
+        });
+        this._timer = null;
+    }
+
+    onInput() {
+        clearTimeout(this._timer);
+        const q = this.state.query.trim();
+        if (q.length < 2) { this.state.results = []; return; }
+        this.state.loading = true;
+        this._timer = setTimeout(async () => {
+            try {
+                const res = await jsonPost("/kiosk/search", { query: q });
+                this.state.results = res || [];
+            } catch {
+                this.state.results = [];
+            } finally {
+                this.state.loading = false;
+            }
+        }, 300);
+    }
+
+    async addMember(member) {
+        this.state.error = "";
+        try {
+            const result = await jsonPost("/kiosk/instructor/roster/add", {
+                session_id: this.props.session.id,
+                member_id: member.member_id,
+            });
+            if (result.success) {
+                this.props.onAdded(member);
+            } else {
+                this.state.error = result.error || "Could not add member.";
+            }
+        } catch (e) {
+            this.state.error = "Network error.";
+        }
+    }
+}
+
+// ─── KioskSettingsModal ───────────────────────────────────────────────────────
+
+class KioskSettingsModal extends Component {
+    static template = xml`
+        <div class="k-modal-backdrop" t-on-click.self="props.onClose">
+            <div class="k-modal k-modal--settings">
+                <div class="k-modal__header">
+                    <span class="k-modal__title">⚙ Kiosk Settings</span>
+                    <button class="k-modal__close" t-on-click="props.onClose">✕</button>
+                </div>
+                <div class="k-modal__body">
+
+                    <div class="k-field">
+                        <label class="k-field__label">Font Size</label>
+                        <div class="k-settings-row">
+                            <button t-attf-class="k-sz-btn #{props.fontSize === 'normal' ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onFontSize('normal')">Normal</button>
+                            <button t-attf-class="k-sz-btn #{props.fontSize === 'large' ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onFontSize('large')">Large</button>
+                            <button t-attf-class="k-sz-btn #{props.fontSize === 'xl' ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onFontSize('xl')">X-Large</button>
+                        </div>
+                    </div>
+
+                    <div class="k-field">
+                        <label class="k-field__label">Theme</label>
+                        <div class="k-settings-row">
+                            <button t-attf-class="k-sz-btn #{props.theme === 'light' ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onTheme('light')">Light</button>
+                            <button t-attf-class="k-sz-btn #{props.theme === 'dark' ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onTheme('dark')">Dark</button>
+                        </div>
+                    </div>
+
+                    <div class="k-field">
+                        <label class="k-field__label">Idle Timeout</label>
+                        <div class="k-settings-row">
+                            <button t-attf-class="k-sz-btn #{props.idleMinutes === 1 ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onIdleMinutes(1)">1 min</button>
+                            <button t-attf-class="k-sz-btn #{props.idleMinutes === 3 ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onIdleMinutes(3)">3 min</button>
+                            <button t-attf-class="k-sz-btn #{props.idleMinutes === 5 ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onIdleMinutes(5)">5 min</button>
+                            <button t-attf-class="k-sz-btn #{props.idleMinutes === 10 ? 'k-sz-btn--active' : ''}"
+                                t-on-click="() => props.onIdleMinutes(10)">10 min</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="k-modal__footer">
+                    <button class="k-btn k-btn--primary" t-on-click="props.onClose">Done</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    static props = ["onClose", "fontSize", "theme", "idleMinutes", "onFontSize", "onTheme", "onIdleMinutes"];
 }
 
 // ─── KioskApp (root) ─────────────────────────────────────────────────────────
@@ -632,157 +946,135 @@ class KioskApp extends Component {
             <div class="k-header">
                 <span class="k-header__logo">🥋 Dojo</span>
 
-                <!-- Mode tabs -->
                 <div class="k-mode-tabs">
-                    <button t-attf-class="k-mode-tab #{state.mode === 'scan' ? 'k-mode-tab--active' : ''}"
-                        t-on-click="() => this.setMode('scan')">
-                        Scan
+                    <button t-attf-class="k-mode-tab #{state.mode === 'barcode' ? 'k-mode-tab--active' : ''}"
+                        t-on-click="() => this.setMode('barcode')">
+                        Barcode
                     </button>
-                    <button t-attf-class="k-mode-tab #{state.mode === 'sessions' ? 'k-mode-tab--active' : ''}"
-                        t-on-click="() => this.setMode('sessions')">
-                        Sessions
+                    <button t-attf-class="k-mode-tab #{state.mode === 'session' ? 'k-mode-tab--active' : ''}"
+                        t-on-click="() => this.setMode('session')">
+                        Session
                     </button>
                 </div>
 
-                <!-- Session context picker (scan mode only) -->
-                <t t-if="state.mode === 'scan'">
-                    <select class="k-header__session-select" t-on-change="onSessionChange">
-                        <option value="">— Session —</option>
-                        <t t-foreach="state.sessions" t-as="s" t-key="s.id">
-                            <option t-att-value="s.id" t-att-selected="state.sessionId === s.id">
-                                <t t-esc="s.template_name"/> (<t t-esc="formatTime(s.start)"/>)
-                            </option>
-                        </t>
-                    </select>
-                </t>
+                <!-- Instructor mode — absolutely centred in the header row -->
+                <div class="k-instructor-group">
+                    <span class="k-instructor-label">Instructor Mode</span>
+                    <label class="k-toggle-switch">
+                        <input type="checkbox"
+                            t-att-checked="state.instructorMode"
+                            t-on-change="onInstructorToggle"/>
+                        <span class="k-toggle-track"><span class="k-toggle-knob"/></span>
+                    </label>
+                </div>
 
                 <div class="k-header__spacer"/>
-
-                <!-- Instructor mode -->
-                <t t-if="state.instructorMode">
-                    <div class="k-instructor-badge" t-on-click="exitInstructorMode">
-                        <span class="k-dot"/>
-                        Instructor Mode
-                    </div>
-                </t>
-                <t t-else="">
-                    <button class="k-unlock-btn" t-on-click="openPin">🔒 Instructor</button>
-                </t>
             </div>
 
             <!-- ── Body ── -->
             <div class="k-body">
 
-                <!-- ════════════ SCAN MODE ════════════ -->
-                <t t-if="state.mode === 'scan'">
+                <!-- ════════════ BARCODE VIEW ════════════ -->
+                <t t-if="state.mode === 'barcode'">
+                    <div class="k-barcode-view">
+                        <svg class="k-barcode-svg k-barcode-svg--large" viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <rect x="7"   y="6" width="5"  height="58"/>
+                            <rect x="16"  y="6" width="9"  height="58"/>
+                            <rect x="29"  y="6" width="4"  height="58"/>
+                            <rect x="37"  y="6" width="10" height="58"/>
+                            <rect x="51"  y="6" width="5"  height="58"/>
+                            <rect x="60"  y="6" width="4"  height="58"/>
+                            <rect x="68"  y="6" width="8"  height="58"/>
+                            <rect x="80"  y="6" width="5"  height="58"/>
+                            <rect x="89"  y="6" width="10" height="58"/>
+                            <rect x="103" y="6" width="4"  height="58"/>
+                            <rect x="111" y="6" width="6"  height="58"/>
+                            <rect x="121" y="6" width="12" height="58"/>
+                            <text x="70" y="80" text-anchor="middle" font-size="9" font-family="monospace" letter-spacing="2">SCAN BADGE</text>
+                        </svg>
+                        <p class="k-barcode-hint">Scan your card to check in</p>
+                    </div>
+                </t>
 
-                    <!-- Instructor + session selected: attendance list -->
-                    <t t-if="state.instructorMode &amp;&amp; state.sessionId">
-                        <t t-if="state.loading">
-                            <div class="k-empty"><div class="k-spinner"/></div>
-                        </t>
-                        <t t-else="">
-                            <t t-if="!state.roster.length">
-                                <div class="k-empty">
-                                    <div class="k-empty__icon">👥</div>
-                                    <div class="k-empty__text">No students enrolled</div>
-                                </div>
+                <!-- ════════════ SESSION VIEW ════════════ -->
+                <t t-else="">
+                    <!-- Controls row -->
+                    <div class="k-session-view-header">
+                        <!-- Member name search -->
+                        <div class="k-svh-search">
+                            <span class="k-svh-search__icon">🔍</span>
+                            <input class="k-svh-search__input"
+                                type="text"
+                                placeholder="Search member…"
+                                t-model="state.searchQuery"
+                                t-on-input="onSearchInput"
+                                t-on-keydown="onSearchKeydown"
+                                autocomplete="off"
+                                autocorrect="off"
+                                spellcheck="false"/>
+                            <t t-if="state.searchQuery">
+                                <button class="k-svh-search__clear" t-on-click="clearSearch">✕</button>
                             </t>
-                            <t t-foreach="state.roster" t-as="entry" t-key="entry.member_id">
-                                <AttendanceRow entry="entry" sessionId="state.sessionId"
-                                    onMark="(mid, st) => this.markAttendance(mid, st)"/>
-                            </t>
-                            <t t-if="state.roster.length">
-                                <div style="margin-top:16px;display:flex;justify-content:flex-end;">
-                                    <button class="k-btn k-btn--secondary k-btn--sm" t-on-click="closeSession">
-                                        Mark Session Done
-                                    </button>
-                                </div>
-                            </t>
-                        </t>
-                    </t>
-
-                    <!-- Student scan/search center -->
-                    <t t-else="">
-                        <div class="k-scan-center">
-
-                            <!-- Barcode icon (shown when not searching) -->
-                            <t t-if="!state.searchQuery">
-                                <div class="k-barcode-wrap">
-                                    <svg class="k-barcode-svg" viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <rect x="7"   y="6" width="5"  height="58"/>
-                                        <rect x="16"  y="6" width="9"  height="58"/>
-                                        <rect x="29"  y="6" width="4"  height="58"/>
-                                        <rect x="37"  y="6" width="10" height="58"/>
-                                        <rect x="51"  y="6" width="5"  height="58"/>
-                                        <rect x="60"  y="6" width="4"  height="58"/>
-                                        <rect x="68"  y="6" width="8"  height="58"/>
-                                        <rect x="80"  y="6" width="5"  height="58"/>
-                                        <rect x="89"  y="6" width="10" height="58"/>
-                                        <rect x="103" y="6" width="4"  height="58"/>
-                                        <rect x="111" y="6" width="6"  height="58"/>
-                                        <rect x="121" y="6" width="12" height="58"/>
-                                        <text x="70" y="80" text-anchor="middle" font-size="9" font-family="monospace" letter-spacing="2">SCAN BADGE</text>
-                                    </svg>
-                                    <p class="k-scan-hint">Scan member badge or search by name</p>
-                                </div>
-                            </t>
-
-                            <!-- Search input -->
-                            <div class="k-scan-search-wrap">
-                                <span class="k-scan-search-icon">🔍</span>
-                                <input class="k-scan-input"
-                                    type="text"
-                                    placeholder="Search by name…"
-                                    t-model="state.searchQuery"
-                                    t-on-input="onSearchInput"
-                                    t-on-keydown="onSearchKeydown"
-                                    autocomplete="off"
-                                    autocorrect="off"
-                                    spellcheck="false"/>
-                                <t t-if="state.searchQuery">
-                                    <button class="k-scan-clear" t-on-click="clearSearch">✕</button>
-                                </t>
-                            </div>
-
-                            <!-- Member search result cards -->
                             <t t-if="state.searchResults.length">
-                                <div class="k-member-cards">
+                                <div class="k-svh-dropdown">
                                     <t t-foreach="state.searchResults" t-as="m" t-key="m.member_id">
-                                        <MemberSearchCard member="m"
-                                            onSelect="(mem) => this.selectSearchResult(mem)"/>
+                                        <div class="k-svh-dropdown__item" t-on-click="() => this.selectSearchResult(m)">
+                                            <img class="k-svh-dropdown__avatar"
+                                                t-att-src="m.image_url"
+                                                t-att-alt="m.name"
+                                                t-on-error="(ev) => ev.target.style.display='none'"/>
+                                            <div class="k-svh-dropdown__info">
+                                                <span class="k-svh-dropdown__name" t-esc="m.name"/>
+                                                <t t-if="m.belt_rank">
+                                                    <span class="k-svh-dropdown__belt" t-esc="m.belt_rank"/>
+                                                </t>
+                                            </div>
+                                        </div>
                                     </t>
                                 </div>
                             </t>
-                            <t t-elif="state.searchQuery.length >= 2 &amp;&amp; !state.searchLoading">
-                                <p class="k-scan-no-results">
-                                    No students found for "<t t-esc="state.searchQuery"/>"
-                                </p>
-                            </t>
-
                         </div>
-                    </t>
 
-                </t>
+                        <!-- Session filter -->
+                        <select class="k-svh-select" t-on-change="onSessionViewFilter">
+                            <option value="">All Sessions</option>
+                            <t t-foreach="state.sessions" t-as="s" t-key="s.id">
+                                <option t-att-value="s.id" t-att-selected="state.sessionViewId === s.id">
+                                    <t t-esc="s.template_name"/> (<t t-esc="formatTime(s.start)"/>)
+                                </option>
+                            </t>
+                        </select>
 
-                <!-- ════════════ SESSIONS MODE ════════════ -->
-                <t t-else="">
-                    <t t-if="!state.sessions.length">
+                        <!-- Date picker -->
+                        <input class="k-svh-date"
+                            type="date"
+                            t-att-value="state.filterDate"
+                            t-on-change="onDateChange"/>
+
+                        <!-- Settings -->
+                        <button class="k-svh-settings k-btn k-btn--secondary k-btn--sm" t-on-click="openSettings">⚙</button>
+                    </div>
+
+                    <!-- Sessions list -->
+                    <t t-if="!filteredSessions().length">
                         <div class="k-empty">
                             <div class="k-empty__icon">📅</div>
-                            <div class="k-empty__text">No open sessions today</div>
+                            <div class="k-empty__text">No open sessions</div>
                         </div>
                     </t>
                     <t t-else="">
                         <div class="k-sessions-list">
-                            <t t-foreach="state.sessions" t-as="session" t-key="session.id">
+                            <t t-foreach="filteredSessions()" t-as="session" t-key="session.id">
                                 <SessionCard
                                     session="session"
                                     roster="state.sessionRosters[session.id] || []"
                                     loading="!!state.loadingRosters[session.id]"
                                     instructorMode="state.instructorMode"
                                     onSelect="(memberId, sessionId) => this.openProfile(memberId, sessionId)"
-                                    onClose="(sessionId) => this.closeSessionById(sessionId)"/>
+                                    onClose="(sessionId) => this.closeSessionById(sessionId)"
+                                    onDelete="(sessionId) => this.deleteSessionById(sessionId)"
+                                    onEdit="(session) => this.openEditSession(session)"
+                                    onAddMember="(session) => this.openAddMember(session)"/>
                             </t>
                         </div>
                     </t>
@@ -809,6 +1101,34 @@ class KioskApp extends Component {
                 <PinModal onClose="() => this.closePin()" onSuccess="() => this.onPinSuccess()"/>
             </t>
 
+            <!-- ── Edit session modal ── -->
+            <t t-if="state.editingSession">
+                <SessionEditModal
+                    session="state.editingSession"
+                    onClose="() => this.closeEditSession()"
+                    onSaved="() => this.onSessionSaved()"/>
+            </t>
+
+            <!-- ── Add member modal ── -->
+            <t t-if="state.addMemberSession">
+                <AddMemberModal
+                    session="state.addMemberSession"
+                    onClose="() => this.closeAddMember()"
+                    onAdded="(m) => this.onMemberAdded(m)"/>
+            </t>
+
+            <!-- ── Kiosk settings modal ── -->
+            <t t-if="state.showSettings">
+                <KioskSettingsModal
+                    fontSize="state.fontSize"
+                    theme="state.theme"
+                    idleMinutes="state.idleMinutes"
+                    onClose="() => this.closeSettings()"
+                    onFontSize="(s) => this.onFontSize(s)"
+                    onTheme="(t) => this.onTheme(t)"
+                    onIdleMinutes="(m) => this.onIdleMinutes(m)"/>
+            </t>
+
         </div>
     `;
 
@@ -820,17 +1140,22 @@ class KioskApp extends Component {
         PinModal,
         CheckinConfirmation,
         IdleScreen,
+        SessionEditModal,
+        AddMemberModal,
+        KioskSettingsModal,
     };
 
     setup() {
         this.state = useState({
-            mode: "scan",
+            mode: "barcode",         // "barcode" | "session"
             sessions: [],
-            sessionId: null,
+            sessionId: null,         // active session for barcode check-in
+            sessionViewId: null,     // session view filter (null = all)
             roster: [],
             loading: false,
             instructorMode: false,
             showPin: false,
+            showSettings: false,
             profileMember: null,
             profileSessionId: null,
             searchQuery: "",
@@ -841,6 +1166,14 @@ class KioskApp extends Component {
             loadingRosters: {},
             idle: false,
             announcements: [],
+            filterDate: todayIso(),
+            // Kiosk display settings
+            fontSize: "normal",      // "normal" | "large" | "xl"
+            theme: "dark",           // "light" | "dark"
+            idleMinutes: 3,          // idle timeout in minutes
+            // Instructor CRUD
+            editingSession: null,    // session object being edited
+            addMemberSession: null,  // session object for add-member flow
         });
 
         this._searchTimer = null;
@@ -875,7 +1208,7 @@ class KioskApp extends Component {
         clearTimeout(this._idleTimer);
         this._idleTimer = setTimeout(() => {
             this.state.idle = true;
-        }, IDLE_TIMEOUT_MS);
+        }, this.state.idleMinutes * 60_000);
     }
 
     wakeFromIdle() {
@@ -888,17 +1221,90 @@ class KioskApp extends Component {
     setMode(mode) {
         if (this.state.mode === mode) return;
         this.state.mode = mode;
-        if (mode === "sessions") this._loadAllSessionRosters();
+        if (mode === "session") this._loadAllSessionRosters();
+    }
+
+    filteredSessions() {
+        if (this.state.sessionViewId) {
+            return this.state.sessions.filter(s => s.id === this.state.sessionViewId);
+        }
+        return this.state.sessions;
+    }
+
+    onSessionViewFilter(ev) {
+        const val = ev.target.value;
+        this.state.sessionViewId = val ? parseInt(val, 10) : null;
+        if (this.state.sessionViewId) {
+            this.state.sessionId = this.state.sessionViewId;
+            if (!this.state.sessionRosters[this.state.sessionViewId]) {
+                this._loadSessionRoster(this.state.sessionViewId);
+            }
+        }
+    }
+
+    async onDateChange(ev) {
+        const date = ev.target.value;
+        this.state.filterDate = date;
+        this.state.sessionViewId = null;
+        this.state.sessionRosters = {};
+        await this._loadSessions(date || null);
+        if (this.state.mode === "session") this._loadAllSessionRosters();
+    }
+
+    openSettings() {
+        this.state.showSettings = true;
+    }
+
+    closeSettings() {
+        this.state.showSettings = false;
+    }
+
+    onFontSize(size) {
+        this.state.fontSize = size;
+        document.body.classList.remove("kiosk-font-large", "kiosk-font-xl");
+        if (size === "large") document.body.classList.add("kiosk-font-large");
+        if (size === "xl") document.body.classList.add("kiosk-font-xl");
+    }
+
+    onTheme(theme) {
+        this.state.theme = theme;
+        document.body.classList.remove("kiosk-theme-light", "kiosk-theme-dark");
+        document.body.classList.add(`kiosk-theme-${theme}`);
+    }
+
+    onIdleMinutes(mins) {
+        this.state.idleMinutes = mins;
+        this._resetIdleTimer();
+    }
+
+    onInstructorToggle(ev) {
+        if (ev.target.checked && !this.state.instructorMode) {
+            ev.target.checked = false; // revert — PIN success will set instructorMode
+            this.openPin();
+        } else if (!ev.target.checked && this.state.instructorMode) {
+            this.exitInstructorMode();
+        }
     }
 
     // ── Bootstrap ────────────────────────────────────────────────
 
     async _bootstrap() {
+        // Sync initial theme state with whatever class the server put on <body>
+        if (document.body.classList.contains("kiosk-theme-light")) {
+            this.state.theme = "light";
+        } else {
+            this.state.theme = "dark";
+        }
+
         try {
             const data = await jsonPost("/kiosk/api/bootstrap");
             if (data && !data.error) {
                 this.state.announcements = data.announcements || [];
                 this.state.sessions = data.sessions || [];
+                // Apply theme from config (may differ from initial body class if toggled)
+                if (data.theme_mode && data.theme_mode !== this.state.theme) {
+                    this.onTheme(data.theme_mode);
+                }
                 if (this.state.sessions.length === 1) {
                     this.state.sessionId = this.state.sessions[0].id;
                     await this._loadScanRoster();
@@ -915,11 +1321,12 @@ class KioskApp extends Component {
 
     // ── Sessions ─────────────────────────────────────────────────
 
-    async _loadSessions() {
+    async _loadSessions(date = null) {
         try {
-            const sessions = await jsonPost("/kiosk/sessions");
+            const params = date ? { date } : {};
+            const sessions = await jsonPost("/kiosk/sessions", params);
             this.state.sessions = sessions || [];
-            if (this.state.sessions.length === 1) {
+            if (this.state.sessions.length === 1 && !this.state.sessionViewId) {
                 this.state.sessionId = this.state.sessions[0].id;
                 await this._loadScanRoster();
             }
@@ -1142,6 +1549,53 @@ class KioskApp extends Component {
         } catch (e) {
             console.error("Kiosk: close session failed", e);
         }
+    }
+
+    // ── Instructor — delete session ───────────────────────────────
+
+    async deleteSessionById(sessionId) {
+        if (!confirm("Delete this session? This will cancel all enrollments.")) return;
+        try {
+            await jsonPost("/kiosk/instructor/session/delete", { session_id: sessionId });
+            delete this.state.sessionRosters[sessionId];
+            if (this.state.sessionViewId === sessionId) this.state.sessionViewId = null;
+            await this._loadSessions();
+        } catch (e) {
+            console.error("Kiosk: delete session failed", e);
+        }
+    }
+
+    // ── Instructor — edit session ─────────────────────────────────
+
+    openEditSession(session) {
+        this.state.editingSession = session;
+    }
+
+    closeEditSession() {
+        this.state.editingSession = null;
+    }
+
+    async onSessionSaved() {
+        this.state.editingSession = null;
+        await this._loadSessions();
+        if (this.state.mode === "session") this._loadAllSessionRosters();
+    }
+
+    // ── Instructor — add member ───────────────────────────────────
+
+    openAddMember(session) {
+        this.state.addMemberSession = session;
+    }
+
+    closeAddMember() {
+        this.state.addMemberSession = null;
+    }
+
+    async onMemberAdded(member) {
+        const sid = this.state.addMemberSession && this.state.addMemberSession.id;
+        this.state.addMemberSession = null;
+        if (sid) await this._loadSessionRoster(sid);
+        await this._loadSessions();
     }
 
     // ── PIN / instructor mode ────────────────────────────────────

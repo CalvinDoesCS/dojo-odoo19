@@ -16,7 +16,7 @@
         "views/dojo_kiosk_views.xml",
         "views/dojo_kiosk_announcement_views.xml",
     ],
-    "application": False,
+    "application": True,
     "installable": True,
     "auto_install": False,
 }

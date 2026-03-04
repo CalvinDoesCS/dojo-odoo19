@@ -63,11 +63,19 @@ class DojoKioskService(models.AbstractModel):
     # -------------------------------------------------------------------------
 
     @api.model
-    def get_todays_sessions(self):
-        """Return open sessions for today, ordered by start time."""
-        now = fields.Datetime.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+    def get_todays_sessions(self, date=None):
+        """Return open sessions for a given date (defaults to today), ordered by start time."""
+        if date:
+            try:
+                from datetime import datetime as _dt
+                target = _dt.strptime(date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                target = fields.Datetime.now()
+        else:
+            target = fields.Datetime.now()
+
+        today_start = target.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = target.replace(hour=23, minute=59, second=59, microsecond=999999)
 
         sessions = self.env["dojo.class.session"].search([
             ("state", "=", "open"),
@@ -256,6 +264,41 @@ class DojoKioskService(models.AbstractModel):
                 "emergency_contacts": contacts,
             }
 
+        # Belt progression: classes since last rank + per-program stats
+        att_since_rank = getattr(member, "attendance_since_last_rank", 0) or 0
+        programs = []
+        if hasattr(member, "rank_history_ids"):
+            prog_ranks = {}
+            for rank_rec in member.rank_history_ids:
+                prog = rank_rec.program_id
+                prog_key = prog.id if prog else 0
+                if prog_key not in prog_ranks or rank_rec.date_awarded > prog_ranks[prog_key]["date"]:
+                    prog_ranks[prog_key] = {
+                        "program_name": prog.name if prog else "General",
+                        "rank_name": rank_rec.rank_id.name if rank_rec.rank_id else "",
+                        "rank_color": rank_rec.rank_id.color if rank_rec.rank_id else "",
+                        "date": rank_rec.date_awarded,
+                    }
+            # Count attendance logs per program
+            all_logs = self.env["dojo.attendance.log"].search([
+                ("member_id", "=", member.id),
+                ("status", "in", ["present", "late"]),
+            ])
+            prog_attendance = {}
+            for log in all_logs:
+                tmpl = log.session_id.template_id if log.session_id else None
+                if tmpl and tmpl.program_id:
+                    pid = tmpl.program_id.id
+                    prog_attendance[pid] = prog_attendance.get(pid, 0) + 1
+            for prog_key, info in prog_ranks.items():
+                programs.append({
+                    "program_name": info["program_name"],
+                    "rank_name": info["rank_name"],
+                    "rank_color": info["rank_color"],
+                    "attendance_count": prog_attendance.get(prog_key, 0),
+                })
+            programs.sort(key=lambda p: p["program_name"])
+
         return {
             "member_id": member.id,
             "name": member.name,
@@ -277,6 +320,8 @@ class DojoKioskService(models.AbstractModel):
             "appointments": appointments,
             "plan_name": plan_name,
             "household": household,
+            "attendance_since_last_rank": att_since_rank,
+            "programs": programs,
         }
 
     def _compute_issue_flags(self, member):
@@ -506,6 +551,31 @@ class DojoKioskService(models.AbstractModel):
         if not session.exists():
             return {"success": False, "error": "Session not found."}
         session.state = "done"
+        return {"success": True}
+
+    @api.model
+    def delete_session(self, session_id):
+        """Cancel a session and all its registrations."""
+        session = self.env["dojo.class.session"].browse(session_id)
+        if not session.exists():
+            return {"success": False, "error": "Session not found."}
+        session.enrollment_ids.filtered(
+            lambda e: e.status == "registered"
+        ).write({"status": "cancelled"})
+        session.state = "cancelled"
+        return {"success": True}
+
+    @api.model
+    def update_session(self, session_id, capacity=None):
+        """Update editable fields on an open session."""
+        session = self.env["dojo.class.session"].browse(session_id)
+        if not session.exists():
+            return {"success": False, "error": "Session not found."}
+        if capacity is not None:
+            try:
+                session.capacity = max(0, int(capacity))
+            except (TypeError, ValueError):
+                return {"success": False, "error": "Invalid capacity value."}
         return {"success": True}
 
     # -------------------------------------------------------------------------

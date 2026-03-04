@@ -9,8 +9,13 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
+                <field name="kiosk_url" widget="url" string="Kiosk URL" readonly="1"/>
+                <field name="theme_mode" string="Theme"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active"/>
+                <button name="action_open_kiosk_url" type="object"
+                    string="Launch" icon="fa-external-link"
+                    class="btn-primary"/>
             </list>
         </field>
     </record>
@@ -70,26 +75,30 @@
          Actions
     ================================================================ -->
     <record id="action_dojo_kiosk_config" model="ir.actions.act_window">
-        <field name="name">Kiosk Settings</field>
+        <field name="name">Kiosks</field>
         <field name="res_model">dojo.kiosk.config</field>
         <field name="view_mode">list,form</field>
     </record>
 
-    <record id="action_open_kiosk" model="ir.actions.act_url">
-        <field name="name">Open Kiosk</field>
-        <field name="url">/kiosk</field>
-        <field name="target">new</field>
-    </record>
-
     <!-- ================================================================
-         Menu items — nested under the existing app menu
+         Menu items — standalone Kiosk app
     ================================================================ -->
+
+    <!-- Top-level app entry -->
     <menuitem
-        id="menu_dojo_kiosk_config"
-        name="Kiosk Settings"
-        parent="dojo_members.menu_dojo_members_root"
+        id="menu_dojo_kiosk_root"
+        name="Kiosk"
+        sequence="10"
+        groups="dojo_base.group_dojo_admin"
+    />
+
+    <!-- Kiosks list (launch URLs from here) -->
+    <menuitem
+        id="menu_dojo_kiosk_list"
+        name="Kiosks"
+        parent="menu_dojo_kiosk_root"
         action="action_dojo_kiosk_config"
-        sequence="95"
+        sequence="10"
         groups="dojo_base.group_dojo_admin"
     />
 </odoo>

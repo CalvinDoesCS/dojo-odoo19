@@ -63,6 +63,15 @@ class DojoKioskConfig(models.Model):
         for cfg in self:
             cfg.kiosk_token = secrets.token_urlsafe(32)
 
+    def action_open_kiosk_url(self):
+        """Open this kiosk's URL in a new browser tab."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_url",
+            "url": self.kiosk_url,
+            "target": "new",
+        }
+
     def _compute_kiosk_url(self):
         base = self.env["ir.config_parameter"].sudo().get_param("web.base.url") or ""
         for cfg in self:
