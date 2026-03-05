@@ -13,5 +13,6 @@ numpy
 reportlab[renderPM,pycairo]
 rlPyCairo
 
-# Standard Odoo dependencies (if not already handled by the platform)
+# Standard Odoo dependencies (if not already handled by the platform) 
 Pillow
+babel
