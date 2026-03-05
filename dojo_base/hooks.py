@@ -10,7 +10,9 @@ so the permission is never accidentally lost.
 
 def _ensure_admin_dojo_group(env):
     """Core helper: give the admin user the Dojo Admin group if missing."""
-    admin_user = env["res.users"].search([("login", "=", "admin")], limit=1)
+    # Use the canonical base.user_admin reference so this works regardless of
+    # what the administrator's login address happens to be.
+    admin_user = env.ref("base.user_admin", raise_if_not_found=False)
     if not admin_user:
         return
     group_admin = env.ref("dojo_base.group_dojo_admin", raise_if_not_found=False)
