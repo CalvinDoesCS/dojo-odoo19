@@ -248,7 +248,11 @@ class KioskController(http.Controller):
         "/kiosk/instructor/roster/add",
         type="jsonrpc", auth="public", methods=["POST"], csrf=False,
     )
-    def kiosk_roster_add(self, session_id=None, member_id=None, token=None, **kw):
+    def kiosk_roster_add(
+        self, session_id=None, member_id=None,
+        override_settings=False, override_capacity=False,
+        token=None, **kw
+    ):
         if not session_id or not member_id:
             return {"success": False, "error": "session_id and member_id are required."}
         if token:
@@ -257,7 +261,11 @@ class KioskController(http.Controller):
             except AccessError:
                 return {"success": False, "error": "Invalid kiosk token."}
         svc = request.env["dojo.kiosk.service"].sudo()
-        return svc.roster_add(session_id, member_id)
+        return svc.roster_add(
+            session_id, member_id,
+            override_settings=bool(override_settings),
+            override_capacity=bool(override_capacity),
+        )
 
     @http.route(
         "/kiosk/instructor/roster/bulk_add",

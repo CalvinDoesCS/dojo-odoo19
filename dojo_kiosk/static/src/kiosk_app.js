@@ -382,6 +382,9 @@ class MemberProfileCard extends Component {
                                 <t t-else="">
                                     <button class="k-btn k-btn--danger" t-on-click="onRosterRemove">− Remove from Roster</button>
                                 </t>
+                                <t t-if="state.rosterAddError">
+                                    <div class="k-field-error" style="margin-top:6px;white-space:pre-line;" t-esc="state.rosterAddError"/>
+                                </t>
                             </div>
                         </t>
                         <t t-else="">
@@ -501,7 +504,7 @@ class MemberProfileCard extends Component {
     static props = ["member", "sessionId", "instructorMode", "onClose", "onCheckin", "onMarkAttendance", "onRosterAdd", "onRosterRemove", "onCheckout"];
 
     setup() {
-        this.state = useState({ tab: "profile" });
+        this.state = useState({ tab: "profile", rosterAddError: "" });
     }
 
     initials(name) { return initials(name); }
@@ -511,7 +514,15 @@ class MemberProfileCard extends Component {
     markAttendance(status) { this.props.onMarkAttendance(this.props.member, this.props.sessionId, status); }
     onCheckin() { this.props.onCheckin(this.props.member, this.props.sessionId); }
     onCheckout() { this.props.onCheckout(this.props.member, this.props.sessionId); }
-    onRosterAdd() { this.props.onRosterAdd(this.props.member, this.props.sessionId); this.props.onClose(); }
+    async onRosterAdd() {
+        this.state.rosterAddError = "";
+        const result = await this.props.onRosterAdd(this.props.member, this.props.sessionId);
+        if (result && result.success) {
+            this.props.onClose();
+        } else {
+            this.state.rosterAddError = (result && result.error) || "Could not add to roster.";
+        }
+    }
     onRosterRemove() { this.props.onRosterRemove(this.props.member, this.props.sessionId); this.props.onClose(); }
 }
 
@@ -1280,7 +1291,17 @@ class AssignRosterModal extends Component {
                 pref_sun: this.state.prefDays.sun,
             });
             if (result.success) {
-                this.props.onAssigned(this.state.sessionId);
+                const added = result.added || [];
+                const skipped = result.skipped || [];
+                if (added.length === 0 && skipped.length > 0) {
+                    // Nobody was added — keep modal open and show why each was skipped
+                    this.state.error = skipped
+                        .map(s => typeof s === 'object' ? s.reason : `Member could not be added`)
+                        .join('\n');
+                } else {
+                    // At least some members added — close the modal
+                    this.props.onAssigned(this.state.sessionId);
+                }
             } else {
                 this.state.error = result.error || "Could not add members.";
             }
@@ -1988,9 +2009,15 @@ class KioskApp extends Component {
                 session_id: sessionId,
                 member_id: member.member_id,
             });
-            if (result.success) await this._loadSessionRoster(sessionId);
+            if (result.success) {
+                await this._loadSessionRoster(sessionId);
+                return { success: true };
+            } else {
+                return { success: false, error: result.error || "Could not add to roster." };
+            }
         } catch (e) {
             console.error("Kiosk: roster add failed", e);
+            return { success: false, error: "Network error." };
         }
     }
 

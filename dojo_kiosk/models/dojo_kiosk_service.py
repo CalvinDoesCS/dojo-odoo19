@@ -4,6 +4,8 @@ Methods are designed to be called from the kiosk HTTP controller via sudo().
 """
 from datetime import datetime, timedelta
 
+import pytz
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError
 
@@ -55,17 +57,26 @@ class DojoKioskService(models.AbstractModel):
     @api.model
     def get_enrolled_sessions_today(self, member_id, date=None):
         """Return today's open sessions where the member has a registered enrollment."""
+        tz_name = (
+            self.env.context.get("tz")
+            or self.env.user.tz
+            or self.env.company.partner_id.tz
+            or "UTC"
+        )
+        tz = pytz.timezone(tz_name)
         if date:
             try:
                 from datetime import datetime as _dt
-                target = _dt.strptime(date, "%Y-%m-%d")
+                local_target = _dt.strptime(date, "%Y-%m-%d")
             except (ValueError, TypeError):
-                target = fields.Datetime.now()
+                local_target = datetime.now(tz).replace(tzinfo=None)
         else:
-            target = fields.Datetime.now()
+            local_target = datetime.now(tz).replace(tzinfo=None)
 
-        today_start = target.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = target.replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_start_local = local_target.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end_local = local_target.replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_start = tz.localize(today_start_local).astimezone(pytz.utc).replace(tzinfo=None)
+        today_end = tz.localize(today_end_local).astimezone(pytz.utc).replace(tzinfo=None)
 
         enrollments = self.env["dojo.class.enrollment"].search([
             ("member_id", "=", member_id),
@@ -144,8 +155,35 @@ class DojoKioskService(models.AbstractModel):
                 skipped.append(member_id)
                 continue
 
-            # ── 1. Add to course_member_ids if override_settings + recurring type ──
-            if override_settings and enroll_type in ("multiday", "permanent") and template:
+            # ── 1. Pre-checks (course membership + weekly limit) ──────────────
+            if not override_settings:
+                # Course membership
+                if template and template.course_member_ids and member not in template.course_member_ids:
+                    course_name = template.name or "this course"
+                    skipped.append({
+                        "member_id": member_id,
+                        "reason": (
+                            f"{member.name} is not enrolled in {course_name}."
+                        ),
+                    })
+                    continue
+
+                # Weekly session limit
+                allowed = member.sessions_allowed_per_week
+                used = member.sessions_used_this_week
+                if allowed > 0 and used >= allowed:
+                    skipped.append({
+                        "member_id": member_id,
+                        "reason": (
+                            f"{member.name} has reached their weekly session limit "
+                            f"({used}/{allowed} sessions used)."
+                        ),
+                    })
+                    continue
+
+            # Add to course_member_ids when overriding so the ORM constraint and
+            # future cron enrollments both succeed.
+            if override_settings and template and template.course_member_ids:
                 if member not in template.course_member_ids:
                     template.course_member_ids = [(4, member.id)]
 
@@ -156,22 +194,30 @@ class DojoKioskService(models.AbstractModel):
             ], limit=1)
             if existing:
                 if existing.status != "registered":
-                    existing.status = "registered"
+                    try:
+                        existing.status = "registered"
+                    except Exception as e:
+                        skipped.append({"member_id": member_id, "reason": str(e)})
+                        continue
                     added.append(member_id)
                 else:
                     # Already registered — still apply auto-enroll pref below
                     added.append(member_id)
             else:
                 if not override_capacity and session.capacity > 0 and session.seats_taken >= session.capacity:
-                    skipped.append(member_id)
+                    skipped.append({"member_id": member_id, "reason": "Session is at full capacity."})
                     continue
 
-                EnrollModel.create({
-                    "session_id": session_id,
-                    "member_id": member_id,
-                    "status": "registered",
-                    "attendance_state": "pending",
-                })
+                try:
+                    EnrollModel.create({
+                        "session_id": session_id,
+                        "member_id": member_id,
+                        "status": "registered",
+                        "attendance_state": "pending",
+                    })
+                except Exception as e:
+                    skipped.append({"member_id": member_id, "reason": str(e)})
+                    continue
                 added.append(member_id)
 
             # ── 3. Auto-enroll preference (multiday / permanent) ───────────────────
@@ -233,18 +279,32 @@ class DojoKioskService(models.AbstractModel):
 
     @api.model
     def get_todays_sessions(self, date=None):
-        """Return open sessions for a given date (defaults to today), ordered by start time."""
+        """Return open sessions for a given date (defaults to today), ordered by start time.
+
+        The date bounds are computed in the company local timezone so that
+        sessions are not missed when the server runs in UTC.
+        """
+        tz_name = (
+            self.env.context.get("tz")
+            or self.env.user.tz
+            or self.env.company.partner_id.tz
+            or "UTC"
+        )
+        tz = pytz.timezone(tz_name)
         if date:
             try:
                 from datetime import datetime as _dt
-                target = _dt.strptime(date, "%Y-%m-%d")
+                local_target = _dt.strptime(date, "%Y-%m-%d")
             except (ValueError, TypeError):
-                target = fields.Datetime.now()
+                local_target = datetime.now(tz).replace(tzinfo=None)
         else:
-            target = fields.Datetime.now()
+            local_target = datetime.now(tz).replace(tzinfo=None)
 
-        today_start = target.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = target.replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_start_local = local_target.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end_local = local_target.replace(hour=23, minute=59, second=59, microsecond=999999)
+        # Convert local midnight → end-of-day to UTC so the ORM query is correct
+        today_start = tz.localize(today_start_local).astimezone(pytz.utc).replace(tzinfo=None)
+        today_end = tz.localize(today_end_local).astimezone(pytz.utc).replace(tzinfo=None)
 
         sessions = self.env["dojo.class.session"].search([
             ("state", "=", "open"),
@@ -613,6 +673,10 @@ class DojoKioskService(models.AbstractModel):
         # Sync enrollment
         enrollment.attendance_state = "present"
 
+        # Invalidate cached computed fields (sessions_used_this_week, etc.) so the
+        # returned profile reflects the newly created enrollment / attendance log.
+        member.invalidate_recordset()
+
         return {
             "success": True,
             "status": status,
@@ -666,6 +730,9 @@ class DojoKioskService(models.AbstractModel):
                 "present" if attendance_status in ("present", "late") else attendance_status
             )
 
+        # Invalidate cached computed fields so any subsequent profile read is fresh
+        member.invalidate_recordset()
+
         return {"success": True, "log_id": log.id}
 
     # -------------------------------------------------------------------------
@@ -673,31 +740,89 @@ class DojoKioskService(models.AbstractModel):
     # -------------------------------------------------------------------------
 
     @api.model
-    def roster_add(self, session_id, member_id):
-        """Add a member to the session roster (creates enrollment)."""
+    def roster_add(self, session_id, member_id, override_settings=False, override_capacity=False):
+        """Add a member to the session roster (creates enrollment).
+
+        override_settings: bypass course-membership check and add member to course roster.
+        override_capacity: bypass the per-session capacity limit.
+        """
+        from odoo.exceptions import ValidationError as _VE
+
         session = self.env["dojo.class.session"].browse(session_id)
         member = self.env["dojo.member"].browse(member_id)
         if not session.exists() or not member.exists():
             return {"success": False, "error": "Session or member not found."}
 
-        existing = self.env["dojo.class.enrollment"].search([
+        template = session.template_id
+
+        # --- Descriptive pre-checks (skipped when instructor overrides) ---
+        if not override_settings:
+            if template and template.course_member_ids and member not in template.course_member_ids:
+                course_name = template.name or "this course"
+                return {
+                    "success": False,
+                    "error": (
+                        f"{member.name} is not enrolled in {course_name}. "
+                        "Use the override option to add them anyway."
+                    ),
+                }
+
+            # Weekly session limit
+            allowed = member.sessions_allowed_per_week
+            used = member.sessions_used_this_week
+            if allowed > 0 and used >= allowed:
+                return {
+                    "success": False,
+                    "error": (
+                        f"{member.name} has reached their weekly session limit "
+                        f"({used}/{allowed} sessions used). "
+                        "Use the override option to add them anyway."
+                    ),
+                }
+
+        if not override_capacity:
+            if session.capacity > 0 and session.seats_taken >= session.capacity:
+                return {
+                    "success": False,
+                    "error": (
+                        f"Session is at full capacity ({session.capacity} seats). "
+                        "Use the override option to add them anyway."
+                    ),
+                }
+
+        # When overriding, add to the course roster so the ORM constraint is satisfied
+        if override_settings and template and template.course_member_ids:
+            if member not in template.course_member_ids:
+                template.course_member_ids = [(4, member.id)]
+
+        # Build enrollment model with bypass context when overriding
+        enroll_ctx = dict(self.env.context)
+        if override_settings:
+            enroll_ctx["skip_course_membership_check"] = True
+        EnrollModel = self.env["dojo.class.enrollment"].with_context(**enroll_ctx)
+
+        existing = EnrollModel.search([
             ("session_id", "=", session_id),
             ("member_id", "=", member_id),
         ], limit=1)
         if existing:
             if existing.status != "registered":
-                existing.status = "registered"
+                try:
+                    existing.status = "registered"
+                except _VE as e:
+                    return {"success": False, "error": str(e)}
             return {"success": True, "enrollment_id": existing.id}
 
-        if session.capacity > 0 and session.seats_taken >= session.capacity:
-            return {"success": False, "error": "Session is at full capacity."}
+        try:
+            enr = EnrollModel.create({
+                "session_id": session_id,
+                "member_id": member_id,
+                "status": "registered",
+                "attendance_state": "pending",
+            })
+        except _VE as e:
+            return {"success": False, "error": str(e)}
 
-        enr = self.env["dojo.class.enrollment"].create({
-            "session_id": session_id,
-            "member_id": member_id,
-            "status": "registered",
-            "attendance_state": "pending",
-        })
         return {"success": True, "enrollment_id": enr.id}
 
     @api.model
