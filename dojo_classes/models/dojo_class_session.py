@@ -30,6 +30,13 @@ class DojoClassSession(models.Model):
         "dojo.class.enrollment", "session_id", string="Enrollments"
     )
     seats_taken = fields.Integer(compute="_compute_seats_taken")
+    attendance_complete = fields.Boolean(
+        compute="_compute_attendance_complete",
+        store=True,
+        readonly=False,
+        string="Attendance Complete",
+        help="Automatically set when all registered enrollments are marked. Can also be toggled manually.",
+    )
     generated_from_recurrence = fields.Boolean(
         string="Auto-generated", default=False, readonly=True, index=True
     )
@@ -63,6 +70,19 @@ class DojoClassSession(models.Model):
         counts = {g['session_id'][0]: g['session_id_count'] for g in groups}
         for session in self:
             session.seats_taken = counts.get(session.id, 0)
+
+    @api.depends("state", "enrollment_ids.attendance_state", "enrollment_ids.status")
+    def _compute_attendance_complete(self):
+        for session in self:
+            if session.state != "done":
+                session.attendance_complete = False
+                continue
+            registered = session.enrollment_ids.filtered(
+                lambda e: e.status == "registered"
+            )
+            session.attendance_complete = bool(registered) and all(
+                e.attendance_state != "pending" for e in registered
+            )
 
     @api.constrains("start_datetime", "end_datetime")
     def _check_datetime_order(self):

@@ -15,17 +15,17 @@ class ResUsers(models.Model):
         string="Dojo Role",
     )
 
-    @api.depends("groups_id")
+    @api.depends("all_group_ids")
     def _compute_dojo_role(self):
         group_admin = self.env.ref("dojo_base.group_dojo_admin")
         group_instructor = self.env.ref("dojo_base.group_dojo_instructor")
         group_parent = self.env.ref("dojo_base.group_dojo_parent_student")
         for user in self:
-            if group_admin in user.groups_id:
+            if group_admin in user.all_group_ids:
                 user.dojo_role = "admin"
-            elif group_instructor in user.groups_id:
+            elif group_instructor in user.all_group_ids:
                 user.dojo_role = "instructor"
-            elif group_parent in user.groups_id:
+            elif group_parent in user.all_group_ids:
                 user.dojo_role = "parent_student"
             else:
                 user.dojo_role = "other"

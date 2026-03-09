@@ -193,6 +193,7 @@
                 <field name="capacity"/>
                 <field name="seats_taken"/>
                 <field name="state"/>
+                <field name="attendance_complete" widget="boolean_toggle" optional="show"/>
                 <field name="generated_from_recurrence" optional="show"/>
             </list>
         </field>
@@ -204,13 +205,44 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <!-- Roster stat button: shows enrolled / capacity -->
+                        <button class="oe_stat_button" icon="fa-users"
+                                help="Enrolled / Capacity — see Enrollments tab below">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="seats_taken"/>/<field name="capacity"/>
+                                </span>
+                                <span class="o_stat_text">Roster</span>
+                            </div>
+                        </button>
+                        <!-- Attendance pending badge -->
+                        <button class="oe_stat_button" icon="fa-clock-o"
+                                invisible="attendance_complete == True or state != 'done'"
+                                help="Attendance not yet fully recorded">
+                            <field name="attendance_complete" widget="boolean_toggle" nolabel="1"/>
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Attendance</span>
+                                <span class="o_stat_text">Pending</span>
+                            </div>
+                        </button>
+                        <!-- Attendance complete badge -->
+                        <button class="oe_stat_button" icon="fa-check-circle"
+                                invisible="attendance_complete == False"
+                                help="All attendance recorded">
+                            <field name="attendance_complete" widget="boolean_toggle" nolabel="1"/>
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Attendance</span>
+                                <span class="o_stat_text">Complete</span>
+                            </div>
+                        </button>
+                    </div>
                     <group>
                         <field name="template_id"/>
                         <field name="instructor_profile_id"/>
                         <field name="start_datetime"/>
                         <field name="end_datetime"/>
                         <field name="capacity"/>
-                        <field name="seats_taken" readonly="1"/>
                         <field name="state"/>
                     </group>
                     <notebook>
@@ -234,9 +266,15 @@
         <field name="name">dojo.class.session.calendar</field>
         <field name="model">dojo.class.session</field>
         <field name="arch" type="xml">
-            <calendar date_start="start_datetime" date_stop="end_datetime" color="instructor_profile_id" string="Class Sessions">
+            <calendar date_start="start_datetime" date_stop="end_datetime"
+                      color="instructor_profile_id" string="Class Sessions"
+                      quick_create="false">
+                <field name="instructor_profile_id" filters="1" string="Instructor"/>
                 <field name="name"/>
-                <field name="template_id"/>
+                <field name="seats_taken" string="Enrolled"/>
+                <field name="capacity" string="Capacity"/>
+                <field name="state" string="Status"/>
+                <field name="attendance_complete" string="Attendance Complete"/>
             </calendar>
         </field>
     </record>

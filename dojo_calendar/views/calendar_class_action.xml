@@ -19,6 +19,11 @@
                 <!-- Sidebar filter groups -->
                 <field name="x_instructor_id" filters="1" string="Instructor"/>
                 <field name="x_site_id" filters="1" string="Site"/>
+                <!-- Capacity & roster -->
+                <field name="x_roster_count" string="Enrolled"/>
+                <field name="x_capacity" string="Capacity"/>
+                <!-- Attendance status badge -->
+                <field name="x_attendance_complete" string="Attendance Complete"/>
             </calendar>
         </field>
     </record>

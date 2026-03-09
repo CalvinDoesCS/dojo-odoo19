@@ -7,7 +7,6 @@
             <list>
                 <field name="name"/>
                 <field name="user_id"/>
-                <field name="employee_id"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
         </field>
@@ -19,10 +18,22 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(hr.open_view_employee_list_my)d"
+                                type="action"
+                                class="oe_stat_button"
+                                icon="fa-id-badge"
+                                invisible="not employee_id"
+                                context="{'default_id': employee_id}">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Employee</span>
+                            </div>
+                        </button>
+                    </div>
                     <group>
                         <field name="name"/>
                         <field name="user_id"/>
-                        <field name="employee_id"/>
+                        <field name="employee_id" invisible="1"/>
                         <field name="partner_id"/>
                         <field name="company_id" groups="base.group_multi_company"/>
                     </group>
@@ -30,6 +41,7 @@
                         <field name="bio"/>
                     </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
