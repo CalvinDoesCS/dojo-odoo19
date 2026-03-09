@@ -48,16 +48,23 @@ class DojoMemberWeeklyCounter(models.Model):
     # needed; enrollment records in dojo.class.enrollment are counted via search).
     @api.depends()
     def _compute_sessions_used_this_week(self):
+        if not self.ids:
+            return
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
         week_end = week_start + timedelta(days=6)
         week_start_str = "%s 00:00:00" % week_start
         week_end_str = "%s 23:59:59" % week_end
+        groups = self.env['dojo.class.enrollment'].read_group(
+            [
+                ('member_id', 'in', self.ids),
+                ('status', '=', 'registered'),
+                ('session_id.start_datetime', '>=', week_start_str),
+                ('session_id.start_datetime', '<=', week_end_str),
+            ],
+            fields=['member_id'],
+            groupby=['member_id'],
+        )
+        counts = {g['member_id'][0]: g['member_id_count'] for g in groups}
         for member in self:
-            count = self.env["dojo.class.enrollment"].search_count([
-                ("member_id", "=", member.id),
-                ("status", "=", "registered"),
-                ("session_id.start_datetime", ">=", week_start_str),
-                ("session_id.start_datetime", "<=", week_end_str),
-            ])
-            member.sessions_used_this_week = count
+            member.sessions_used_this_week = counts.get(member.id, 0)

@@ -5,3 +5,4 @@ Dojo-Odoo.csv
 config/odoo.conf
 *.pyc
 **/__pycache__/
+CLAUDE.md

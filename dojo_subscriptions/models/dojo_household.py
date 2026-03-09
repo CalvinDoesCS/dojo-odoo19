@@ -36,7 +36,7 @@ class DojoHousehold(models.Model):
 
     # ── Internal helpers ────────────────────────────────────────────────────
     def _get_stripe_api(self):
-        """Return the stripe module with the secret key configured."""
+        """Return (stripe_module, secret_key). Never sets the global api_key."""
         try:
             import stripe as stripe_lib
         except ImportError:
@@ -49,10 +49,9 @@ class DojoHousehold(models.Model):
         if not secret_key:
             raise UserError(_(
                 'Stripe secret key is not configured. '
-                'Go to Settings → Technical → System Parameters and set "stripe.secret_key".'
+                'Go to Settings \u2192 Technical \u2192 System Parameters and set "stripe.secret_key".'
             ))
-        stripe_lib.api_key = secret_key
-        return stripe_lib
+        return stripe_lib, secret_key
 
     # ── Stripe Issuing actions ──────────────────────────────────────────────
     def action_create_stripe_cardholder(self):
@@ -63,7 +62,7 @@ class DojoHousehold(models.Model):
         guardian = self.primary_guardian_id
         if not guardian:
             raise UserError(_('A primary guardian must be set before creating a Stripe cardholder.'))
-        stripe = self._get_stripe_api()
+        stripe, api_key = self._get_stripe_api()
         company = self.env.company
         cardholder = stripe.issuing.Cardholder.create(
             name=guardian.name,
@@ -79,6 +78,7 @@ class DojoHousehold(models.Model):
                     'country': company.country_id.code if company.country_id else 'US',
                 }
             },
+            api_key=api_key,
         )
         self.sudo().write({'stripe_customer_id': cardholder['id']})
 
@@ -89,12 +89,13 @@ class DojoHousehold(models.Model):
             self.action_create_stripe_cardholder()
         if self.stripe_card_id:
             return  # Already created
-        stripe = self._get_stripe_api()
+        stripe, api_key = self._get_stripe_api()
         currency = (self.env.company.currency_id.name or 'usd').lower()
         card = stripe.issuing.Card.create(
             cardholder=self.stripe_customer_id,
             currency=currency,
             type='virtual',
+            api_key=api_key,
         )
         self.sudo().write({
             'stripe_card_id': card['id'],
@@ -112,10 +113,11 @@ class DojoHousehold(models.Model):
         self.ensure_one()
         if not self.stripe_card_id:
             raise UserError(_('No Stripe card exists for this household yet.'))
-        stripe = self._get_stripe_api()
+        stripe, api_key = self._get_stripe_api()
         eph = stripe.EphemeralKey.create(
             {'issuing_card': self.stripe_card_id},
             stripe_version='2024-06-20',
+            api_key=api_key,
         )
         ICP = self.env['ir.config_parameter'].sudo()
         return {

@@ -5,7 +5,7 @@ class DojoGuardianLink(models.Model):
     _name = "dojo.guardian.link"
     _description = "Dojo Guardian Link"
 
-    household_id = fields.Many2one("dojo.household", required=True, index=True)
+    household_id = fields.Many2one("dojo.household", required=True, index=True, ondelete="cascade")
     guardian_member_id = fields.Many2one(
         "dojo.member", required=True, ondelete="cascade", index=True
     )

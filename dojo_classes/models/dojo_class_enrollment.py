@@ -9,7 +9,7 @@ class DojoClassEnrollment(models.Model):
     session_id = fields.Many2one(
         "dojo.class.session", required=True, ondelete="cascade", index=True
     )
-    member_id = fields.Many2one("dojo.member", required=True, index=True)
+    member_id = fields.Many2one("dojo.member", required=True, index=True, ondelete="restrict")
     company_id = fields.Many2one(
         "res.company", related="session_id.company_id", store=True, readonly=True
     )

@@ -33,6 +33,10 @@
 
     function b(map, key)  { return map[key] || { label: key || "\u2014", cls: "bg-secondary" }; }
     function esc(s)       { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function getCsrfToken() {
+        var el = document.getElementById('dojo_activities_mount');
+        return (el && el.dataset.csrf) || '';
+    }
     function fmtDt(iso) {
         if (!iso) return "\u2014";
         var d = new Date(iso.indexOf("T") !== -1 ? iso + "Z" : iso);
@@ -266,7 +270,7 @@
             var payload = { household_name: hhName };
             if (cName && cPhone) { payload.new_contact = { member_id: mId, name: cName, relationship: cRel, phone: cPhone, email: cEmail }; }
             saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026";
-            fetch('/my/dojo/household/save', {
+            fetch('/my/dojo/household/save?csrf_token=' + encodeURIComponent(getCsrfToken()), {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -386,6 +390,7 @@
             saveBtn.disabled = true; saveBtn.textContent = "Updating\u2026";
             var form = new FormData();
             form.set("plan_id", checked.value);
+            form.set("csrf_token", getCsrfToken());
             fetch("/my/dojo/billing/change-plan", { method: "POST", credentials: "same-origin", body: form })
                 .then(function(r){ return r.json(); })
                 .then(function(res){
@@ -531,7 +536,7 @@
                 if (!sid || !mid) return;
                 enrollBtn.disabled = true; enrollBtn.textContent = "Enrolling\u2026";
                 var form = new FormData();
-                form.set('session_id', sid); form.set('member_id', mid);
+                form.set('session_id', sid); form.set('member_id', mid); form.set('csrf_token', getCsrfToken());
                 fetch('/my/dojo/enroll', { method:'POST', credentials:'same-origin', body:form })
                     .then(function(r){ return r.json(); })
                     .then(function(res){
@@ -1021,7 +1026,7 @@
                 var eid = parseInt(btn.dataset.enrollmentId, 10);
                 if (!eid || !confirm('Cancel this enrollment?')) return;
                 btn.disabled = true; btn.textContent = 'Cancelling\u2026';
-                var form = new FormData(); form.set('enrollment_id', eid);
+                var form = new FormData(); form.set('enrollment_id', eid); form.set('csrf_token', getCsrfToken());
                 fetch('/my/dojo/unenroll', { method: 'POST', credentials: 'same-origin', body: form })
                     .then(function(r){ return r.json(); })
                     .then(function(res){
@@ -1112,7 +1117,7 @@
                 var payload = readCardState(key);
                 if (!payload) return;
                 btn.disabled = true;
-                fetch('/my/dojo/auto-enroll', {
+                fetch('/my/dojo/auto-enroll?csrf_token=' + encodeURIComponent(getCsrfToken()), {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
@@ -1144,7 +1149,7 @@
                 if (!confirm('Request a belt test? Your instructor will be notified.')) return;
                 btn.disabled = true; btn.textContent = 'Requesting\u2026';
                 var mid = btn.dataset.memberId;
-                var form = new FormData(); if (mid) form.set('member_id', mid);
+                var form = new FormData(); if (mid) form.set('member_id', mid); form.set('csrf_token', getCsrfToken());
                 fetch('/my/dojo/belt-test-request', { method: 'POST', credentials: 'same-origin', body: form })
                     .then(function(r){ return r.json(); })
                     .then(function(res){
@@ -1166,7 +1171,7 @@
                 if (!msg) { if (feedback) feedback.innerHTML = '<span class="text-danger">Please enter a message.</span>'; return; }
                 btn.disabled = true; btn.textContent = 'Sending\u2026';
                 if (feedback) feedback.innerHTML = '';
-                fetch('/my/dojo/message', {
+                fetch('/my/dojo/message?csrf_token=' + encodeURIComponent(getCsrfToken()), {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: msg, member_id: mid ? parseInt(mid, 10) : null }),
@@ -1240,7 +1245,8 @@
                     "Pausing will stop automatic billing. You can resume at any time.",
                     "Pause", "btn-warning",
                     function(onErr){
-                        fetch("/my/dojo/billing/pause", { method:"POST", credentials:"same-origin" })
+                        var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
+                        fetch("/my/dojo/billing/pause", { method:"POST", credentials:"same-origin", body: csrfForm })
                             .then(function(r){ return r.json(); })
                             .then(function(res){ if (res.ok) { closeOverlay(); refreshBilling(); } else onErr(res.error || "Could not pause."); })
                             .catch(function(){ onErr("An error occurred."); });
@@ -1251,7 +1257,8 @@
         var resumeBtn = document.getElementById("dojoBillingResume");
         if (resumeBtn) {
             resumeBtn.addEventListener("click", function(){
-                fetch("/my/dojo/billing/resume", { method:"POST", credentials:"same-origin" })
+                var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
+                fetch("/my/dojo/billing/resume", { method:"POST", credentials:"same-origin", body: csrfForm })
                     .then(function(r){ return r.json(); })
                     .then(function(res){ if (res.ok) refreshBilling(); });
             });
@@ -1264,7 +1271,8 @@
                     "This will permanently cancel your membership subscription. This action cannot be undone.",
                     "Yes, Cancel", "btn-danger",
                     function(onErr){
-                        fetch("/my/dojo/billing/cancel", { method:"POST", credentials:"same-origin" })
+                        var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
+                        fetch("/my/dojo/billing/cancel", { method:"POST", credentials:"same-origin", body: csrfForm })
                             .then(function(r){ return r.json(); })
                             .then(function(res){ if (res.ok) { closeOverlay(); refreshBilling(); } else onErr(res.error || "Could not cancel."); })
                             .catch(function(){ onErr("An error occurred."); });

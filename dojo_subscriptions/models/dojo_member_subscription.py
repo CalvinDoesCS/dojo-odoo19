@@ -10,7 +10,7 @@ class DojoMemberSubscription(models.Model):
     _name = "dojo.member.subscription"
     _description = "Dojo Member Subscription"
 
-    member_id = fields.Many2one("dojo.member", required=True, index=True)
+    member_id = fields.Many2one("dojo.member", required=True, index=True, ondelete="restrict")
     household_id = fields.Many2one(
         "dojo.household", related="member_id.household_id", store=True, readonly=True
     )
@@ -115,7 +115,7 @@ class DojoMemberSubscription(models.Model):
             'move_type': 'out_invoice',
             'partner_id': billing_partner.id,
             'invoice_date': today,
-            'invoice_date_due': today + relativedelta(months=1),
+            'invoice_date_due': self._next_date_from(period_start),
             'subscription_id': self.id,
             'company_id': (self.company_id or self.env.company).id,
             'invoice_line_ids': [(0, 0, line_vals)],

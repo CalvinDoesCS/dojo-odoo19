@@ -85,11 +85,17 @@ class CrmLead(models.Model):
     # ------------------------------------------------------------------
 
     def write(self, vals):
-        if vals.get("no_show") is True:
-            for rec in self:
-                if not rec.no_show:
-                    vals.setdefault("no_show_date", fields.Date.today())
-                    break
+        if vals.get("no_show") is True and "no_show_date" not in vals:
+            today = fields.Date.today()
+            # Stamp no_show_date only on records transitioning False→True
+            # that don't already have a stored date, preserving historical values.
+            needs_date = self.filtered(lambda r: not r.no_show and not r.no_show_date)
+            has_date = self - needs_date
+            if needs_date:
+                super(CrmLead, needs_date).write(dict(vals, no_show_date=today))
+            if has_date:
+                super(CrmLead, has_date).write(vals)
+            return True
         return super().write(vals)
 
     # ------------------------------------------------------------------

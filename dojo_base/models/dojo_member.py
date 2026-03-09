@@ -136,7 +136,7 @@ class DojoMember(models.Model):
                 "partner_id": partner.id,
                 "login": partner.email,
                 "name": partner.name,
-                "groups_id": [(6, 0, [group_parent.id])],
+                "groups_id": [(4, group_parent.id)],
             })
         return {
             "type": "ir.actions.client",

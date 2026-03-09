@@ -423,7 +423,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/auto-enroll', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/auto-enroll', type='http', auth='user', methods=['POST'])
     def portal_post_auto_enroll(self, **post):
         """Create or update a single auto-enroll preference.
 
@@ -603,7 +603,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/enroll', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/enroll', type='http', auth='user', methods=['POST'])
     def portal_enroll(self, session_id=None, member_id=None, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -657,7 +657,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/household/save', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/household/save', type='http', auth='user', methods=['POST'])
     def portal_household_save(self, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -876,7 +876,7 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     # ── /my/dojo/unenroll ──────────────────────────────────────────────────
-    @http.route('/my/dojo/unenroll', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/unenroll', type='http', auth='user', methods=['POST'])
     def portal_unenroll(self, enrollment_id=None, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -906,7 +906,7 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     # ── /my/dojo/belt-test-request ─────────────────────────────────────────
-    @http.route('/my/dojo/belt-test-request', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/belt-test-request', type='http', auth='user', methods=['POST'])
     def portal_belt_test_request(self, member_id=None, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -938,7 +938,7 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     # ── /my/dojo/message ───────────────────────────────────────────────────
-    @http.route('/my/dojo/message', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/message', type='http', auth='user', methods=['POST'])
     def portal_message_instructor(self, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -1078,7 +1078,7 @@ class DojoMemberPortal(CustomerPortal):
         ], order='start_date desc', limit=1)
         return sub or None
 
-    @http.route('/my/dojo/billing/change-plan', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/billing/change-plan', type='http', auth='user', methods=['POST'])
     def portal_billing_change_plan(self, plan_id=None, **kwargs):
         def _err(msg):
             return request.make_response(
@@ -1101,7 +1101,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/billing/pause', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/billing/pause', type='http', auth='user', methods=['POST'])
     def portal_billing_pause(self, **kwargs):
         sub = self._get_household_active_sub()
         if not sub or sub.state != 'active':
@@ -1115,7 +1115,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/billing/resume', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/billing/resume', type='http', auth='user', methods=['POST'])
     def portal_billing_resume(self, **kwargs):
         sub = self._get_household_active_sub()
         if not sub or sub.state != 'paused':
@@ -1129,7 +1129,7 @@ class DojoMemberPortal(CustomerPortal):
             headers=[('Content-Type', 'application/json')],
         )
 
-    @http.route('/my/dojo/billing/cancel', type='http', auth='user', methods=['POST'], csrf=False)
+    @http.route('/my/dojo/billing/cancel', type='http', auth='user', methods=['POST'])
     def portal_billing_cancel(self, **kwargs):
         sub = self._get_household_active_sub()
         if not sub:

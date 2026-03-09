@@ -134,6 +134,7 @@
                  t-att-data-members="members_json"
                  t-att-data-students="students_json"
                  t-att-data-member-id="member.id"
+                 t-att-data-csrf="request.csrf_token()"
                  class="dojo-portal-root mt-3"/>
         </t>
     </template>

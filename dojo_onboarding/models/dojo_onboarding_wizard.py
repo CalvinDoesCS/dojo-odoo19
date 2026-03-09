@@ -107,7 +107,7 @@ class DojoOnboardingWizard(models.TransientModel):
     auto_enroll_mode = fields.Selection(
         [
             ('permanent', 'Permanent (Never Remove)'),
-            ('weekly_limited', 'This Week Only'),
+            ('multiday', 'Limited Date Range'),
         ],
         string='Recurrence Mode',
         default='permanent',
@@ -308,6 +308,28 @@ class DojoOnboardingWizard(models.TransientModel):
                 'is_primary': True,
             })
 
+        # ── Subscription (required) — must be created BEFORE session/template
+        # enrollments so the subscription constraint can validate new enrolments.
+        # ─────────────────────────────────────────────────────────────────────
+        sub_start = self.subscription_start_date or fields.Date.today()
+        period = self.plan_id.billing_period
+        if period == 'weekly':
+            next_billing = sub_start + relativedelta(weeks=1)
+        elif period == 'yearly':
+            next_billing = sub_start + relativedelta(years=1)
+        else:
+            next_billing = sub_start + relativedelta(months=1)
+        self.env['dojo.member.subscription'].create({
+            'member_id': member.id,
+            'plan_id': self.plan_id.id,
+            'start_date': sub_start,
+            'next_billing_date': next_billing,
+            'state': 'active',
+            'company_id': self.env.company.id,
+        })
+        # Transition membership state to active now that a plan is assigned
+        member.action_set_active()
+
         # ── Program enrollment — access is now controlled by subscription ─────
         # No action needed here; the subscription plan links member to program.
 
@@ -350,25 +372,6 @@ class DojoOnboardingWizard(models.TransientModel):
                         'pref_sat': self.auto_enroll_sat,
                         'pref_sun': self.auto_enroll_sun,
                     })
-        # ── Subscription (required) ───────────────────────────────────────────
-        sub_start = self.subscription_start_date or fields.Date.today()
-        period = self.plan_id.billing_period
-        if period == 'weekly':
-            next_billing = sub_start + relativedelta(weeks=1)
-        elif period == 'yearly':
-            next_billing = sub_start + relativedelta(years=1)
-        else:
-            next_billing = sub_start + relativedelta(months=1)
-        self.env['dojo.member.subscription'].create({
-            'member_id': member.id,
-            'plan_id': self.plan_id.id,
-            'start_date': sub_start,
-            'next_billing_date': next_billing,
-            'state': 'active',
-            'company_id': self.env.company.id,
-        })
-        # Transition membership state to active now that a plan is assigned
-        member.action_set_active()
 
         # ── Issue Stripe card for new households ──────────────────────────────
         if self.create_new_household and household:

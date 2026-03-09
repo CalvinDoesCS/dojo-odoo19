@@ -3,6 +3,7 @@ Kiosk service methods -- all business logic for the kiosk SPA lives here.
 Methods are designed to be called from the kiosk HTTP controller via sudo().
 """
 from datetime import datetime, timedelta
+import threading
 
 import pytz
 
@@ -10,9 +11,14 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError
 
 # Module-level rate limit state: {key: {"attempts": int, "locked_until": datetime|None}}
+# Protected by _PIN_ATTEMPTS_LOCK for thread safety within a single worker.
+# NOTE: in multi-worker deployments each worker process has its own dict;
+# a database-backed rate limiter would give full cross-worker protection.
 _PIN_ATTEMPTS: dict = {}
+_PIN_ATTEMPTS_LOCK = threading.Lock()
 _MAX_PIN_ATTEMPTS = 5
 _LOCKOUT_MINUTES = 15
+_MAX_PIN_ENTRIES = 500  # evict oldest entry when this size is reached
 
 
 class DojoKioskService(models.AbstractModel):
@@ -897,12 +903,19 @@ class DojoKioskService(models.AbstractModel):
             cfg_id = None
 
         key = cfg_id or "global"
-        state = _PIN_ATTEMPTS.setdefault(key, {"attempts": 0, "locked_until": None})
         now = datetime.utcnow()
-        if state["locked_until"] and now < state["locked_until"]:
-            remaining = int((state["locked_until"] - now).total_seconds() / 60) + 1
-            return {"success": False, "error": "locked", "retry_in_minutes": remaining}
 
+        # Check lockout state under lock (fast path)
+        with _PIN_ATTEMPTS_LOCK:
+            if len(_PIN_ATTEMPTS) >= _MAX_PIN_ENTRIES:
+                # Evict the oldest entry to cap memory usage
+                del _PIN_ATTEMPTS[next(iter(_PIN_ATTEMPTS))]
+            state = _PIN_ATTEMPTS.setdefault(key, {"attempts": 0, "locked_until": None})
+            if state["locked_until"] and now < state["locked_until"]:
+                remaining = int((state["locked_until"] - now).total_seconds() / 60) + 1
+                return {"success": False, "error": "locked", "retry_in_minutes": remaining}
+
+        # Database lookup outside the lock to avoid blocking other threads
         domain = [("active", "=", True), ("pin_code", "=", pin)]
         if cfg_id:
             domain.append(("id", "=", cfg_id))
@@ -910,10 +923,12 @@ class DojoKioskService(models.AbstractModel):
             domain.append(("company_id", "in", [self.env.company.id, False]))
         found = self.env["dojo.kiosk.config"].search(domain, limit=1)
 
-        if found:
-            _PIN_ATTEMPTS[key] = {"attempts": 0, "locked_until": None}
-            return {"success": True}
-        else:
+        # Update attempt counter under lock
+        with _PIN_ATTEMPTS_LOCK:
+            if found:
+                _PIN_ATTEMPTS[key] = {"attempts": 0, "locked_until": None}
+                return {"success": True}
+            state = _PIN_ATTEMPTS.setdefault(key, {"attempts": 0, "locked_until": None})
             state["attempts"] += 1
             if state["attempts"] >= _MAX_PIN_ATTEMPTS:
                 state["locked_until"] = now + timedelta(minutes=_LOCKOUT_MINUTES)

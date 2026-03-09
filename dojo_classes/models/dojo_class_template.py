@@ -113,8 +113,9 @@ class DojoClassTemplate(models.Model):
         )
         existing_dates = {s.start_datetime.date() for s in existing}
 
-        hour = int(self.recurrence_time)
-        minute = int(round((self.recurrence_time - hour) * 60))
+        hour, frac = divmod(self.recurrence_time, 1)
+        hour = int(hour)
+        minute = min(59, int(round(frac * 60)))
         duration = timedelta(minutes=self.duration_minutes or 60)
 
         current = start
@@ -166,7 +167,10 @@ class DojoClassTemplate(models.Model):
                     else:
                         enroll = pref.should_enroll_on_date(current)
                     if enroll:
-                        Enrollment.create(
+                        Enrollment.with_context(
+                            skip_subscription_check=True,
+                            skip_course_membership_check=True,
+                        ).create(
                             {
                                 "session_id": session.id,
                                 "member_id": member.id,
@@ -259,15 +263,23 @@ class DojoClassTemplate(models.Model):
                         ('state', 'not in', ['done', 'cancelled']),
                     ])
                     Enrollment = self.env['dojo.class.enrollment']
+                    # Pre-load all existing enrollments in one query to avoid
+                    # O(sessions × members) individual search() calls below.
+                    existing_pairs = set()
+                    if future_sessions:
+                        existing_data = Enrollment.search_read([
+                            ('session_id', 'in', future_sessions.ids),
+                            ('member_id', 'in', added_ids),
+                        ], fields=['session_id', 'member_id'])
+                        existing_pairs = {
+                            (e['session_id'][0], e['member_id'][0])
+                            for e in existing_data
+                        }
                     for session in future_sessions:
                         session_date = session.start_datetime.date()
+                        to_create = []
                         for member_id in added_ids:
-                            # Skip if already enrolled
-                            already = Enrollment.search([
-                                ('session_id', '=', session.id),
-                                ('member_id', '=', member_id),
-                            ], limit=1)
-                            if already:
+                            if (session.id, member_id) in existing_pairs:
                                 continue
                             pref = pref_by_member.get(member_id)
                             if pref is None:
@@ -275,13 +287,15 @@ class DojoClassTemplate(models.Model):
                             else:
                                 enroll = pref.should_enroll_on_date(session_date)
                             if enroll:
-                                Enrollment.with_context(
-                                    skip_course_membership_check=True
-                                ).create({
+                                to_create.append({
                                     'session_id': session.id,
                                     'member_id': member_id,
                                     'status': 'registered',
                                 })
+                        if to_create:
+                            Enrollment.with_context(
+                                skip_course_membership_check=True
+                            ).create(to_create)
         return res
 
     @api.model

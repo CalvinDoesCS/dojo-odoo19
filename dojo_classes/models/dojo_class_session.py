@@ -53,10 +53,16 @@ class DojoClassSession(models.Model):
 
     @api.depends("enrollment_ids.status")
     def _compute_seats_taken(self):
+        if not self.ids:
+            return
+        groups = self.env['dojo.class.enrollment'].read_group(
+            [('session_id', 'in', self.ids), ('status', '=', 'registered')],
+            fields=['session_id'],
+            groupby=['session_id'],
+        )
+        counts = {g['session_id'][0]: g['session_id_count'] for g in groups}
         for session in self:
-            session.seats_taken = len(
-                session.enrollment_ids.filtered(lambda enrollment: enrollment.status == "registered")
-            )
+            session.seats_taken = counts.get(session.id, 0)
 
     @api.constrains("start_datetime", "end_datetime")
     def _check_datetime_order(self):

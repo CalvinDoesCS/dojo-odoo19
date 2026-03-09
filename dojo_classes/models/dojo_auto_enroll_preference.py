@@ -194,7 +194,10 @@ class DojoAutoEnrollPreference(models.Model):
             if already:
                 continue
             if self.should_enroll_on_date(session.start_datetime.date()):
-                Enrollment.with_context(skip_course_membership_check=True).create({
+                Enrollment.with_context(
+                    skip_course_membership_check=True,
+                    skip_subscription_check=True,
+                ).create({
                     "session_id": session.id,
                     "member_id": self.member_id.id,
                     "status": "registered",

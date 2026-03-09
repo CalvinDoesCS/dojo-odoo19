@@ -5,8 +5,8 @@ from odoo import api, fields, models
 
 class DojoMemberDashboard(models.Model):
     """Extends dojo.member with a belt rank stub and enrollment One2many for the
-    instructor dashboard.  Replace current_belt_stub with Many2one('dojo.belt.rank')
-    once dojo_belt_progression ships."""
+    instructor dashboard.  When dojo_belt_progression is installed, the view
+    XPath in that module replaces current_belt_stub with current_rank_id."""
 
     _inherit = 'dojo.member'
 
@@ -23,7 +23,7 @@ class DojoMemberDashboard(models.Model):
     current_belt_stub = fields.Char(
         string='Belt Rank',
         compute='_compute_belt_stub',
-        help='Placeholder — full belt progression coming in dojo_belt_progression module.',
+        help='Placeholder — full belt progression is available once dojo_belt_progression is installed.',
     )
 
     def _compute_belt_stub(self):
@@ -146,19 +146,6 @@ class DojoInstructorProfile(models.Model):
         digits=(5, 1),
     )
 
-    # Belt rank stub – replaced when dojo_belt_progression ships
-    # TODO: update to a real Many2one('dojo.belt.rank') in phase 5
-    current_belt_stub = fields.Char(
-        string='Belt Rank',
-        compute='_compute_belt_stub',
-        help='Placeholder until the dojo_belt_progression module is installed.',
-    )
-
-    @api.depends('user_id')
-    def _compute_belt_stub(self):
-        for rec in self:
-            rec.current_belt_stub = '—'
-
     @api.model
     def get_my_profile_data(self):
         """Returns KPI data for the currently logged-in instructor.
@@ -179,68 +166,81 @@ class DojoInstructorProfile(models.Model):
 
     @api.depends('user_id')
     def _compute_instructor_kpis(self):
-        """Computes KPI values for each instructor profile.
-        Uses ``@api.depends('user_id')`` so the cache is invalidated when
-        the profile's user changes; dashboard views will always re-fetch."""
+        """Computes KPI values for each instructor profile using batched queries
+        (5 queries total regardless of how many profiles are in ``self``)."""
+        if not self:
+            return
         Session = self.env['dojo.class.session']
         Enrollment = self.env['dojo.class.enrollment']
         AttendanceLog = self.env['dojo.attendance.log']
 
+        profile_ids = self.ids
         _, today_start, today_end = self._today_utc_range()
         thirty_days_ago = today_start - timedelta(days=30)
 
+        # ── Today’s session count per instructor (1 query) ─────────────────
+        today_sessions = Session.search([
+            ('instructor_profile_id', 'in', profile_ids),
+            ('start_datetime', '>=', today_start),
+            ('start_datetime', '<=', today_end),
+        ])
+        today_count_map = {}
+        for s in today_sessions:
+            pid = s.instructor_profile_id.id
+            today_count_map[pid] = today_count_map.get(pid, 0) + 1
+
+        # ── Total enrolled students (distinct) per instructor (2 queries) ──
+        all_active_sessions = Session.search([
+            ('instructor_profile_id', 'in', profile_ids),
+            ('state', 'in', ['open', 'done']),
+        ])
+        # Pre-build session_id → instructor_profile_id map to avoid M2o chain in loop
+        sess_to_instructor = {s.id: s.instructor_profile_id.id for s in all_active_sessions}
+        students_map = {}  # pid → set of member ids
+        if all_active_sessions:
+            all_enrollments = Enrollment.search([
+                ('session_id', 'in', all_active_sessions.ids),
+                ('status', '=', 'registered'),
+            ])
+            for enr in all_enrollments:
+                pid = sess_to_instructor.get(enr.session_id.id)
+                if pid:
+                    students_map.setdefault(pid, set()).add(enr.member_id.id)
+
+        # ── Recent sessions per instructor for fill/attendance rate (1 query)
+        recent_sessions = Session.search([
+            ('instructor_profile_id', 'in', profile_ids),
+            ('start_datetime', '>=', thirty_days_ago),
+            ('state', 'in', ['open', 'done']),
+        ])
+        recent_sess_to_instructor = {s.id: s.instructor_profile_id.id for s in recent_sessions}
+        capacity_map = {}  # pid → (total_capacity, total_taken)
+        for s in recent_sessions:
+            pid = s.instructor_profile_id.id
+            cap, taken = capacity_map.get(pid, (0, 0))
+            if s.capacity > 0:
+                cap += s.capacity
+            capacity_map[pid] = (cap, taken + s.seats_taken)
+
+        # ── Attendance logs for all recent sessions (1 query) ─────────────
+        log_map = {}  # pid → (total, present)
+        if recent_sessions:
+            logs = AttendanceLog.search([('session_id', 'in', recent_sessions.ids)])
+            for log in logs:
+                pid = recent_sess_to_instructor.get(log.session_id.id)
+                if pid:
+                    total, present = log_map.get(pid, (0, 0))
+                    log_map[pid] = (total + 1, present + (1 if log.status == 'present' else 0))
+
+        # ── Assign computed values ─────────────────────────────────────────
         for profile in self:
-            # Today's sessions
-            today_sessions = Session.search([
-                ('instructor_profile_id', '=', profile.id),
-                ('start_datetime', '>=', today_start),
-                ('start_datetime', '<=', today_end),
-            ])
-            profile.sessions_today_count = len(today_sessions)
-
-            # Total distinct registered students across all active sessions
-            all_sessions = Session.search([
-                ('instructor_profile_id', '=', profile.id),
-                ('state', 'in', ['open', 'done']),
-            ])
-            if all_sessions:
-                enrolled_members = Enrollment.search([
-                    ('session_id', 'in', all_sessions.ids),
-                    ('status', '=', 'registered'),
-                ]).mapped('member_id')
-                profile.students_total_count = len(enrolled_members)
-            else:
-                profile.students_total_count = 0
-
-            # Fill rate over last 30 days
-            recent_sessions = Session.search([
-                ('instructor_profile_id', '=', profile.id),
-                ('start_datetime', '>=', thirty_days_ago),
-                ('state', 'in', ['open', 'done']),
-            ])
-            if recent_sessions:
-                total_capacity = sum(
-                    s.capacity for s in recent_sessions if s.capacity > 0
-                )
-                total_taken = sum(s.seats_taken for s in recent_sessions)
-                profile.avg_fill_rate = (
-                    (total_taken / total_capacity * 100) if total_capacity else 0.0
-                )
-            else:
-                profile.avg_fill_rate = 0.0
-
-            # Attendance rate over last 30 days
-            if recent_sessions:
-                logs = AttendanceLog.search([
-                    ('session_id', 'in', recent_sessions.ids),
-                ])
-                if logs:
-                    present = len(logs.filtered(lambda l: l.status == 'present'))
-                    profile.attendance_rate = present / len(logs) * 100
-                else:
-                    profile.attendance_rate = 0.0
-            else:
-                profile.attendance_rate = 0.0
+            pid = profile.id
+            profile.sessions_today_count = today_count_map.get(pid, 0)
+            profile.students_total_count = len(students_map.get(pid, set()))
+            tot_cap, tot_taken = capacity_map.get(pid, (0, 0))
+            profile.avg_fill_rate = (tot_taken / tot_cap * 100) if tot_cap else 0.0
+            tot_logs, tot_present = log_map.get(pid, (0, 0))
+            profile.attendance_rate = (tot_present / tot_logs * 100) if tot_logs else 0.0
 
     # ── Admin dashboard data ──────────────────────────────────────────────
 

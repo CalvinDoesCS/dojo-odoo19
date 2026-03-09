@@ -8,8 +8,8 @@
         <field name="name">Dojo CRM: Trial Booked — Send Confirmation</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
-        <field name="filter_pre_domain">[('stage_id.name', '!=', 'Trial Booked')]</field>
-        <field name="filter_domain">[('stage_id.name', '=', 'Trial Booked')]</field>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
         <field name="active" eval="True"/>
         <field name="action_server_ids">
             <record model="ir.actions.server" id="automation_trial_booked_email_action">
@@ -45,8 +45,8 @@ for rec in records:
         <field name="name">Dojo CRM: Trial Attended — Send Offer</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
-        <field name="filter_pre_domain">[('stage_id.name', '!=', 'Trial Attended')]</field>
-        <field name="filter_domain">[('stage_id.name', '=', 'Trial Attended')]</field>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_attended'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_trial_attended'))]"/>
         <field name="active" eval="True"/>
         <field name="action_server_ids">
             <record model="ir.actions.server" id="automation_trial_attended_offer_action">
@@ -72,8 +72,8 @@ for rec in records:
         <field name="name">Dojo CRM: Offer Made — Send Plan Details</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
-        <field name="filter_pre_domain">[('stage_id.name', '!=', 'Offer Made')]</field>
-        <field name="filter_domain">[('stage_id.name', '=', 'Offer Made')]</field>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_offer_made'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_offer_made'))]"/>
         <field name="active" eval="True"/>
         <field name="action_server_ids">
             <record model="ir.actions.server" id="automation_offer_made_details_action">

@@ -10,7 +10,7 @@ class DojoAttendanceLog(models.Model):
         "dojo.class.session", required=True, ondelete="cascade", index=True
     )
     enrollment_id = fields.Many2one("dojo.class.enrollment", index=True)
-    member_id = fields.Many2one("dojo.member", required=True, index=True)
+    member_id = fields.Many2one("dojo.member", required=True, index=True, ondelete="restrict")
     status = fields.Selection(
         [
             ("present", "Present"),

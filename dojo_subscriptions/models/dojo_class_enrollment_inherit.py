@@ -9,6 +9,10 @@ class DojoClassEnrollment(models.Model):
 
     @api.constrains('session_id', 'member_id', 'status')
     def _check_subscription_constraints(self):
+        # Allow cron session generation, auto-enroll, and onboarding wizard to
+        # bypass this constraint — they always create the subscription first.
+        if self.env.context.get('skip_subscription_check'):
+            return
         for rec in self:
             if rec.status != 'registered':
                 continue
