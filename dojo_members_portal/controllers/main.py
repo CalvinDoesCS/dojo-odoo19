@@ -132,7 +132,7 @@ class DojoMemberPortal(CustomerPortal):
 
     # ── /my/dojo  (unified portal page) ─────────────────────────────────
     @http.route('/my/dojo', type='http', auth='user', website=True)
-    def portal_dojo_home(self, tab='programs', saved=None, **kwargs):
+    def portal_dojo_home(self, tab='programs', saved=None, upgraded=None, invoice_warning=None, **kwargs):
         member = self._get_current_member()
         if not member:
             return request.render('dojo_members_portal.portal_no_member', {})
@@ -168,6 +168,8 @@ class DojoMemberPortal(CustomerPortal):
             'attendance_count': attendance_count,
             'upcoming_count': upcoming_count,
             'household_saved': saved == '1',
+            'plan_upgraded': upgraded == '1',
+            'invoice_warning': invoice_warning == '1',
             'members_json': members_json,
             'students_json': students_json,
             # Belt context: hide rank card for parents who have no rank of their own

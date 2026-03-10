@@ -119,6 +119,14 @@ class DojoOnboardingWizard(models.TransientModel):
     auto_enroll_fri = fields.Boolean('Fri')
     auto_enroll_sat = fields.Boolean('Sat')
     auto_enroll_sun = fields.Boolean('Sun')
+    auto_enroll_date_from = fields.Date(
+        'Auto-Enroll From',
+        help='Required when mode is Multiday Range. First day of the date range.',
+    )
+    auto_enroll_date_to = fields.Date(
+        'Auto-Enroll To',
+        help='Required when mode is Multiday Range. Last day (inclusive) of the date range.',
+    )
 
     # ── Step 4: Subscription ─────────────────────────────────────────────────
     plan_id = fields.Many2one(
@@ -202,6 +210,16 @@ class DojoOnboardingWizard(models.TransientModel):
                 raise UserError(_(
                     'Please select a program for this member.'
                 ))
+        elif self.step == 'auto_enroll':
+            if self.auto_enroll_active and self.auto_enroll_mode == 'multiday':
+                if not self.auto_enroll_date_from or not self.auto_enroll_date_to:
+                    raise UserError(_(
+                        'A From and To date are required for Multiday Range mode.'
+                    ))
+                if self.auto_enroll_date_from > self.auto_enroll_date_to:
+                    raise UserError(_(
+                        '"From" date must be on or before the "To" date.'
+                    ))
         elif self.step == 'subscription':
             if not self.plan_id:
                 raise UserError(_(
@@ -366,12 +384,13 @@ class DojoOnboardingWizard(models.TransientModel):
             # Create auto-enroll preference (if active option was chosen)
             if self.auto_enroll_active:
                 Pref = self.env['dojo.course.auto.enroll']
+                mode = self.auto_enroll_mode or 'permanent'
                 for tmpl in self.template_ids:
-                    Pref.create({
+                    pref_vals = {
                         'member_id': member.id,
                         'template_id': tmpl.id,
                         'active': True,
-                        'mode': self.auto_enroll_mode or 'permanent',
+                        'mode': mode,
                         'pref_mon': self.auto_enroll_mon,
                         'pref_tue': self.auto_enroll_tue,
                         'pref_wed': self.auto_enroll_wed,
@@ -379,7 +398,11 @@ class DojoOnboardingWizard(models.TransientModel):
                         'pref_fri': self.auto_enroll_fri,
                         'pref_sat': self.auto_enroll_sat,
                         'pref_sun': self.auto_enroll_sun,
-                    })
+                    }
+                    if mode == 'multiday':
+                        pref_vals['date_from'] = self.auto_enroll_date_from
+                        pref_vals['date_to'] = self.auto_enroll_date_to
+                    Pref.create(pref_vals)
 
         # ── Issue Stripe card for new households ──────────────────────────────
         if self.create_new_household and household:

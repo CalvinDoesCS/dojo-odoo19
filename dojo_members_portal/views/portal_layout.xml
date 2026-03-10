@@ -130,7 +130,22 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"/>
                 </div>
             </t>
-
+            <!-- ── Plan upgraded flash ────────────────────────────────────────── -->
+            <t t-if="plan_upgraded and not invoice_warning">
+                <div class="alert alert-success alert-dismissible mb-3" role="alert">
+                    <i class="fa fa-check-circle me-1"/>
+                    <strong>Congratulations!</strong> Your membership is now active and your first invoice has been sent.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"/>
+                </div>
+            </t>
+            <t t-if="plan_upgraded and invoice_warning">
+                <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+                    <i class="fa fa-exclamation-triangle me-1"/>
+                    <strong>Membership activated</strong>, but we could not generate your first invoice automatically.
+                    Please contact the front desk or try again from the Billing tab.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"/>
+                </div>
+            </t>
             <!-- ── JS activities mount ─────────────────────────────────────── -->
             <div id="dojo_activities_mount"
                  t-att-data-tab="initial_tab or 'programs'"

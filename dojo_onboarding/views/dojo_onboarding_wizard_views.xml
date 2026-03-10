@@ -197,6 +197,13 @@
                             <field name="auto_enroll_sun"/>
                         </group>
                     </group>
+                    <group string="Date Range"
+                           invisible="not auto_enroll_active or auto_enroll_mode != 'multiday'">
+                        <field name="auto_enroll_date_from"
+                               required="auto_enroll_active and auto_enroll_mode == 'multiday'"/>
+                        <field name="auto_enroll_date_to"
+                               required="auto_enroll_active and auto_enroll_mode == 'multiday'"/>
+                    </group>
                     <div class="text-muted small ps-1" invisible="auto_enroll_active" colspan="2">
                         Auto-enroll is disabled. The member will not be automatically enrolled
                         in recurring sessions — they can still sign up for individual sessions

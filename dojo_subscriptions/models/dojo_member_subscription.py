@@ -103,13 +103,28 @@ class DojoMemberSubscription(models.Model):
             raise_if_not_found=False,
         )
 
-        line_vals = {
+        invoice_line_ids = []
+
+        # Initial / setup fee — only on the very first invoice
+        is_first_invoice = not bool(self.invoice_ids)
+        if is_first_invoice and plan.initial_fee and plan.initial_fee > 0:
+            fee_vals = {
+                'name': '{} – Enrollment Fee'.format(plan.name),
+                'quantity': 1.0,
+                'price_unit': plan.initial_fee,
+            }
+            if product:
+                fee_vals['product_id'] = product.id
+            invoice_line_ids.append((0, 0, fee_vals))
+
+        recurring_vals = {
             'name': '{} – {} Membership ({})'.format(plan.name, period_label, date_range),
             'quantity': 1.0,
             'price_unit': plan.price,
         }
         if product:
-            line_vals['product_id'] = product.id
+            recurring_vals['product_id'] = product.id
+        invoice_line_ids.append((0, 0, recurring_vals))
 
         invoice = self.env['account.move'].sudo().create({
             'move_type': 'out_invoice',
@@ -118,7 +133,7 @@ class DojoMemberSubscription(models.Model):
             'invoice_date_due': self._next_date_from(period_start),
             'subscription_id': self.id,
             'company_id': (self.company_id or self.env.company).id,
-            'invoice_line_ids': [(0, 0, line_vals)],
+            'invoice_line_ids': invoice_line_ids,
         })
         invoice.action_post()
         self.last_invoice_id = invoice
@@ -172,6 +187,16 @@ class DojoMemberSubscription(models.Model):
             ("next_billing_date", "<=", today),
         ])
         for sub in due:
+            # Idempotency guard: skip if an invoice was already posted today
+            # for this subscription (handles cron crash-and-retry scenarios).
+            already_today = self.env['account.move'].search_count([
+                ('subscription_id', '=', sub.id),
+                ('invoice_date', '=', today),
+                ('move_type', '=', 'out_invoice'),
+                ('state', '!=', 'cancel'),
+            ])
+            if already_today:
+                continue
             try:
                 sub.action_generate_invoice()
             except Exception as exc:

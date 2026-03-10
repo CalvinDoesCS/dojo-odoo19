@@ -287,15 +287,20 @@ class DojoCheckout(http.Controller):
             member.sudo().action_set_active()
 
             # Generate and email the first invoice
+            invoice_failed = False
             try:
-                invoice = subscription.sudo().action_generate_invoice()
+                subscription.sudo().action_generate_invoice()
             except Exception:
                 _logger.warning(
                     "Portal upgrade: could not generate invoice for member %s",
                     member.id, exc_info=True
                 )
+                invoice_failed = True
 
-            return request.redirect("/my/dojo?tab=billing&upgraded=1")
+            redirect_url = "/my/dojo?tab=billing&upgraded=1"
+            if invoice_failed:
+                redirect_url += "&invoice_warning=1"
+            return request.redirect(redirect_url)
 
         # GET — show plan picker
         plans = request.env["dojo.subscription.plan"].sudo().search(

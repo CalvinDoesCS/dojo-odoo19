@@ -246,9 +246,11 @@ class DojoCheckoutSession(models.Model):
                 invoice_lines.append((0, 0, uline))
                 if internal_user and activity_type and member_model_id:
                     try:
+                        # Resolve the dojo.member record so res_id matches res_model_id
+                        upsell_member = subscription.member_id
                         env["mail.activity"].sudo().create({
                             "res_model_id": member_model_id,
-                            "res_id": billing_partner.id,
+                            "res_id": upsell_member.id,
                             "activity_type_id": activity_type.id,
                             "summary": f"Checkout upsell: {upsell.name}",
                             "note": (
