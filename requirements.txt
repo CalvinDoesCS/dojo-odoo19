@@ -4,6 +4,10 @@ twilio
 # Stripe – Issuing virtual cards + Google Wallet push provisioning
 stripe
 
+# JWT verification for the dojo_bridge Control Plane API
+# NestJS issues HS256 JWTs; Odoo verifies them here (never contacts Firebase directly)
+PyJWT>=2.8.0
+
 # Data Analysis for HRMS Dashboard
 pandas
 numpy
