@@ -351,10 +351,18 @@ class DojoMemberPortal(CustomerPortal):
                 headers=[('Content-Type', 'application/json')],
             )
 
-        # All active recurring templates
-        all_templates = request.env['dojo.class.template'].sudo().search([
-            ('recurrence_active', '=', True),
-        ])
+        # Only recurring templates the students are actually enrolled in
+        enrolled_tmpl_ids = set()
+        for _m in household_members:
+            enrolled_tmpl_ids.update(_m.enrolled_template_ids.ids)
+            _en = request.env['dojo.class.enrollment'].sudo().search([
+                ('member_id', '=', _m.id),
+                ('status', '!=', 'cancelled'),
+            ])
+            enrolled_tmpl_ids.update(_en.mapped('session_id.template_id').ids)
+        all_templates = request.env['dojo.class.template'].sudo().browse(
+            list(enrolled_tmpl_ids)
+        ).filtered(lambda t: t.recurrence_active)
 
         # Existing explicit preferences (include inactive/opted-out via active_test=False)
         prefs = request.env['dojo.course.auto.enroll'].with_context(
@@ -1033,6 +1041,7 @@ class DojoMemberPortal(CustomerPortal):
                 'due': fields.Date.to_string(inv.invoice_date_due) if inv.invoice_date_due else None,
                 'amount': inv.amount_total,
                 'state': inv.state,
+                'payment_state': inv.payment_state,  # not_paid / partial / in_payment / paid
                 'currency': inv.currency_id.name if inv.currency_id else 'USD',
             })
 
@@ -1185,8 +1194,14 @@ class DojoMemberPortal(CustomerPortal):
         invoices = request.env['account.move'].sudo().browse(invoice_ids).sorted(
             key=lambda i: i.invoice_date or i.create_date, reverse=True
         )
+        ICP = request.env['ir.config_parameter'].sudo()
+        stripe_pk = ICP.get_param('stripe.publishable_key', '')
+        paid_flash = request.httprequest.args.get('paid') == '1'
         return request.render('dojo_members_portal.portal_my_dojo_invoices', {
             'invoices': invoices,
+            'household': member.household_id,
+            'stripe_pk': stripe_pk,
+            'paid_flash': paid_flash,
             'page_name': 'dojo_invoices',
         })
 
@@ -1213,6 +1228,89 @@ class DojoMemberPortal(CustomerPortal):
                 ('Content-Disposition', f'attachment; filename="invoice-{invoice.name}.pdf"'),
             ],
         )
+
+    # ── /my/dojo/billing  (parent: add/update Stripe card on file) ────────
+    @http.route(
+        '/my/dojo/billing',
+        type='http', auth='user', methods=['GET', 'POST'], website=True,
+    )
+    def portal_dojo_billing(self, payment_method_id='', **post):
+        member = self._get_current_member()
+        if not member or member.role not in ('parent', 'both'):
+            return request.render('dojo_members_portal.portal_no_member', {})
+        ICP = request.env['ir.config_parameter'].sudo()
+        stripe_pk = ICP.get_param('stripe.publishable_key', '')
+        household = member.sudo().household_id
+        card_error = ''
+        saved = False
+        if request.httprequest.method == 'POST':
+            pm_id = (payment_method_id or '').strip()
+            if not pm_id.startswith('pm_'):
+                card_error = 'Invalid card token. Please try again.'
+            elif not household:
+                card_error = 'No household linked to your account.'
+            else:
+                try:
+                    household.sudo().action_save_payment_method(pm_id)
+                    saved = True
+                except Exception as exc:
+                    card_error = str(exc)
+        return request.render('dojo_members_portal.portal_dojo_billing', {
+            'member': member,
+            'household': household,
+            'stripe_pk': stripe_pk,
+            'saved': saved,
+            'card_error': card_error,
+            'page_name': 'dojo_billing',
+        })
+
+    # ── /my/dojo/invoices/<id>/pay  (parent: pay open invoice via Stripe) ──
+    @http.route(
+        '/my/dojo/invoices/<int:invoice_id>/pay',
+        type='http', auth='user', methods=['GET', 'POST'], website=True,
+    )
+    def portal_dojo_invoice_pay(self, invoice_id, payment_method_id='', **kwargs):
+        member = self._get_current_member()
+        if not member or member.role not in ('parent', 'both'):
+            return request.not_found()
+        invoice_ids = self._get_household_invoice_ids()
+        if invoice_id not in invoice_ids:
+            return request.not_found()
+        invoice = request.env['account.move'].sudo().browse(invoice_id)
+        if invoice.payment_state in ('paid', 'in_payment'):
+            return request.redirect('/my/dojo/invoices')
+        household = member.sudo().household_id
+        ICP = request.env['ir.config_parameter'].sudo()
+        stripe_pk = ICP.get_param('stripe.publishable_key', '')
+        pay_error = ''
+        if request.httprequest.method == 'POST':
+            pm_id = (payment_method_id or '').strip()
+            if pm_id.startswith('pm_') and household:
+                try:
+                    household.sudo().action_save_payment_method(pm_id)
+                except Exception as exc:
+                    pay_error = str(exc)
+            if not pay_error and household and household.stripe_payment_method_id:
+                try:
+                    household.sudo().action_charge_invoice(invoice)
+                    sub = request.env['dojo.member.subscription'].sudo().search([
+                        ('member_id', 'in', self._get_household_member_ids()),
+                        ('last_invoice_id', '=', invoice.id),
+                    ], limit=1)
+                    if sub and sub.billing_failure_count:
+                        sub._reset_billing_failures()
+                    return request.redirect('/my/dojo/invoices?paid=1')
+                except Exception as exc:
+                    pay_error = str(exc)
+            elif not pay_error:
+                pay_error = 'No payment method saved. Please enter your card below.'
+        return request.render('dojo_members_portal.portal_invoice_pay', {
+            'invoice': invoice,
+            'household': household,
+            'stripe_pk': stripe_pk,
+            'pay_error': pay_error,
+            'page_name': 'dojo_invoices',
+        })
 
     # ── /my/dojo/household ────────────────────────────────────────────────
     @http.route(

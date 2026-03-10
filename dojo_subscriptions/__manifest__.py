@@ -1,7 +1,7 @@
 {
     "name": "Dojo Subscriptions",
     "summary": "Membership plans and subscriptions",
-    "version": "19.0.3.0.0",
+    "version": "19.0.4.0.0",
     "category": "Services",
     "license": "LGPL-3",
     "author": "Dojo",

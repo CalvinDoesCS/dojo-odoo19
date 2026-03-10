@@ -120,9 +120,6 @@
                         <field name="new_guardian_email" placeholder="email@example.com"/>
                         <field name="new_guardian_phone" required="step == 'guardian_setup'"/>
                     </group>
-                    <div class="text-muted small ps-1" colspan="2">
-                        Phone number is required for the guardian.
-                    </div>
                     <group>
                         <field name="new_guardian_role"/>
                         <field name="new_household_name"

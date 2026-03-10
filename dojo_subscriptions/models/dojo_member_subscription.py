@@ -156,7 +156,7 @@ class DojoMemberSubscription(models.Model):
             'move_type': 'out_invoice',
             'partner_id': billing_partner.id,
             'invoice_date': today,
-            'invoice_date_due': self._next_date_from(period_start),
+            'invoice_date_due': period_start,   # due same day as billing date
             'subscription_id': self.id,
             'company_id': (self.company_id or self.env.company).id,
             'invoice_line_ids': invoice_line_ids,

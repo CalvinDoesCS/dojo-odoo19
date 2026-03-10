@@ -1,6 +1,6 @@
 {
     'name': 'Dojo Member Portal',
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'summary': 'Self-service portal for dojo parents and students',
     'description': """
         Extends the Odoo website portal (/my) with dojo-specific pages:
@@ -22,6 +22,7 @@
         'dojo_classes',
         'dojo_attendance',
         'dojo_subscriptions',
+        'dojo_stripe',
         'dojo_belt_progression',
     ],
     'data': [

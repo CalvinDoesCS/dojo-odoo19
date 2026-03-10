@@ -341,14 +341,25 @@
             html += '<div class="table-responsive"><table class="table table-sm table-hover">';
             html += '<thead class="table-light"><tr><th>Invoice #</th><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>';
             invoices.forEach(function(inv) {
-                var bcls = inv.state === 'posted' ? 'bg-success' : inv.state === 'cancel' ? 'bg-danger' : 'bg-secondary';
-                var blbl = inv.state === 'posted' ? 'Paid' : inv.state === 'cancel' ? 'Cancelled' : 'Draft';
+                var ps = inv.payment_state || '';
+                var isPaid = ps === 'paid' || ps === 'in_payment';
+                var isPartial = ps === 'partial';
+                var isCancelled = inv.state === 'cancel';
+                var isDraft = inv.state === 'draft';
+                var bcls = isPaid ? 'bg-success' : isCancelled ? 'bg-danger' : isPartial ? 'bg-warning text-dark' : isDraft ? 'bg-secondary' : 'bg-primary';
+                var blbl = isPaid ? 'Paid' : isCancelled ? 'Cancelled' : isPartial ? 'Partial' : isDraft ? 'Draft' : 'Open';
+                var canPay = inv.state === 'posted' && !isPaid && !isCancelled;
                 html += '<tr>';
                 html += '<td class="small">' + esc(inv.name || '\u2014') + '</td>';
                 html += '<td class="small">' + esc(fmtDate(inv.date)) + '</td>';
                 html += '<td class="small fw-semibold">' + esc(fmtMoney(inv.amount, inv.currency)) + '</td>';
                 html += '<td><span class="badge ' + esc(bcls) + '">' + esc(blbl) + '</span></td>';
-                html += '<td><a href="/my/dojo/invoices/' + inv.id + '/pdf" class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="fa fa-download"></i></a></td>';
+                html += '<td class="d-flex gap-1">';
+                html += '<a href="/my/dojo/invoices/' + inv.id + '/pdf" class="btn btn-sm btn-outline-secondary py-0 px-2" title="PDF"><i class="fa fa-download"></i></a>';
+                if (canPay) {
+                    html += '<a href="/my/dojo/invoices/' + inv.id + '/pay" class="btn btn-sm btn-primary py-0 px-2">Pay</a>';
+                }
+                html += '</td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';

@@ -25,7 +25,7 @@
                     </div>
                 </a>
             </div>
-            <!-- Invoices: parents / guardians only -->
+                            <!-- Invoices: parents / guardians only -->
             <t t-if="_dojo_is_parent">
                 <div class="o_portal_index_card col-md-6 order-2">
                     <a href="/my/dojo/invoices" title="Dojo Invoices" class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none bg-100">
@@ -36,7 +36,20 @@
                             <div class="mt-0 mb-1 fs-5 fw-normal lh-1">
                                 <span>Dojo Invoices</span>
                             </div>
-                            <div class="opacity-75">View subscription invoices</div>
+                            <div class="opacity-75">View &amp; pay subscription invoices</div>
+                        </div>
+                    </a>
+                </div>
+                <div class="o_portal_index_card col-md-6 order-2">
+                    <a href="/my/dojo/billing" title="Billing &amp; Payment" class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none bg-100">
+                        <div class="o_portal_icon d-block align-self-start">
+                            <img src="/portal/static/src/img/portal-addresses.svg"/>
+                        </div>
+                        <div>
+                            <div class="mt-0 mb-1 fs-5 fw-normal lh-1">
+                                <span>Billing &amp; Payment</span>
+                            </div>
+                            <div class="opacity-75">Update your card on file</div>
                         </div>
                     </a>
                 </div>
@@ -203,6 +216,12 @@
                 <t t-set="title">Subscription Invoices</t>
             </t>
 
+            <t t-if="paid_flash">
+                <div class="alert alert-success" role="alert">
+                    <i class="fa fa-check-circle"/> Payment processed successfully.
+                </div>
+            </t>
+
             <t t-if="not invoices">
                 <div class="alert alert-info">No invoices found for your household.</div>
             </t>
@@ -216,7 +235,7 @@
                                 <th>Due Date</th>
                                 <th>Amount</th>
                                 <th>Status</th>
-                                <th class="text-center">PDF</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -238,21 +257,259 @@
                                               t-options='{"widget": "monetary", "display_currency": inv.currency_id}'/>
                                     </td>
                                     <td>
-                                        <span t-att-class="'badge ' + ('bg-secondary' if inv.state == 'draft' else 'bg-success' if inv.state == 'posted' else 'bg-danger' if inv.state == 'cancel' else 'bg-secondary')"
-                                              t-out="'Draft' if inv.state == 'draft' else 'Posted' if inv.state == 'posted' else 'Cancelled' if inv.state == 'cancel' else inv.state"/>
+                                        <t t-if="inv.state == 'draft'">
+                                            <span class="badge bg-secondary">Draft</span>
+                                        </t>
+                                        <t t-elif="inv.state == 'cancel'">
+                                            <span class="badge bg-danger">Cancelled</span>
+                                        </t>
+                                        <t t-elif="inv.payment_state in ('paid', 'in_payment')">
+                                            <span class="badge bg-success">Paid</span>
+                                        </t>
+                                        <t t-elif="inv.payment_state == 'partial'">
+                                            <span class="badge bg-warning text-dark">Partial</span>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="badge bg-primary">Open</span>
+                                        </t>
                                     </td>
                                     <td class="text-center">
-                                        <a t-attf-href="/my/dojo/invoices/#{inv.id}/pdf"
-                                           class="btn btn-sm btn-outline-primary"
-                                           title="Download PDF">
-                                            <i class="fa fa-download"/> PDF
-                                        </a>
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <a t-attf-href="/my/dojo/invoices/#{inv.id}/pdf"
+                                               class="btn btn-sm btn-outline-secondary"
+                                               title="Download PDF">
+                                                <i class="fa fa-download"/>
+                                            </a>
+                                            <t t-if="inv.state == 'posted' and inv.payment_state not in ('paid', 'in_payment')">
+                                                <a t-attf-href="/my/dojo/invoices/#{inv.id}/pay"
+                                                   class="btn btn-sm btn-primary">
+                                                    Pay Now
+                                                </a>
+                                            </t>
+                                        </div>
                                     </td>
                                 </tr>
                             </t>
                         </tbody>
                     </table>
                 </div>
+            </t>
+        </t>
+    </template>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         BILLING &amp; PAYMENT  /my/dojo/billing
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <template id="portal_dojo_billing" name="Billing &amp; Payment">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="False"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Billing &amp; Payment</t>
+            </t>
+
+            <t t-if="saved">
+                <div class="alert alert-success" role="alert">
+                    <i class="fa fa-check-circle"/> <strong>Card saved!</strong>
+                    Your new payment method is now on file.
+                </div>
+            </t>
+            <t t-if="card_error">
+                <div class="alert alert-danger" role="alert">
+                    <i class="fa fa-exclamation-circle"/> <t t-out="card_error"/>
+                </div>
+            </t>
+
+            <!-- Current card on file -->
+            <div class="card mb-4 mt-3">
+                <div class="card-header"><strong>Card on File</strong></div>
+                <div class="card-body">
+                    <t t-if="household and household.stripe_payment_method_id">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="fa fa-credit-card fa-2x text-muted"/>
+                            <div>
+                                <div class="fw-bold">
+                                    <t t-out="household.payment_card_brand or 'Card'"/>
+                                    ending in <t t-out="household.payment_card_last4 or '????'"/>
+                                </div>
+                                <div class="text-muted small">Expires <t t-out="household.payment_card_expiry or '—'"/></div>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <p class="text-muted mb-0">No card on file. Add one below to enable automatic billing.</p>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Update card form (Stripe Elements) -->
+            <t t-if="stripe_pk">
+                <div class="card mb-4">
+                    <div class="card-header"><strong>Update Payment Method</strong></div>
+                    <div class="card-body">
+                        <form id="billing-card-form" method="POST" action="/my/dojo/billing">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="payment_method_id" id="billing-pm-id" value=""/>
+                            <div class="mb-3">
+                                <label class="form-label">Card Details</label>
+                                <div id="billing-card-element" class="form-control" style="height:42px;padding-top:10px;"/>
+                                <div id="billing-card-errors" class="text-danger small mt-1"/>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="billing-submit-btn">
+                                <i class="fa fa-lock me-1"/> Save Card
+                            </button>
+                            <a href="/my/dojo" class="btn btn-secondary ms-2">Cancel</a>
+                        </form>
+                    </div>
+                </div>
+                <script src="https://js.stripe.com/v3/"/>
+                <script t-att-data-pk="stripe_pk" id="billing-stripe-init">
+                (function(){
+                    var pkEl = document.getElementById('billing-stripe-init');
+                    var pk = pkEl ? pkEl.getAttribute('data-pk') : '';
+                    if (!pk) return;
+                    var stripe = Stripe(pk);
+                    var elements = stripe.elements();
+                    var card = elements.create('card', {style: {base: {fontSize: '16px'}}});
+                    card.mount('#billing-card-element');
+                    card.on('change', function(e){
+                        document.getElementById('billing-card-errors').textContent = e.error ? e.error.message : '';
+                    });
+                    var form = document.getElementById('billing-card-form');
+                    form.addEventListener('submit', async function(e){
+                        e.preventDefault();
+                        var btn = document.getElementById('billing-submit-btn');
+                        btn.disabled = true; btn.textContent = 'Processing…';
+                        var result = await stripe.createPaymentMethod({type:'card', card:card});
+                        if (result.error) {
+                            document.getElementById('billing-card-errors').textContent = result.error.message;
+                            btn.disabled = false; btn.textContent = 'Save Card';
+                        } else {
+                            document.getElementById('billing-pm-id').value = result.paymentMethod.id;
+                            form.submit();
+                        }
+                    });
+                })();
+                </script>
+            </t>
+            <t t-else="">
+                <div class="alert alert-info">
+                    Online card payments are not configured yet. Please contact the dojo admin.
+                </div>
+                <a href="/my/dojo" class="btn btn-secondary">Back</a>
+            </t>
+        </t>
+    </template>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         PAY INVOICE  /my/dojo/invoices/<id>/pay
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <template id="portal_invoice_pay" name="Pay Invoice">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="False"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Pay Invoice</t>
+            </t>
+
+            <t t-if="pay_error">
+                <div class="alert alert-danger" role="alert">
+                    <i class="fa fa-exclamation-circle"/> <t t-out="pay_error"/>
+                </div>
+            </t>
+
+            <!-- Invoice summary -->
+            <div class="card mb-4 mt-3">
+                <div class="card-header"><strong>Invoice Summary</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Invoice #</dt>
+                        <dd class="col-sm-9"><t t-out="invoice.name"/></dd>
+                        <dt class="col-sm-3">Date</dt>
+                        <dd class="col-sm-9"><span t-field="invoice.invoice_date" t-options='{"widget": "date"}'/></dd>
+                        <dt class="col-sm-3">Amount Due</dt>
+                        <dd class="col-sm-9 fw-bold">
+                            <span t-field="invoice.amount_residual"
+                                  t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <t t-if="stripe_pk">
+                <!-- Saved card quick-pay (POST with no card entry) -->
+                <t t-if="household and household.stripe_payment_method_id">
+                    <div class="card mb-4">
+                        <div class="card-header"><strong>Pay with Saved Card</strong></div>
+                        <div class="card-body">
+                            <p>
+                                <i class="fa fa-credit-card me-1"/>
+                                <t t-out="household.payment_card_brand or 'Card'"/>
+                                ending in <strong><t t-out="household.payment_card_last4 or '????'"/></strong>
+                                (expires <t t-out="household.payment_card_expiry or '—'"/>)
+                            </p>
+                            <form method="POST">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-lock me-1"/> Charge Saved Card
+                                </button>
+                                <a href="/my/dojo/invoices" class="btn btn-secondary ms-2">Cancel</a>
+                            </form>
+                        </div>
+                    </div>
+                </t>
+                <!-- New card entry -->
+                <div class="card mb-4">
+                    <div class="card-header"><strong>Pay with a New Card</strong></div>
+                    <div class="card-body">
+                        <form id="invoice-pay-form" method="POST">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="payment_method_id" id="invoice-pm-id" value=""/>
+                            <div class="mb-3">
+                                <label class="form-label">Card Details</label>
+                                <div id="invoice-card-element" class="form-control" style="height:42px;padding-top:10px;"/>
+                                <div id="invoice-card-errors" class="text-danger small mt-1"/>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="invoice-submit-btn">
+                                <i class="fa fa-lock me-1"/> Pay Now
+                            </button>
+                            <a href="/my/dojo/invoices" class="btn btn-secondary ms-2">Cancel</a>
+                        </form>
+                    </div>
+                </div>
+                <script src="https://js.stripe.com/v3/"/>
+                <script t-att-data-pk="stripe_pk" id="invoice-stripe-init">
+                (function(){
+                    var pkEl = document.getElementById('invoice-stripe-init');
+                    var pk = pkEl ? pkEl.getAttribute('data-pk') : '';
+                    if (!pk) return;
+                    var stripe = Stripe(pk);
+                    var elements = stripe.elements();
+                    var card = elements.create('card', {style: {base: {fontSize: '16px'}}});
+                    card.mount('#invoice-card-element');
+                    card.on('change', function(e){
+                        document.getElementById('invoice-card-errors').textContent = e.error ? e.error.message : '';
+                    });
+                    var form = document.getElementById('invoice-pay-form');
+                    form.addEventListener('submit', async function(e){
+                        e.preventDefault();
+                        var btn = document.getElementById('invoice-submit-btn');
+                        btn.disabled = true; btn.textContent = 'Processing…';
+                        var result = await stripe.createPaymentMethod({type:'card', card:card});
+                        if (result.error) {
+                            document.getElementById('invoice-card-errors').textContent = result.error.message;
+                            btn.disabled = false; btn.textContent = 'Pay Now';
+                        } else {
+                            document.getElementById('invoice-pm-id').value = result.paymentMethod.id;
+                            form.submit();
+                        }
+                    });
+                })();
+                </script>
+            </t>
+            <t t-else="">
+                <div class="alert alert-info">
+                    Online card payments are not configured. Please contact the dojo admin.
+                </div>
+                <a href="/my/dojo/invoices" class="btn btn-secondary">Back to Invoices</a>
             </t>
         </t>
     </template>

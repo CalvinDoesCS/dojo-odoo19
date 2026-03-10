@@ -30,18 +30,13 @@
         <field name="model">x.bridge.identity</field>
         <field name="arch" type="xml">
             <form>
-                <header>
-                    <field name="is_active" widget="statusbar"
-                           statusbar_visible="True,False"
-                           string="Status"/>
-                </header>
                 <sheet>
                     <group string="Identity">
                         <group>
                             <field name="firebase_uid" readonly="1"/>
                             <field name="company_id" readonly="1"
                                    groups="base.group_multi_company"/>
-                            <field name="is_active"/>
+                            <field name="is_active" widget="boolean_toggle"/>
                         </group>
                         <group>
                             <field name="member_id"
@@ -61,7 +56,6 @@
                         </group>
                     </group>
                 </sheet>
-                <chatter/>
             </form>
         </field>
     </record>
