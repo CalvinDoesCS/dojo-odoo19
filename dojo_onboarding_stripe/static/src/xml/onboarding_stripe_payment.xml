@@ -3,55 +3,68 @@
 
     <!-- ── OnboardingStripePayment widget template ──────────────────────── -->
     <t t-name="dojo_onboarding_stripe.OnboardingStripePayment">
-        <div class="dojo-onboarding-stripe-widget">
+        <div class="dojo-onboarding-stripe-widget w-100">
 
-            <!-- Loading Stripe -->
+            <!-- ── Loading ─────────────────────────────────────────────── -->
             <t t-if="state.status === 'loading'">
-                <div class="alert alert-info py-2">
-                    <i class="fa fa-spinner fa-spin me-2"/>
-                    Loading payment form…
+                <div class="d-flex align-items-center gap-2 text-muted py-3">
+                    <i class="fa fa-spinner fa-spin fa-lg"/>
+                    <span>Loading secure payment form…</span>
                 </div>
             </t>
 
-            <!-- Stripe PaymentElement mount point + Save button -->
+            <!-- ── Card entry form ─────────────────────────────────────── -->
             <t t-if="state.status === 'ready' or state.status === 'processing'">
-                <div t-ref="stripe-mount" class="py-2"/>
-                <div class="mt-2">
-                    <button
-                        class="btn btn-primary"
-                        t-on-click="onSaveCard"
-                        t-att-disabled="state.status === 'processing'">
-                        <t t-if="state.status === 'processing'">
-                            <i class="fa fa-spinner fa-spin me-1"/>Saving…
-                        </t>
-                        <t t-else="">
-                            <i class="fa fa-lock me-1"/>Save Card
-                        </t>
-                    </button>
+                <div class="border rounded p-3 bg-white">
+                    <p class="text-muted small mb-2">
+                        <i class="fa fa-lock me-1"/>
+                        Your card details are securely processed by Stripe and never stored on our servers.
+                    </p>
+                    <!-- Stripe mounts its element here -->
+                    <div t-ref="stripe-mount" class="py-1"/>
+                    <div class="mt-3">
+                        <button
+                            class="btn btn-primary"
+                            t-on-click="onSaveCard"
+                            t-att-disabled="state.status === 'processing'">
+                            <t t-if="state.status === 'processing'">
+                                <i class="fa fa-spinner fa-spin me-1"/>Saving card…
+                            </t>
+                            <t t-else="">
+                                <i class="fa fa-lock me-1"/>Save Card
+                            </t>
+                        </button>
+                    </div>
                 </div>
             </t>
 
-            <!-- Success -->
+            <!-- ── Success ─────────────────────────────────────────────── -->
             <t t-if="state.status === 'done'">
-                <div class="alert alert-success py-2">
-                    <i class="fa fa-check-circle me-2"/>
-                    Payment method saved: <strong t-esc="state.cardDisplay"/>
+                <div class="alert alert-success d-flex align-items-center gap-2 py-3 px-3">
+                    <i class="fa fa-check-circle fa-lg flex-shrink-0"/>
+                    <div>
+                        <div class="fw-semibold">Payment method saved</div>
+                        <div class="text-muted small" t-esc="state.cardDisplay"/>
+                    </div>
                 </div>
             </t>
 
-            <!-- Error -->
+            <!-- ── Error ───────────────────────────────────────────────── -->
             <t t-if="state.status === 'error'">
-                <div class="alert alert-danger py-2">
-                    <i class="fa fa-exclamation-circle me-2"/>
-                    <span t-esc="state.errorMessage"/>
+                <div class="alert alert-danger d-flex align-items-start gap-2 py-3 px-3">
+                    <i class="fa fa-exclamation-circle fa-lg flex-shrink-0 mt-1"/>
+                    <div>
+                        <div class="fw-semibold">Payment error</div>
+                        <div class="small" t-esc="state.errorMessage"/>
+                    </div>
                 </div>
-                <button class="btn btn-secondary btn-sm mt-1" t-on-click="onRetry">
+                <button class="btn btn-outline-secondary btn-sm mt-2" t-on-click="onRetry">
                     <i class="fa fa-refresh me-1"/>Try Again
                 </button>
             </t>
 
-            <!-- Skip option (always visible unless card already done) -->
-            <div class="mt-3 pt-2 border-top" t-if="state.status !== 'done'">
+            <!-- ── Skip option ─────────────────────────────────────────── -->
+            <div class="mt-3 pt-3 border-top" t-if="state.status !== 'done'">
                 <div class="form-check">
                     <input
                         type="checkbox"
@@ -60,16 +73,16 @@
                         t-att-checked="props.record.data.skip_payment"
                         t-on-change="onSkipChange"
                     />
-                    <label class="form-check-label text-muted small" for="skip-stripe-payment">
+                    <label class="form-check-label fw-medium" for="skip-stripe-payment">
                         Skip — collect payment method later
                     </label>
                 </div>
-                <div class="text-muted small ps-1 mt-1"
+                <div class="alert alert-warning py-2 px-3 mt-2 small"
                      t-if="props.record.data.skip_payment">
-                    The guardian can add their card at
+                    <i class="fa fa-exclamation-triangle me-2"/>
+                    The guardian will need to add their card at
                     <code>/my/payment_method</code> after signing into the portal.
-                    The first invoice will be charged on the subscription start date
-                    once a card is on file.
+                    The first invoice will not be charged until a card is on file.
                 </div>
             </div>
 

@@ -140,6 +140,31 @@ class DojoOnboardingWizard(models.TransientModel):
         default=fields.Date.today,
     )
 
+    # ── Plan billing display fields (related, read-only — for UI only) ───────
+    plan_currency_id = fields.Many2one(
+        related='plan_id.currency_id', readonly=True, string='Currency',
+    )
+    plan_price = fields.Monetary(
+        related='plan_id.price', readonly=True, string='Recurring Fee',
+        currency_field='plan_currency_id',
+    )
+    plan_initial_fee = fields.Monetary(
+        related='plan_id.initial_fee', readonly=True, string='Enrollment Fee',
+        currency_field='plan_currency_id',
+    )
+    plan_billing_period = fields.Selection(
+        related='plan_id.billing_period', readonly=True, string='Billing Period',
+    )
+    plan_sessions_per_period = fields.Integer(
+        related='plan_id.sessions_per_period', readonly=True, string='Sessions / Period',
+    )
+    plan_unlimited_sessions = fields.Boolean(
+        related='plan_id.unlimited_sessions', readonly=True,
+    )
+    plan_description = fields.Text(
+        related='plan_id.description', readonly=True, string='Plan Notes',
+    )
+
     # ── Step 5: Portal Access ────────────────────────────────────────────────
     create_portal_login = fields.Boolean(
         'Create Portal Login for New Member',
@@ -182,6 +207,10 @@ class DojoOnboardingWizard(models.TransientModel):
 
         # ── Step-specific validation ───────────────────────────────────────
         if self.step == 'member_info':
+            if not self.email:
+                raise UserError(_(
+                    'An email address is required for the member.'
+                ))
             if not self.phone:
                 raise UserError(_(
                     'A phone number is required for the member.'
@@ -196,6 +225,10 @@ class DojoOnboardingWizard(models.TransientModel):
             if not self.new_guardian_name:
                 raise UserError(_(
                     'Guardian full name is required to create a new household.'
+                ))
+            if not self.new_guardian_email:
+                raise UserError(_(
+                    'An email address is required for the guardian.'
                 ))
             if not self.new_guardian_phone:
                 raise UserError(_(

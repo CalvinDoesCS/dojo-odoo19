@@ -27,12 +27,22 @@
             <!-- 3. Payment step content block (inserted before the footer) -->
             <xpath expr="//footer" position="before">
                 <group string="Payment Method" invisible="step != 'payment'">
-                    <div class="alert alert-info py-2 mb-2" invisible="not plan_id" role="alert">
-                        <i class="fa fa-tag me-2"/>
-                        Subscription plan: <b><field name="plan_id" readonly="1" nolabel="1"/></b>
-                        — the guardian's card will be charged immediately on completion.
+                    <div class="alert alert-info py-3 px-3 mb-0" invisible="not plan_id"
+                         colspan="2" role="alert">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fa fa-credit-card fa-lg mt-1 flex-shrink-0" title="Payment"/>
+                            <div>
+                                <div class="fw-semibold mb-1">
+                                    Plan: <field name="plan_id" readonly="1" nolabel="1"/>
+                                </div>
+                                <div class="text-muted">
+                                    After completing onboarding, the saved card will be charged
+                                    for the enrollment fee and first recurring invoice.
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div colspan="2">
+                    <div colspan="2" class="pt-3">
                         <widget name="onboarding_stripe_payment"/>
                     </div>
                 </group>

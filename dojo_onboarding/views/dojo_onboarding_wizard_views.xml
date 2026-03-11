@@ -9,7 +9,7 @@
             <form string="New Member Onboarding">
 
                 <!-- Progress header -->
-                <div class="alert alert-info py-2 mb-3" role="status">
+                <div class="alert alert-info py-2 mb-3 mx-3" role="status">
                     <!-- 6-step path: creating a new household -->
                     <span invisible="step != 'member_info' or not create_new_household">
                         <b>Step 1:</b> Member Info  ›  Household  ›  Guardian Setup  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
@@ -58,12 +58,9 @@
                 <!-- ── Step 1: Member Info ──────────────────────────────── -->
                 <group string="Member Information" invisible="step != 'member_info'">
                     <group>
-                        <field name="name" placeholder="Full name"/>
-                        <field name="email" placeholder="email@example.com"/>
-                        <field name="phone" required="step == 'member_info'"/>
-                        <div class="text-muted small" style="grid-column: span 2; padding-left: 4px;">
-                            Phone number is required.
-                        </div>
+                        <field name="name" string="Full Name *" placeholder="Full name"/>
+                        <field name="email" string="Email *" placeholder="email@example.com"/>
+                        <field name="phone" string="Phone *" placeholder="e.g. +1 555 000 0000"/>
                     </group>
                     <group>
                         <field name="role"/>
@@ -85,8 +82,8 @@
                     <!-- Existing household path -->
                     <group invisible="create_new_household">
                         <field name="household_id"
-                               placeholder="Search for an existing household"
-                               required="not create_new_household and step == 'household'"/>
+                               string="Household *"
+                               placeholder="Search for an existing household"/>
                     </group>
                     <group string="Guardian Link (optional)"
                            invisible="create_new_household or role == 'parent'">
@@ -98,14 +95,14 @@
                     </group>
 
                     <!-- New household hint -->
-                    <div class="alert alert-info small py-1 px-2"
+                    <div class="alert alert-info py-2 px-3" colspan="2"
                          invisible="not create_new_household or role == 'both'" role="alert">
-                        <i class="fa fa-arrow-right me-1"></i>
+                        <i class="fa fa-arrow-right me-2" title="Next"/>
                         Click <b>Next</b> to enter the guardian's details and set up the household.
                     </div>
-                    <div class="alert alert-info small py-1 px-2"
+                    <div class="alert alert-info py-2 px-3" colspan="2"
                          invisible="not create_new_household or role != 'both'" role="alert">
-                        <i class="fa fa-home me-1"></i>
+                        <i class="fa fa-home me-2" title="Household"/>
                         A household will be created for you — you are your own guardian.
                         Click <b>Next</b> to continue to program enrollment.
                     </div>
@@ -115,10 +112,14 @@
                 <group string="Guardian Details" invisible="step != 'guardian_setup'">
                     <group>
                         <field name="new_guardian_name"
-                               placeholder="Full name"
-                               required="step == 'guardian_setup'"/>
-                        <field name="new_guardian_email" placeholder="email@example.com"/>
-                        <field name="new_guardian_phone" required="step == 'guardian_setup'"/>
+                               string="Full Name *"
+                               placeholder="Full name"/>
+                        <field name="new_guardian_email"
+                               string="Email *"
+                               placeholder="email@example.com"/>
+                        <field name="new_guardian_phone"
+                               string="Phone *"
+                               placeholder="e.g. +1 555 000 0000"/>
                     </group>
                     <group>
                         <field name="new_guardian_role"/>
@@ -126,11 +127,10 @@
                                placeholder="Auto-generated from guardian name if left blank"/>
                     </group>
                     <group>
-                        <field name="guardian_relation"
-                               required="step == 'guardian_setup'"/>
+                        <field name="guardian_relation" string="Relation *"/>
                     </group>
-                    <div class="alert alert-info small py-1 px-2 mt-2" colspan="2" role="alert">
-                        <i class="fa fa-credit-card me-1"></i>
+                    <div class="alert alert-info py-2 px-3" colspan="2" role="alert">
+                        <i class="fa fa-credit-card me-2" title="Payment"/>
                         A payment method will be collected in the next steps to set up recurring billing.
                     </div>
                 </group>
@@ -139,41 +139,42 @@
                 <group string="Program Enrollment" invisible="step != 'enrollment'">
                     <group>
                         <field name="program_id"
-                               placeholder="Select a program…"
-                               required="step == 'enrollment'"/>
+                               string="Program *"
+                               placeholder="Select a program…"/>
                     </group>
-                    <div class="alert alert-info small py-1 px-2" invisible="not program_id"
+                    <div class="alert alert-warning py-2 px-3" invisible="program_id"
                          colspan="2" role="alert">
-                        <i class="fa fa-info-circle me-1"/>
-                        Optionally select specific upcoming sessions below.
-                        You can always add sessions later from the member's profile.
-                    </div>
-                    <group colspan="2" invisible="not program_id">
-                        <field name="session_ids" nolabel="1" widget="many2many_tags"
-                               domain="[('state', '=', 'open')]"
-                               placeholder="Select open sessions (optional)…"/>
-                    </group>
-                    <group colspan="2" invisible="not program_id">
-                        <label for="template_ids"/>
-                        <field name="template_ids" widget="many2many_tags"
-                               domain="[('recurrence_active', '=', True)]"
-                               placeholder="Add to recurring class rosters (optional)…"
-                               help="Add this member to recurring class templates. The next step lets you choose which days to auto-enrol."/>
-                    </group>
-                    <div class="alert alert-warning small py-1 px-2" invisible="program_id"
-                         colspan="2" role="alert">
-                        <i class="fa fa-exclamation-circle me-1"/>
+                        <i class="fa fa-exclamation-circle me-2" title="Warning"/>
                         A program is required to continue.
                     </div>
+                    <div class="alert alert-info py-2 px-3" invisible="not program_id"
+                         colspan="2" role="alert">
+                        <i class="fa fa-info-circle me-2" title="Info"/>
+                        Select the class rosters this member attends. Once rosters are chosen,
+                        you can optionally pre-register them in specific upcoming sessions from those rosters.
+                    </div>
+                    <group colspan="2" invisible="not program_id">
+                        <field name="template_ids" widget="many2many_tags"
+                               string="Classes *"
+                               domain="[('recurrence_active', '=', True), ('program_id', '=', program_id)]"
+                               placeholder="Add to class rosters for this program…"
+                               help="Add this member to recurring class template rosters. The next step lets you choose which days to auto-enrol."/>
+                    </group>
+                    <group colspan="2" invisible="not template_ids">
+                        <field name="session_ids" widget="many2many_tags"
+                               string="Specific Sessions"
+                               domain="[('state', '=', 'open'), ('template_id', 'in', template_ids)]"
+                               placeholder="Optionally pick specific upcoming sessions from the selected rosters…"/>
+                    </group>
                 </group>
 
                 <!-- ── Step 4b: Auto-Enroll Schedule ────────────────────── -->
                 <group string="Auto-Enroll Schedule" invisible="step != 'auto_enroll'">
                     <div class="alert alert-info small py-1 px-2 mb-2" colspan="2" role="alert">
-                        <i class="fa fa-calendar-check-o me-1"/>
-                        The system can automatically enrol this member into recurring sessions.
+                        <i class="fa fa-calendar-check-o me-1" title="Schedule"/>
+                        The system can automatically enroll this member into recurring sessions.
                         Choose which days of the week they are available.
-                        Leave all days un-ticked to always enrol on every day the class runs.
+                        Leave all days un-ticked to always enroll on every day the class runs.
                     </div>
                     <group>
                         <field name="auto_enroll_active" widget="boolean_toggle"
@@ -195,10 +196,8 @@
                     </group>
                     <group string="Date Range"
                            invisible="not auto_enroll_active or auto_enroll_mode != 'multiday'">
-                        <field name="auto_enroll_date_from"
-                               required="auto_enroll_active and auto_enroll_mode == 'multiday'"/>
-                        <field name="auto_enroll_date_to"
-                               required="auto_enroll_active and auto_enroll_mode == 'multiday'"/>
+                        <field name="auto_enroll_date_from" string="From *"/>
+                        <field name="auto_enroll_date_to" string="To *"/>
                     </group>
                     <div class="text-muted small ps-1" invisible="auto_enroll_active" colspan="2">
                         Auto-enroll is disabled. The member will not be automatically enrolled
@@ -211,27 +210,43 @@
                 <group string="Subscription Plan" invisible="step != 'subscription'">
                     <group>
                         <field name="plan_id"
+                               string="Subscription Plan *"
                                domain="['|', '&amp;', ('plan_type', '=', 'program'), ('program_id', '=', program_id), ('plan_type', '=', 'course')]"
-                               placeholder="Select a subscription plan…"
-                               required="step == 'subscription'"/>
+                               placeholder="Select a subscription plan…"/>
                         <field name="subscription_start_date" invisible="not plan_id"/>
                     </group>
-                    <div class="alert alert-warning small py-1 px-2" invisible="plan_id"
+                    <div class="alert alert-warning py-2 px-3" invisible="plan_id"
                          colspan="2" role="alert">
-                        <i class="fa fa-exclamation-circle me-1"/>
+                        <i class="fa fa-exclamation-circle me-2" title="Warning"/>
                         A subscription plan is required to continue.
                         Only plans compatible with the selected program are shown.
                     </div>
-                    <group string="Billing" invisible="not plan_id">
-                        <div class="alert alert-warning small py-1 px-2" invisible="not plan_id" role="alert">
-                            <b>Initial fee:</b> If this plan has a setup fee, it will be charged
-                            on the subscription start date. The recurring fee begins from the same date.
+                    <group string="Billing Summary" invisible="not plan_id" colspan="2">
+                        <field name="plan_currency_id" invisible="1"/>
+                        <field name="plan_initial_fee"
+                               widget="monetary"
+                               options="{'currency_field': 'plan_currency_id'}"
+                               readonly="1"/>
+                        <field name="plan_price"
+                               widget="monetary"
+                               options="{'currency_field': 'plan_currency_id'}"
+                               readonly="1"/>
+                        <field name="plan_billing_period" readonly="1"/>
+                        <field name="plan_sessions_per_period" readonly="1"
+                               invisible="plan_unlimited_sessions"/>
+                        <field name="plan_unlimited_sessions" invisible="1"/>
+                        <div class="text-muted small" invisible="not plan_unlimited_sessions" colspan="2">
+                            Unlimited sessions included per billing period.
                         </div>
-                        <div class="alert alert-info small py-1 px-2" invisible="not plan_id" role="alert">
-                            A payment method will be collected on the next step.
-                            The card will be charged for the initial fee and recurring invoices.
-                        </div>
+                        <field name="plan_description" readonly="1" widget="text"
+                               invisible="not plan_description"/>
                     </group>
+                    <div class="alert alert-info py-2 px-3" invisible="not plan_id"
+                         colspan="2" role="alert">
+                        <i class="fa fa-credit-card me-2" title="Payment"/>
+                        A payment method will be collected on the next step.
+                        Your card will be invoiced for the enrollment fee and the recurring subscription fee.
+                    </div>
                 </group>
 
                 <!-- ── Step 5: Portal Access ─────────────────────────────── -->
