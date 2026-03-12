@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Add credits_per_period to the subscription plan form -->
+    <record id="view_dojo_subscription_plan_credit_form" model="ir.ui.view">
+        <field name="name">dojo.subscription.plan.credit.form</field>
+        <field name="model">dojo.subscription.plan</field>
+        <field name="inherit_id" ref="dojo_subscriptions.view_dojo_subscription_plan_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='billing_period']" position="after">
+                <field name="credits_per_period"
+                       help="Credits granted at each billing cycle renewal. 0 = unlimited (credit gate disabled)."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -50,7 +50,6 @@
                 <field name="price"/>
                 <field name="initial_fee"/>
                 <field name="billing_period"/>
-                <field name="unlimited_sessions"/>
                 <field name="active"/>
             </list>
         </field>
@@ -73,29 +72,19 @@
                         <field name="initial_fee"/>
                         <field name="currency_id"/>
                         <field name="billing_period"/>
-                        <field name="unlimited_sessions"
-                               invisible="plan_type != 'course'"/>
-                        <field name="sessions_per_period"
-                               invisible="plan_type != 'course' or unlimited_sessions"/>
                         <field name="active"/>
                     </group>
-                    <group string="Session Restrictions">
-                        <field name="max_sessions_per_week"
-                               string="Max Sessions / Week"
-                               help="0 = unlimited. Applies to both plan types."/>
+                    <group string="Session Restrictions"
+                          invisible="plan_type != 'course'">
                         <field name="allowed_template_ids"
                                widget="many2many_tags"
-                               invisible="plan_type != 'course'"
                                placeholder="Leave empty to allow all courses in the program…"/>
                         <div class="alert alert-info small py-1 px-2"
-                             invisible="not max_sessions_per_week and (plan_type != 'course' or unlimited_sessions)"
+                             invisible="not allowed_template_ids"
                              colspan="2" role="alert">
                             <b>Enrollment rules enforced on save:</b>
                             <ul class="mb-0 mt-1">
-                                <li invisible="plan_type != 'program'">Members may attend any class belonging to the selected program.</li>
-                                <li invisible="plan_type != 'course' or not allowed_template_ids">Members may only enrol in sessions for the listed courses.</li>
-                                <li invisible="not max_sessions_per_week">Members may attend at most <b><field name="max_sessions_per_week" nolabel="1"/></b> session(s) per calendar week.</li>
-                                <li invisible="plan_type != 'course' or unlimited_sessions">Members may attend at most <b><field name="sessions_per_period" nolabel="1"/></b> session(s) per billing period.</li>
+                                <li>Members may only enrol in sessions for the listed courses.</li>
                             </ul>
                         </div>
                     </group>
@@ -141,6 +130,7 @@
                             string="Generate Invoice"
                             class="btn-primary"
                             invisible="state != 'active'"
+                            groups="account.group_account_invoice"
                             confirm="This will create and post an invoice for the current billing cycle and advance the next billing date. Continue?"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,active,paused,cancelled"/>
@@ -150,7 +140,8 @@
                         <button name="action_view_invoices"
                                 type="object"
                                 class="oe_stat_button"
-                                icon="fa-file-text-o">
+                                icon="fa-file-text-o"
+                                groups="account.group_account_invoice">
                             <div class="o_stat_info">
                                 <span class="o_stat_value"><field name="invoice_count"/></span>
                                 <span class="o_stat_text">Invoices</span>
@@ -165,7 +156,7 @@
                         <field name="start_date"/>
                         <field name="end_date"/>
                         <field name="next_billing_date"/>
-                        <field name="last_invoice_id"/>
+                        <field name="last_invoice_id" groups="account.group_account_invoice"/>
                         <field name="billing_reference"/>
                     </group>
                     <group>

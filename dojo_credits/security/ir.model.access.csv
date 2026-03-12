@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_dojo_credit_transaction_admin,dojo.credit.transaction (admin),model_dojo_credit_transaction,base.group_system,1,1,1,1
+access_dojo_credit_transaction_manager,dojo.credit.transaction (manager),model_dojo_credit_transaction,dojo_base.group_dojo_admin,1,1,1,0
+access_dojo_credit_transaction_instructor,dojo.credit.transaction (instructor),model_dojo_credit_transaction,dojo_base.group_dojo_instructor,1,0,0,0
+access_dojo_credit_adjustment_wizard_admin,dojo.credit.adjustment.wizard (admin),model_dojo_credit_adjustment_wizard,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_credit_adjustment_wizard_manager,dojo.credit.adjustment.wizard (manager),model_dojo_credit_adjustment_wizard,base.group_system,1,1,1,1

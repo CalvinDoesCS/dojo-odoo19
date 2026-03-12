@@ -94,7 +94,7 @@ class DojoMemberSubscription(models.Model):
 
     @api.depends("invoice_ids", "household_invoice_ids")
     def _compute_invoice_count(self):
-        for rec in self:
+        for rec in self.sudo():
             rec.invoice_count = len(rec.invoice_ids | rec.household_invoice_ids)
 
     @api.depends('billing_failure_count', 'last_billing_failure_date')

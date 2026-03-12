@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── List view ─────────────────────────────────────────────────── -->
+    <record id="view_dojo_credit_transaction_list" model="ir.ui.view">
+        <field name="name">dojo.credit.transaction.list</field>
+        <field name="model">dojo.credit.transaction</field>
+        <field name="arch" type="xml">
+            <list string="Credit Transactions" default_order="date desc" decoration-success="status=='confirmed' and amount &gt; 0" decoration-danger="status=='confirmed' and amount &lt; 0" decoration-muted="status=='cancelled'" decoration-warning="status=='pending'">
+                <field name="reference"/>
+                <field name="date"/>
+                <field name="member_id"/>
+                <field name="subscription_id"/>
+                <field name="transaction_type"/>
+                <field name="amount"/>
+                <field name="status"/>
+                <field name="session_id" optional="show"/>
+                <field name="note" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form view ─────────────────────────────────────────────────── -->
+    <record id="view_dojo_credit_transaction_form" model="ir.ui.view">
+        <field name="name">dojo.credit.transaction.form</field>
+        <field name="model">dojo.credit.transaction</field>
+        <field name="arch" type="xml">
+            <form string="Credit Transaction" create="false">
+                <sheet>
+                    <group>
+                        <group string="Identity">
+                            <field name="reference"/>
+                            <field name="date"/>
+                            <field name="transaction_type"/>
+                            <field name="amount"/>
+                            <field name="status"/>
+                            <field name="note"/>
+                        </group>
+                        <group string="Links">
+                            <field name="member_id"/>
+                            <field name="subscription_id"/>
+                            <field name="enrollment_id"/>
+                            <field name="session_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Search view ───────────────────────────────────────────────── -->
+    <record id="view_dojo_credit_transaction_search" model="ir.ui.view">
+        <field name="name">dojo.credit.transaction.search</field>
+        <field name="model">dojo.credit.transaction</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="reference"/>
+                <field name="member_id"/>
+                <field name="subscription_id"/>
+                <filter name="filter_pending" string="Pending" domain="[('status','=','pending')]"/>
+                <filter name="filter_confirmed" string="Confirmed" domain="[('status','=','confirmed')]"/>
+                <filter name="filter_cancelled" string="Cancelled / Released" domain="[('status','=','cancelled')]"/>
+                <separator/>
+                <filter name="filter_grant" string="Grants" domain="[('transaction_type','=','grant')]"/>
+                <filter name="filter_hold" string="Holds" domain="[('transaction_type','=','hold')]"/>
+                <filter name="filter_expiry" string="Expiries" domain="[('transaction_type','=','expiry')]"/>
+                <filter name="filter_adjustment" string="Adjustments" domain="[('transaction_type','=','adjustment')]"/>
+                <group>
+                    <filter name="group_member" string="Member" context="{'group_by':'member_id'}"/>
+                    <filter name="group_type" string="Transaction Type" context="{'group_by':'transaction_type'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by':'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action ────────────────────────────────────────────────────── -->
+    <record id="action_dojo_credit_transaction" model="ir.actions.act_window">
+        <field name="name">Credit Ledger</field>
+        <field name="res_model">dojo.credit.transaction</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_dojo_credit_transaction_search"/>
+    </record>
+
+    <!-- ── Menu ──────────────────────────────────────────────────────── -->
+    <menuitem
+        id="menu_dojo_credits_root"
+        name="Credits"
+        sequence="90"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
+
+    <menuitem
+        id="menu_dojo_credit_transaction"
+        name="Credit Ledger"
+        parent="menu_dojo_credits_root"
+        action="action_dojo_credit_transaction"
+        sequence="10"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
+</odoo>

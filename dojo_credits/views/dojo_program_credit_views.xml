@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Add credits_per_class to the program form -->
+    <record id="view_dojo_program_credit_form" model="ir.ui.view">
+        <field name="name">dojo.program.credit.form</field>
+        <field name="model">dojo.program</field>
+        <field name="inherit_id" ref="dojo_classes.view_dojo_program_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='active']" position="after">
+                <field name="credits_per_class"
+                       help="Credits deducted when a member books a session in this program. Ignored when the plan has unlimited credits (0)."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

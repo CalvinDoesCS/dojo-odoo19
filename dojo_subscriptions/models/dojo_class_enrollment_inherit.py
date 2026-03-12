@@ -59,6 +59,13 @@ class DojoClassEnrollment(models.Model):
             #    plan does not exceed its caps. ──────────────────────────────
             cap_errors = []
 
+            # When the Credits module is active, the credit balance is the
+            # sole enrollment gate — hard session caps are no longer enforced.
+            if self.env['ir.module.module'].search_count(
+                [('name', '=', 'dojo_credits'), ('state', '=', 'installed')]
+            ):
+                return
+
             for sub in permitting_subs:
                 plan = sub.plan_id
                 plan_ok = True  # assume this plan is fine until a cap fires

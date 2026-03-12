@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Add credit balance summary + ledger tab to the subscription form -->
+    <record id="view_dojo_member_subscription_credit_form" model="ir.ui.view">
+        <field name="name">dojo.member.subscription.credit.form</field>
+        <field name="model">dojo.member.subscription</field>
+        <field name="inherit_id" ref="dojo_subscriptions.view_dojo_member_subscription_form"/>
+        <field name="arch" type="xml">
+            <!-- Balance stat buttons at top -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button" icon="fa-credit-card" type="object" name="action_view_credit_transactions">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value"><field name="credit_balance"/></span>
+                        <span class="o_stat_text">Credits</span>
+                    </div>
+                </button>
+            </xpath>
+
+            <!-- Credit ledger tab -->
+            <xpath expr="//sheet" position="inside">
+                <notebook>
+                    <page string="Credit Ledger" name="credit_ledger">
+                        <group>
+                            <group string="Balance Summary">
+                                <field name="credit_balance" readonly="1"/>
+                                <field name="credit_confirmed" readonly="1"/>
+                                <field name="credit_pending" readonly="1"/>
+                            </group>
+                        </group>
+                        <field name="transaction_ids" readonly="1">
+                            <list default_order="date desc" decoration-success="status=='confirmed' and amount &gt; 0" decoration-danger="status=='confirmed' and amount &lt; 0" decoration-muted="status=='cancelled'" decoration-warning="status=='pending'">
+                                <field name="reference"/>
+                                <field name="date"/>
+                                <field name="transaction_type"/>
+                                <field name="amount"/>
+                                <field name="status"/>
+                                <field name="session_id"/>
+                                <field name="note"/>
+                            </list>
+                        </field>
+                        <div class="o_row mt16">
+                            <button string="Manual Adjustment" type="object"
+                                    name="action_open_adjustment_wizard"
+                                    class="btn btn-secondary"
+                                    groups="dojo_base.group_dojo_admin"/>
+                        </div>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+
+
+</odoo>
