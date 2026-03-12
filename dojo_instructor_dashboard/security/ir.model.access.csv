@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_project_role_instructor,project.role instructor,project.model_project_role,dojo_base.group_dojo_instructor,1,0,0,0
 access_dojo_attendance_quick_wizard_admin,dojo.attendance.quick.wizard admin,model_dojo_attendance_quick_wizard,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_attendance_quick_wizard_instructor,dojo.attendance.quick.wizard instructor,model_dojo_attendance_quick_wizard,dojo_base.group_dojo_instructor,1,1,1,1
 access_dojo_attendance_quick_line_admin,dojo.attendance.quick.line admin,model_dojo_attendance_quick_line,dojo_base.group_dojo_admin,1,1,1,1

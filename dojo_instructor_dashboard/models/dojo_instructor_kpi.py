@@ -303,6 +303,55 @@ class DojoInstructorProfile(models.Model):
             ('session_id.start_datetime', '>=', sixty_days_ago),
         ])
 
+        # ── Revenue KPIs ──────────────────────────────────────────────────
+        revenue_this_month = 0.0
+        revenue_ytd = 0.0
+        outstanding_balance = 0.0
+        new_members_this_month = 0
+        if 'account.move' in self.env:
+            Invoice = self.env['account.move']
+            today_date = today_start.date() if hasattr(today_start, 'date') else date.today()
+            month_start = today_date.replace(day=1)
+            year_start = today_date.replace(month=1, day=1)
+
+            # Revenue this month: posted customer invoices
+            month_invoices = Invoice.search([
+                ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'),
+                ('invoice_date', '>=', fields.Date.to_string(month_start)),
+                ('invoice_date', '<=', fields.Date.to_string(today_date)),
+                ('company_id', '=', self.env.company.id),
+            ])
+            revenue_this_month = sum(month_invoices.mapped('amount_untaxed'))
+
+            # Revenue YTD: posted customer invoices since Jan 1
+            ytd_invoices = Invoice.search([
+                ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'),
+                ('invoice_date', '>=', fields.Date.to_string(year_start)),
+                ('invoice_date', '<=', fields.Date.to_string(today_date)),
+                ('company_id', '=', self.env.company.id),
+            ])
+            revenue_ytd = sum(ytd_invoices.mapped('amount_untaxed'))
+
+            # Outstanding balance: unpaid posted invoices
+            unpaid_invoices = Invoice.search([
+                ('move_type', '=', 'out_invoice'),
+                ('state', '=', 'posted'),
+                ('payment_state', 'in', ['not_paid', 'partial']),
+                ('company_id', '=', self.env.company.id),
+            ])
+            outstanding_balance = sum(unpaid_invoices.mapped('amount_residual'))
+
+        # New members this month
+        if 'dojo.member' in self.env:
+            today_date = today_start.date() if hasattr(today_start, 'date') else date.today()
+            month_start_str = fields.Date.to_string(today_date.replace(day=1))
+            new_members_this_month = self.env['dojo.member'].search_count([
+                ('create_date', '>=', month_start_str),
+                ('role', 'in', ['student', 'both']),
+            ])
+
         summary = {
             'total_instructors': len(all_profiles),
             'total_active_students': active_members,
@@ -310,6 +359,10 @@ class DojoInstructorProfile(models.Model):
             'overall_fill_rate': round(overall_fill_rate, 1),
             'overall_attendance_rate': round(overall_attendance_rate, 1),
             'total_dropped_60d': total_dropped_60d,
+            'revenue_this_month': round(revenue_this_month, 2),
+            'revenue_ytd': round(revenue_ytd, 2),
+            'outstanding_balance': round(outstanding_balance, 2),
+            'new_members_this_month': new_members_this_month,
         }
 
         # ── Per-instructor KPIs ───────────────────────────────────────────        # Build students_count per instructor directly to avoid stale

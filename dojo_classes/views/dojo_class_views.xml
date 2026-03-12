@@ -34,6 +34,8 @@
     <menuitem id="menu_dojo_class_sessions" name="Sessions" parent="menu_dojo_classes_root" action="action_dojo_class_sessions" sequence="10"/>
     <menuitem id="menu_dojo_class_templates" name="Templates" parent="menu_dojo_classes_root" action="action_dojo_class_templates" sequence="20"/>
     <menuitem id="menu_dojo_class_enrollments" name="Enrollments" parent="menu_dojo_classes_root" action="action_dojo_class_enrollments" sequence="30"/>
+    <menuitem id="menu_dojo_classes_configuration" name="Configuration" parent="menu_dojo_classes_root" sequence="100"/>
+    <menuitem id="menu_dojo_martial_art_styles" name="Martial Art Styles" parent="menu_dojo_classes_configuration" action="dojo_base.action_dojo_martial_art_styles" sequence="10"/>
 
     <!-- ========== Programs ========== -->
     <record id="view_dojo_program_list" model="ir.ui.view">
@@ -72,6 +74,7 @@
                             <field name="code"/>
                             <field name="sequence"/>
                             <field name="color"/>
+                            <field name="style_id"/>
                             <field name="active"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>

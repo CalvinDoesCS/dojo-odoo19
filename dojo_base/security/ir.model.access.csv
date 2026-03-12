@@ -14,3 +14,6 @@ access_dojo_guardian_parent,dojo.guardian.link parent,model_dojo_guardian_link,d
 access_dojo_instructor_profile_user,dojo.instructor.profile user,model_dojo_instructor_profile,base.group_user,1,0,0,0
 access_dojo_instructor_profile_admin,dojo.instructor.profile admin,model_dojo_instructor_profile,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_instructor_profile_instructor,dojo.instructor.profile instructor,model_dojo_instructor_profile,dojo_base.group_dojo_instructor,1,0,0,0
+access_dojo_martial_art_style_user,dojo.martial.art.style user,model_dojo_martial_art_style,base.group_user,1,0,0,0
+access_dojo_martial_art_style_admin,dojo.martial.art.style admin,model_dojo_martial_art_style,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_martial_art_style_instructor,dojo.martial.art.style instructor,model_dojo_martial_art_style,dojo_base.group_dojo_instructor,1,0,0,0

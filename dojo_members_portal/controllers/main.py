@@ -540,10 +540,22 @@ class DojoMemberPortal(CustomerPortal):
         )
         data = []
         for log in logs:
+            # Build a clean session label: "Class Name — Mon, Mar 10, 2026 3:00 PM"
+            sess = log.session_id
+            if sess:
+                class_name = (sess.template_id.name if sess.template_id else None) or sess.name or 'Session'
+                if sess.start_datetime:
+                    dt_utc = fields.Datetime.from_string(sess.start_datetime) if isinstance(sess.start_datetime, str) else sess.start_datetime
+                    display_dt = dt_utc.strftime('%b %-d, %Y %-I:%M %p')
+                    session_label = '%s — %s' % (class_name, display_dt)
+                else:
+                    session_label = class_name
+            else:
+                session_label = ''
             data.append({
                 'id': log.id,
                 'member_name': log.member_id.name or '',
-                'session_name': log.session_id.name if log.session_id else '',
+                'session_name': session_label,
                 'checkin_datetime': fields.Datetime.to_string(log.checkin_datetime)
                     if log.checkin_datetime else None,
                 'status': log.status or 'present',
@@ -1073,7 +1085,7 @@ class DojoMemberPortal(CustomerPortal):
                     ('active', '=', True),
                 ], limit=1)
                 if token:
-                    payment_method_data = {'name': token.name or 'Card on file'}
+                    payment_method_data = {'name': token.payment_details or token.display_name or 'Card on file'}
 
         return request.make_response(
             json.dumps({

@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class DojoMemberRank(models.Model):
@@ -32,3 +32,15 @@ class DojoMemberRank(models.Model):
         store=True,
         index=True,
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Reset milestone_todos_sent on the member when a new rank is awarded
+        so that attendance milestones fire again after each promotion."""
+        records = super().create(vals_list)
+        member_ids = records.mapped("member_id").ids
+        if member_ids:
+            self.env["dojo.member"].browse(member_ids).write(
+                {"milestone_todos_sent": ""}
+            )
+        return records

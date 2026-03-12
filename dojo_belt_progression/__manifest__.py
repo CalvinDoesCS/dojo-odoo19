@@ -11,6 +11,7 @@
         "security/ir.model.access.csv",
         "data/ir_cron.xml",
         "views/dojo_belt_views.xml",
+        "views/dojo_belt_promotion_wizard_views.xml",
     ],
     "application": True,
     "auto_install": True,

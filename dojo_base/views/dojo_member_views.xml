@@ -88,6 +88,17 @@
                         <page string="Guardian Of">
                             <field name="guardian_for_link_ids" readonly="1"/>
                         </page>
+                        <page string="Medical Info">
+                            <group>
+                                <group>
+                                    <field name="blood_type"/>
+                                    <field name="allergies"/>
+                                </group>
+                                <group>
+                                    <field name="medical_notes"/>
+                                </group>
+                            </group>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   DOJO INSTRUCTOR DASHBOARD
+   DOJO INSTRUCTOR + ADMIN DASHBOARD — Google Material style
 ═══════════════════════════════════════════════════════════════ */
 
 html .o_web_client > .o_action_manager {
@@ -7,183 +7,214 @@ html .o_web_client > .o_action_manager {
 }
 
 .o_di_root {
-    background: #f4f6f9;
+    background: #f8f9fa;
     min-height: 100%;
     font-family: inherit;
 }
 
-/* ── Hero Banner ──────────────────────────────────────────────── */
-.o_di_banner {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    padding: 28px 32px;
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-}
-.o_di_banner::after {
-    content: "";
-    position: absolute;
-    right: -60px;
-    top: -60px;
-    width: 220px;
-    height: 220px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    pointer-events: none;
-}
-.o_di_banner_inner {
+/* ── Page Header ──────────────────────────────────────────────── */
+.o_di_page_header {
+    background: #fff;
+    border-bottom: 1px solid #e8eaed;
+    padding: 20px 28px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    max-width: 1400px;
+    gap: 16px;
+    flex-wrap: wrap;
 }
-.o_di_banner_left {
+.o_di_header_left {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 14px;
 }
-.o_di_banner_avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.12);
+.o_di_header_icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    color: rgba(255,255,255,0.85);
+    font-size: 1.4rem;
+    color: #fff;
     flex-shrink: 0;
 }
-.o_di_greeting {
-    font-size: 0.85rem;
-    color: rgba(255,255,255,0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 2px;
-}
-.o_di_name {
-    font-size: 1.5rem;
-    font-weight: 700;
+.o_di_header_icon_blue   { background: #1a73e8; }
+.o_di_header_icon_indigo { background: #7c3aed; }
+.o_di_header_title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #202124;
     line-height: 1.2;
 }
-.o_di_date {
-    font-size: 0.85rem;
-    color: rgba(255,255,255,0.55);
-    margin-top: 3px;
+.o_di_header_date {
+    font-size: 0.81rem;
+    color: #5f6368;
+    margin-top: 2px;
 }
-.o_di_banner_right {
-    font-size: 3.5rem;
-    color: rgba(255,255,255,0.08);
-}
-
-/* ── KPI Tile Row ─────────────────────────────────────────────── */
-.o_di_kpi_row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-}
-@media (max-width: 1100px) { .o_di_kpi_row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px)  { .o_di_kpi_row { grid-template-columns: 1fr; } }
-
-.o_di_kpi_card {
+.o_di_header_actions {
     display: flex;
+    gap: 8px;
     align-items: center;
-    gap: 18px;
-    padding: 24px 28px;
-    color: #fff;
-    cursor: default;
-    transition: filter 0.15s ease;
-    position: relative;
-    overflow: hidden;
+    flex-wrap: wrap;
 }
-.o_di_kpi_card::after {
-    content: "";
-    position: absolute;
-    right: -20px;
-    bottom: -20px;
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.08);
-    pointer-events: none;
-}
-.o_di_kpi_card[t-on-click] { cursor: pointer; }
-.o_di_kpi_card[t-on-click]:hover { filter: brightness(1.08); }
-
-.o_di_kpi_blue   { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
-.o_di_kpi_green  { background: linear-gradient(135deg, #198754, #146c43); }
-.o_di_kpi_orange { background: linear-gradient(135deg, #fd7e14, #dc6502); }
-.o_di_kpi_purple { background: linear-gradient(135deg, #6f42c1, #59359a); }
-
-.o_di_kpi_icon {
-    font-size: 2.2rem;
-    opacity: 0.85;
-    flex-shrink: 0;
-}
-.o_di_kpi_value {
-    font-size: 2rem;
-    font-weight: 800;
-    line-height: 1;
-}
-.o_di_kpi_label {
-    font-size: 0.9rem;
+.o_di_hdr_btn {
+    font-size: 0.8rem;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid #dadce0;
+    background: transparent;
+    color: #3c4043;
+    cursor: pointer;
     font-weight: 500;
-    margin-top: 3px;
-    opacity: 0.9;
+    transition: background 0.12s ease, box-shadow 0.12s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
-.o_di_kpi_sub {
-    font-size: 0.72rem;
-    opacity: 0.65;
+.o_di_hdr_btn:hover {
+    background: #f1f3f4;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.o_di_hdr_btn_icon {
+    padding: 8px 10px;
+    border-radius: 50%;
+}
+
+/* ── KPI Stat Chips ───────────────────────────────────────────── */
+.o_di_stat_row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 20px 28px 8px;
+}
+.o_di_stat_chip {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+    padding: 18px 22px;
+    min-width: 130px;
+    flex: 1;
+    max-width: 195px;
+    cursor: default;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.o_di_stat_chip.is-clickable { cursor: pointer; }
+.o_di_stat_chip.is-clickable:hover {
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+.o_di_stat_value {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+.o_di_stat_label {
+    font-size: 0.78rem;
+    color: #5f6368;
+    font-weight: 500;
+    margin-top: 4px;
+}
+.o_di_stat_sub {
+    font-size: 0.68rem;
+    color: #9aa0a6;
     margin-top: 1px;
 }
 
-/* ── Quick Actions Row ────────────────────────────────────────── */
-.o_di_actions_row {
-    display: flex;
-    gap: 12px;
-    padding: 20px 24px;
-    background: #fff;
-    border-bottom: 1px solid #e9ecef;
-    flex-wrap: wrap;
+/* Stat chip accent colors — number only */
+.o_di_stat_blue   .o_di_stat_value { color: #1a73e8; }
+.o_di_stat_green  .o_di_stat_value { color: #1e8e3e; }
+.o_di_stat_orange .o_di_stat_value { color: #e8710a; }
+.o_di_stat_purple .o_di_stat_value { color: #7c3aed; }
+.o_di_stat_red    .o_di_stat_value { color: #d93025; }
+.o_di_stat_teal   .o_di_stat_value { color: #0d9488; }
+.o_di_stat_amber  .o_di_stat_value { color: #d97706; }
+.o_di_stat_indigo .o_di_stat_value { color: #4f46e5; }
+.o_di_stat_cyan   .o_di_stat_value { color: #0891b2; }
+
+/* ── Section Label ─────────────────────────────────────────────── */
+.o_di_section_label {
+    padding: 20px 28px 4px;
+    font-size: 0.70rem;
+    font-weight: 600;
+    color: #9aa0a6;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
 }
-.o_di_action_btn {
-    display: inline-flex;
+
+/* ── Quick Actions — Google App Launcher style ─────────────────── */
+.o_di_quick_grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 4px 20px 16px;
+}
+.o_di_quick_item {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 9px 18px;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border: none;
+    padding: 14px 10px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: opacity 0.15s ease, transform 0.1s ease;
-    color: #fff;
+    transition: background 0.12s ease;
+    min-width: 86px;
+    max-width: 108px;
+    flex: 1;
+    border: none;
+    background: transparent;
 }
-.o_di_action_btn:hover { opacity: 0.88; transform: translateY(-1px); }
-.o_di_action_btn:active { transform: translateY(0); }
-.o_di_action_blue   { background: #0d6efd; }
-.o_di_action_green  { background: #198754; }
-.o_di_action_teal   { background: #0d9488; }
-.o_di_action_orange { background: #fd7e14; }
+.o_di_quick_item:hover { background: #f1f3f4; }
+.o_di_quick_icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+.o_di_quick_icon_blue   { background: #1a73e8; }
+.o_di_quick_icon_green  { background: #1e8e3e; }
+.o_di_quick_icon_teal   { background: #0d9488; }
+.o_di_quick_icon_orange { background: #e8710a; }
+.o_di_quick_icon_purple { background: #7c3aed; }
+.o_di_quick_icon_red    { background: #d93025; }
+.o_di_quick_icon_amber  { background: #d97706; }
+.o_di_quick_icon_indigo { background: #4f46e5; }
+.o_di_quick_icon_cyan   { background: #0891b2; }
+.o_di_quick_icon_pink   { background: #db2777; }
+.o_di_quick_label {
+    font-size: 0.72rem;
+    color: #3c4043;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.3;
+}
 
 /* ── Content Grid ─────────────────────────────────────────────── */
 .o_di_content_grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    padding: 24px;
+    gap: 16px;
+    padding: 8px 28px 28px;
 }
-@media (max-width: 900px) { .o_di_content_grid { grid-template-columns: 1fr; } }
+@media (max-width: 1024px) { .o_di_content_grid { grid-template-columns: 1fr; } }
 
-.o_di_card_full {
-    grid-column: 1 / -1;
-}
+.o_di_card_full { grid-column: 1 / -1; }
 
 /* ── Card ─────────────────────────────────────────────────────── */
 .o_di_card {
     background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -192,38 +223,37 @@ html .o_web_client > .o_action_manager {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
-    border-bottom: 1px solid #f0f2f5;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #f1f3f4;
 }
 .o_di_card_title {
+    font-size: 0.93rem;
+    font-weight: 600;
+    color: #202124;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #1a1a2e;
+    gap: 6px;
 }
-.o_di_card_dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
+.o_di_card_subtitle {
+    font-size: 0.77rem;
+    color: #9aa0a6;
+    font-weight: 400;
 }
 .o_di_view_btn {
     font-size: 0.78rem;
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
+    padding: 5px 14px;
+    border-radius: 16px;
+    border: 1px solid #dadce0;
     background: transparent;
-    color: #6c757d;
+    color: #3c4043;
     cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
+    font-weight: 500;
+    transition: background 0.12s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
-.o_di_view_btn:hover {
-    background: #f8f9fa;
-    color: #343a40;
-}
+.o_di_view_btn:hover { background: #f1f3f4; }
 .o_di_card_body {
     flex: 1;
     overflow-x: auto;
@@ -235,11 +265,12 @@ html .o_web_client > .o_action_manager {
 .o_di_empty {
     text-align: center;
     padding: 36px 20px;
-    color: #adb5bd;
+    color: #9aa0a6;
     font-size: 0.875rem;
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 8px;
 }
 
 /* ── Table ────────────────────────────────────────────────────── */
@@ -250,148 +281,38 @@ html .o_web_client > .o_action_manager {
 }
 .o_di_table thead th {
     padding: 9px 16px;
-    font-size: 0.72rem;
+    font-size: 0.69rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #9099a3;
+    letter-spacing: 0.06em;
+    color: #9aa0a6;
     font-weight: 600;
-    background: #f8f9fa;
-    border-bottom: 1px solid #f0f2f5;
+    background: #fff;
+    border-bottom: 1px solid #f1f3f4;
     white-space: nowrap;
 }
 .o_di_table tbody tr {
-    border-bottom: 1px solid #f4f6f9;
+    border-bottom: 1px solid #f8f9fa;
     transition: background 0.1s ease;
 }
 .o_di_table tbody tr:last-child { border-bottom: none; }
 .o_di_table tbody tr:hover { background: #f8f9fd; }
-.o_di_table td {
-    padding: 10px 16px;
-    color: #2c3748;
-}
+.o_di_table td { padding: 10px 16px; color: #3c4043; }
 
 /* ── Badges ───────────────────────────────────────────────────── */
 .o_di_badge {
     display: inline-block;
-    padding: 3px 9px;
+    padding: 3px 10px;
     border-radius: 12px;
-    font-size: 0.72rem;
+    font-size: 0.69rem;
     font-weight: 600;
     white-space: nowrap;
 }
-.o_di_badge_primary   { background: #cfe2ff; color: #084298; }
-.o_di_badge_success   { background: #d1e7dd; color: #0a3622; }
-.o_di_badge_danger    { background: #f8d7da; color: #842029; }
-.o_di_badge_secondary { background: #e9ecef; color: #495057; }
-
-
-/* ═══════════════════════════════════════════════════════════════
-   DOJO ADMIN DASHBOARD — extends the instructor dashboard base
-═══════════════════════════════════════════════════════════════ */
-
-/* ── Admin Hero Banner ────────────────────────────────────────── */
-.o_ad_banner {
-    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 55%, #2d1b69 100%);
-    padding: 26px 32px;
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-}
-.o_ad_banner::before {
-    content: "";
-    position: absolute;
-    left: -80px; top: -80px;
-    width: 260px; height: 260px;
-    border-radius: 50%;
-    background: rgba(109,66,193,0.15);
-    pointer-events: none;
-}
-.o_ad_banner::after {
-    content: "";
-    position: absolute;
-    right: -60px; bottom: -60px;
-    width: 220px; height: 220px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.03);
-    pointer-events: none;
-}
-.o_ad_banner_inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    max-width: 1600px;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-.o_ad_banner_left {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-.o_ad_banner_icon {
-    width: 60px; height: 60px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.7rem;
-    color: rgba(255,255,255,0.85);
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.12);
-}
-.o_ad_banner_label {
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 2px;
-}
-.o_ad_banner_title {
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1.2;
-}
-.o_ad_banner_actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: center;
-}
-.o_ad_hdr_btn {
-    font-size: 0.8rem;
-    padding: 7px 14px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.88);
-    cursor: pointer;
-    transition: background 0.15s ease;
-    white-space: nowrap;
-}
-.o_ad_hdr_btn:hover { background: rgba(255,255,255,0.16); }
-.o_ad_hdr_btn_refresh { padding: 7px 11px; }
-
-/* ── Admin KPI row overrides ─────────────────────────────────── */
-.o_ad_kpi_row {
-    grid-template-columns: repeat(6, 1fr);
-}
-@media (max-width: 1300px) { .o_ad_kpi_row { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px)  { .o_ad_kpi_row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 450px)  { .o_ad_kpi_row { grid-template-columns: 1fr; } }
-
-.o_ad_kpi_indigo {
-    background: linear-gradient(135deg, #6610f2, #7c3aed);
-}
-.o_ad_kpi_red {
-    background: linear-gradient(135deg, #c0392b, #e74c3c);
-}
-
-/* ── Content grid override for admin ─────────────────────────── */
-.o_ad_content_grid {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 20px 24px;
-}
+.o_di_badge_primary   { background: #e8f0fe; color: #1a73e8; }
+.o_di_badge_success   { background: #e6f4ea; color: #1e8e3e; }
+.o_di_badge_danger    { background: #fce8e6; color: #d93025; }
+.o_di_badge_secondary { background: #f1f3f4; color: #5f6368; }
+.o_ad_badge_info      { background: #e8f4fd; color: #0277bd; }
+.o_ad_badge_warning   { background: #fef3cd; color: #b45309; }
 
 /* ── Progress bar widget ─────────────────────────────────────── */
 .o_ad_bar_wrap {
@@ -403,14 +324,14 @@ html .o_web_client > .o_action_manager {
     flex: 1;
     height: 6px;
     border-radius: 4px;
-    background: #e9ecef;
+    background: #f1f3f4;
     overflow: hidden;
     min-width: 60px;
 }
 .o_ad_bar_fill {
     height: 100%;
     border-radius: 4px;
-    transition: width 0.3s ease;
+    transition: width 0.4s ease;
 }
 .o_ad_bar_label {
     font-size: 0.78rem;
@@ -419,57 +340,121 @@ html .o_web_client > .o_action_manager {
     text-align: right;
     white-space: nowrap;
 }
+.o_ad_rate_good    .o_ad_bar_fill { background: #1e8e3e; }
+.o_ad_rate_ok      .o_ad_bar_fill { background: #e8710a; }
+.o_ad_rate_bad     .o_ad_bar_fill { background: #d93025; }
+.o_ad_rate_neutral .o_ad_bar_fill { background: #dadce0; }
+.o_ad_rate_good    { color: #1e8e3e; }
+.o_ad_rate_ok      { color: #e8710a; }
+.o_ad_rate_bad     { color: #d93025; }
+.o_ad_rate_neutral { color: #9aa0a6; }
 
-/* Rate colour variants */
-.o_ad_rate_good  .o_ad_bar_fill  { background: #28a745; }
-.o_ad_rate_ok    .o_ad_bar_fill  { background: #fd7e14; }
-.o_ad_rate_bad   .o_ad_bar_fill  { background: #dc3545; }
-.o_ad_rate_neutral .o_ad_bar_fill { background: #adb5bd; }
-.o_ad_rate_good  { color: #1a6e2e; }
-.o_ad_rate_ok    { color: #974900; }
-.o_ad_rate_bad   { color: #842029; }
-.o_ad_rate_neutral { color: #6c757d; }
+/* ── Admin content grid (same 2-col) ─────────────────────────── */
+.o_ad_content_grid {
+    grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 1024px) { .o_ad_content_grid { grid-template-columns: 1fr; } }
 
-/* ── Extra badges ────────────────────────────────────────────── */
-.o_ad_badge_info    { background: #cff4fc; color: #0c5460; }
-.o_ad_badge_warning { background: #fff3cd; color: #664d03; }
-
-/* ── KPI card cursor overrides ───────────────────────────────── */
-.o_di_kpi_card:hover { filter: brightness(1.06); }
-
-/* ── Mark Attendance button (Today's Classes table) ─────────── */
+/* ── Mark Attendance button ──────────────────────────────────── */
 .o_di_attend_btn {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 11px;
-    border-radius: 6px;
-    border: 1px solid #0d6efd;
+    padding: 5px 12px;
+    border-radius: 14px;
+    border: 1px solid #1a73e8;
     background: transparent;
-    color: #0d6efd;
-    font-size: 0.78rem;
+    color: #1a73e8;
+    font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.12s ease, color 0.12s ease;
 }
-.o_di_attend_btn:hover {
-    background: #0d6efd;
-    color: #fff;
+.o_di_attend_btn:hover { background: #1a73e8; color: #fff; }
+
+/* ── Session rows (instructor today/upcoming cards) ─────────── */
+.o_di_session_row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f3f4;
 }
+.o_di_session_row:last-child { border-bottom: none; }
+.o_di_session_row:hover { background: #f8f9fd; }
+
+.o_di_session_info {
+    flex: 1;
+    min-width: 0;
+}
+.o_di_session_name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #202124;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.o_di_session_meta {
+    font-size: 0.78rem;
+    color: #5f6368;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* ── To-Do list ───────────────────────────────────────────────── */
+.o_di_todo_list {
+    display: flex;
+    flex-direction: column;
+}
+.o_di_todo_item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 16px;
+    border-bottom: 1px solid #f1f3f4;
+}
+.o_di_todo_item:last-child { border-bottom: none; }
+.o_di_todo_item:hover { background: #f8f9fd; }
+
+.o_di_todo_icon {
+    font-size: 1rem;
+    color: #9aa0a6;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+.o_di_todo_icon.done { color: #1e8e3e; }
+
+.o_di_todo_body {
+    flex: 1;
+    min-width: 0;
+}
+.o_di_todo_name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #202124;
+}
+.o_di_todo_due {
+    font-size: 0.75rem;
+    color: #9aa0a6;
+    margin-top: 2px;
+}
+
+/* ── Badge variants used in instructor dashboard ─────────────── */
+.o_di_badge_warning { background: #fef3cd; color: #b45309; }
 
 
 /* ═══════════════════════════════════════════════════════════════
    DOJO MEMBER PROFILE
 ═══════════════════════════════════════════════════════════════ */
 
-.o_mp_root {
-    background: #f4f6f9;
-    min-height: 100%;
-    font-family: inherit;
-}
+.o_mp_root { background: #f8f9fa; min-height: 100%; font-family: inherit; }
 
-/* ── Hero ──────────────────────────────────────────────────────── */
 .o_mp_hero {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     padding: 28px 32px 32px;
@@ -480,207 +465,78 @@ html .o_web_client > .o_action_manager {
 .o_mp_hero::after {
     content: "";
     position: absolute;
-    right: -60px;
-    top: -60px;
-    width: 220px;
-    height: 220px;
+    right: -60px; top: -60px;
+    width: 220px; height: 220px;
     border-radius: 50%;
     background: rgba(255,255,255,0.04);
     pointer-events: none;
 }
-.o_mp_hero_inner {
-    max-width: 1400px;
-    position: relative;
-    z-index: 1;
-}
+.o_mp_hero_inner { max-width: 1400px; position: relative; z-index: 1; }
 .o_mp_back_btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: rgba(255,255,255,0.85);
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.15s ease;
-    margin-bottom: 20px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.85); padding: 6px 14px; border-radius: 6px;
+    font-size: 0.8rem; cursor: pointer; transition: background 0.15s ease; margin-bottom: 20px;
 }
 .o_mp_back_btn:hover { background: rgba(255,255,255,0.18); }
-
 .o_mp_back_btn_plain {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: transparent;
-    border: 1px solid #dee2e6;
-    color: #495057;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.12s ease;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; border: 1px solid #dee2e6; color: #495057;
+    padding: 6px 14px; border-radius: 6px; font-size: 0.8rem;
+    cursor: pointer; transition: background 0.12s ease;
 }
 .o_mp_back_btn_plain:hover { background: #f8f9fa; }
-
-.o_mp_hero_body {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-}
-
-/* Avatar */
+.o_mp_hero_body { display: flex; align-items: center; gap: 24px; }
 .o_mp_avatar_wrap {
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    overflow: hidden;
-    border: 3px solid rgba(255,255,255,0.25);
+    width: 90px; height: 90px; border-radius: 50%; flex-shrink: 0;
+    overflow: hidden; border: 3px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.1);
 }
-.o_mp_avatar {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
+.o_mp_avatar { width: 100%; height: 100%; object-fit: cover; display: block; }
 .o_mp_avatar_fallback {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.2rem;
-    color: rgba(255,255,255,0.6);
+    width: 100%; height: 100%; display: flex; align-items: center;
+    justify-content: center; font-size: 2.2rem; color: rgba(255,255,255,0.6);
 }
-
-/* Identity */
-.o_mp_hero_name {
-    font-size: 1.7rem;
-    font-weight: 700;
-    margin: 0 0 8px;
-    line-height: 1.2;
-    color: #fff;
-}
-.o_mp_hero_badges {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-/* State badge */
+.o_mp_hero_name { font-size: 1.7rem; font-weight: 700; margin: 0 0 8px; line-height: 1.2; color: #fff; }
+.o_mp_hero_badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .o_mp_state_badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
 }
 .o_mp_state_lead      { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); }
 .o_mp_state_trial     { background: rgba(13,202,240,0.25);  color: #cff4fc; }
 .o_mp_state_active    { background: rgba(25,135,84,0.3);    color: #a3d9b8; }
 .o_mp_state_paused    { background: rgba(255,193,7,0.25);   color: #ffe083; }
 .o_mp_state_cancelled { background: rgba(220,53,69,0.3);    color: #ffb3bb; }
-
-/* Role badge */
 .o_mp_role_badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.18);
-    color: rgba(255,255,255,0.8);
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.8);
 }
-
-/* ── Content Area ──────────────────────────────────────────────── */
-.o_mp_content {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 24px;
-}
-
-/* Two-column row for Info + Household */
-.o_mp_two_col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-@media (max-width: 900px) {
-    .o_mp_two_col { grid-template-columns: 1fr; }
-}
-
-/* ── Info card body ────────────────────────────────────────────── */
-.o_mp_info_body {
-    padding: 6px 0;
-    max-height: none !important;
-}
+.o_mp_content { display: flex; flex-direction: column; gap: 20px; padding: 24px; }
+.o_mp_two_col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .o_mp_two_col { grid-template-columns: 1fr; } }
+.o_mp_info_body { padding: 6px 0; max-height: none !important; }
 .o_mp_info_row {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    padding: 10px 20px;
-    border-bottom: 1px solid #f4f6f9;
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 10px 20px; border-bottom: 1px solid #f4f6f9;
 }
 .o_mp_info_row:last-child { border-bottom: none; }
 .o_mp_info_label {
-    min-width: 130px;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #9099a3;
-    font-weight: 600;
-    flex-shrink: 0;
+    min-width: 130px; font-size: 0.78rem; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #9aa0a6; font-weight: 600; flex-shrink: 0;
 }
-.o_mp_info_value {
-    font-size: 0.9rem;
-    color: #2c3748;
-}
-.o_mp_info_value a {
-    color: #0d6efd;
-    text-decoration: none;
-}
+.o_mp_info_value { font-size: 0.9rem; color: #202124; }
+.o_mp_info_value a { color: #1a73e8; text-decoration: none; }
 .o_mp_info_value a:hover { text-decoration: underline; }
-
-/* Emergency note */
 .o_mp_emergency {
-    margin: 8px 16px 10px;
-    border-radius: 8px;
-    background: #fff5f5;
-    border: 1px solid #ffc5c8;
-    padding: 12px 16px;
+    margin: 8px 16px 10px; border-radius: 8px;
+    background: #fce8e6; border: 1px solid #f5c6cb; padding: 12px 16px;
 }
 .o_mp_emergency_title {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #842029;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    font-size: 0.78rem; font-weight: 700; color: #d93025;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
 }
-.o_mp_emergency_text {
-    font-size: 0.875rem;
-    color: #6e1c22;
-    white-space: pre-wrap;
-}
-
-/* ── Household card extras ─────────────────────────────────────── */
-.o_mp_hh_header {
-    padding: 12px 20px 6px;
-    font-size: 1rem;
-    color: #2c3748;
-    display: flex;
-    align-items: center;
-}
-.o_mp_hh_guardian {
-    padding: 4px 20px 10px;
-    font-size: 0.875rem;
-    color: #495057;
-}
+.o_mp_emergency_text { font-size: 0.875rem; color: #a50e0e; white-space: pre-wrap; }
+.o_mp_hh_header { padding: 12px 20px 6px; font-size: 1rem; color: #202124; display: flex; align-items: center; }
+.o_mp_hh_guardian { padding: 4px 20px 10px; font-size: 0.875rem; color: #5f6368; }

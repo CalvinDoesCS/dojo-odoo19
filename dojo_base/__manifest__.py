@@ -12,6 +12,7 @@
         "views/dojo_household_views.xml",
         "views/dojo_member_views.xml",
         "views/dojo_instructor_profile_views.xml",
+        "views/dojo_martial_art_style_views.xml",
     ],
     "application": False,
     "installable": True,

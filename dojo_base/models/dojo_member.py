@@ -31,6 +31,20 @@ class DojoMember(models.Model):
     )
     date_of_birth = fields.Date()
     emergency_note = fields.Text()
+
+    # ── Medical Information ───────────────────────────────────────────────
+    blood_type = fields.Selection(
+        [
+            ("A+", "A+"), ("A-", "A-"),
+            ("B+", "B+"), ("B-", "B-"),
+            ("AB+", "AB+"), ("AB-", "AB-"),
+            ("O+", "O+"), ("O-", "O-"),
+        ],
+        string="Blood Type",
+    )
+    allergies = fields.Text(string="Allergies")
+    medical_notes = fields.Text(string="Medical Notes")
+
     guardian_for_link_ids = fields.One2many(
         "dojo.guardian.link", "guardian_member_id", string="Guardian Of"
     )

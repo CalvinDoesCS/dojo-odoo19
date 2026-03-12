@@ -15,3 +15,5 @@ access_dojo_belt_test_registration_user,dojo.belt.test.registration user,model_d
 access_dojo_belt_test_registration_manager,dojo.belt.test.registration manager,model_dojo_belt_test_registration,dojo_belt_progression.group_dojo_belt_manager,1,1,1,1
 access_dojo_belt_test_registration_instructor,dojo.belt.test.registration instructor,model_dojo_belt_test_registration,dojo_base.group_dojo_instructor,1,1,1,1
 access_dojo_belt_test_registration_admin,dojo.belt.test.registration admin,model_dojo_belt_test_registration,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_belt_promotion_wizard_user,dojo.belt.promotion.wizard user,model_dojo_belt_promotion_wizard,base.group_user,1,1,1,1
+access_dojo_belt_promotion_wizard_line_user,dojo.belt.promotion.wizard.line user,model_dojo_belt_promotion_wizard_line,base.group_user,1,1,1,1

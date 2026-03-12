@@ -136,14 +136,14 @@ lee_hh.primary_guardian_id = s5
 # ── 5. Belt ranks ─────────────────────────────────────────────────────────
 print("Creating belt ranks...")
 rank_defs = [
-    ("White Belt",  10,  0),
-    ("Yellow Belt", 20,  3),
-    ("Orange Belt", 30,  2),
-    ("Green Belt",  40, 10),
-    ("Blue Belt",   50,  4),
-    ("Purple Belt", 60,  1),
-    ("Brown Belt",  70, 12),
-    ("Black Belt",  80, 11),
+    ("White Belt",  10,  "#607d8b"),
+    ("Yellow Belt", 20,  "#f9a825"),
+    ("Orange Belt", 30,  "#ef6c00"),
+    ("Green Belt",  40,  "#2e7d32"),
+    ("Blue Belt",   50,  "#1565c0"),
+    ("Purple Belt", 60,  "#6a1b9a"),
+    ("Brown Belt",  70,  "#4e342e"),
+    ("Black Belt",  80,  "#212529"),
 ]
 ranks = {}
 for rname, seq, color in rank_defs:

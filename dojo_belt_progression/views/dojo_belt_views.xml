@@ -33,6 +33,10 @@
                         <field name="testing_fee_product_id"
                                placeholder="Leave blank if no fee applies"/>
                     </group>
+                    <group string="Dan Level">
+                        <field name="is_dan"/>
+                        <field name="dan_level" invisible="not is_dan"/>
+                    </group>
                     <group string="Description">
                         <field name="description" nolabel="1"/>
                     </group>
@@ -107,6 +111,11 @@
                         class="btn-primary" invisible="state != 'in_progress'"/>
                     <button name="action_cancel" string="Cancel" type="object"
                         class="btn-secondary" invisible="state in ['completed', 'cancelled']"/>
+                    <button name="action_open_promotion_wizard"
+                        string="Promotion Wizard"
+                        type="object"
+                        class="btn-success"
+                        invisible="state != 'completed'"/>
                     <field name="state" widget="statusbar"
                         statusbar_visible="scheduled,in_progress,completed"/>
                 </header>

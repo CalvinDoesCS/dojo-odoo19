@@ -9,6 +9,13 @@ _logger = logging.getLogger(__name__)
 class DojoMemberSubscription(models.Model):
     _name = "dojo.member.subscription"
     _description = "Dojo Member Subscription"
+    _rec_name = "name"
+
+    name = fields.Char(
+        compute="_compute_name",
+        store=True,
+        string="Name",
+    )
 
     member_id = fields.Many2one("dojo.member", required=True, index=True, ondelete="cascade")
     household_id = fields.Many2one(
@@ -75,6 +82,16 @@ class DojoMemberSubscription(models.Model):
     )
 
     # ── Computed ──────────────────────────────────────────────────────────
+    @api.depends("member_id", "plan_id")
+    def _compute_name(self):
+        for rec in self:
+            parts = []
+            if rec.member_id:
+                parts.append(rec.member_id.name)
+            if rec.plan_id:
+                parts.append(rec.plan_id.name)
+            rec.name = " \u2014 ".join(parts) if parts else _("New Subscription")
+
     @api.depends("invoice_ids", "household_invoice_ids")
     def _compute_invoice_count(self):
         for rec in self:

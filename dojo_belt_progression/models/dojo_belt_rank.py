@@ -43,3 +43,15 @@ class DojoBeltRank(models.Model):
     member_rank_ids = fields.One2many(
         "dojo.member.rank", "rank_id", string="Awarded To"
     )
+
+    # ── Dan Level ─────────────────────────────────────────────────────────
+    is_dan = fields.Boolean(
+        string="Is Dan Level",
+        default=False,
+        help="Check if this rank represents a Dan (black belt degree) level.",
+    )
+    dan_level = fields.Integer(
+        string="Dan Level",
+        default=0,
+        help="Dan degree (1–10). Only relevant when 'Is Dan Level' is enabled.",
+    )

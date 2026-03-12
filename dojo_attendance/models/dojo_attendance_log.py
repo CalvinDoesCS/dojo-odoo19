@@ -1,10 +1,23 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class DojoAttendanceLog(models.Model):
     _name = "dojo.attendance.log"
     _description = "Dojo Attendance Log"
     _order = "checkin_datetime desc"
+    _rec_name = "name"
+
+    name = fields.Char(compute="_compute_name", store=True, string="Name")
+
+    @api.depends("member_id", "session_id")
+    def _compute_name(self):
+        for rec in self:
+            parts = []
+            if rec.member_id:
+                parts.append(rec.member_id.name)
+            if rec.session_id:
+                parts.append(rec.session_id.display_name or rec.session_id.name)
+            rec.name = " \u2014 ".join(parts) if parts else "Attendance Log"
 
     session_id = fields.Many2one(
         "dojo.class.session", required=True, ondelete="cascade", index=True

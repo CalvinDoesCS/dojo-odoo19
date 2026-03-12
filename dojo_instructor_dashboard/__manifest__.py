@@ -20,9 +20,12 @@
         'dojo_classes',
         'dojo_attendance',
         'project',
+        'account',
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/instructor_todos_data.xml',
+        'data/ir_cron.xml',
         'views/dojo_instructor_dashboard_views.xml',
         'views/dojo_attendance_quick_views.xml',
         'views/dojo_member_profile_button.xml',

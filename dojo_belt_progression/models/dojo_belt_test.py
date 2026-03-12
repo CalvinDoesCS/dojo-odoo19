@@ -51,3 +51,16 @@ class DojoBeltTest(models.Model):
     def action_award_rank(self):
         """Delegate to registrations — create rank records for all passing members."""
         self.registration_ids.action_award_rank()
+
+    def action_open_promotion_wizard(self):
+        """Open the belt promotion wizard pre-populated with passing registrations."""
+        self.ensure_one()
+        wizard = self.env["dojo.belt.promotion.wizard"].create_from_test(self.id)
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Belt Promotion Wizard",
+            "res_model": "dojo.belt.promotion.wizard",
+            "res_id": wizard.id,
+            "view_mode": "form",
+            "target": "new",
+        }

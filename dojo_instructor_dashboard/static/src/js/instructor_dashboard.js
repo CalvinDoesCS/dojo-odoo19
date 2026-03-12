@@ -156,6 +156,17 @@ class InstructorDashboard extends Component {
     openMyStudents()     { this.action.doAction("dojo_instructor_dashboard.action_my_students"); }
     openCalendar()       { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_calendar"); }
     openTodos()          { this.action.doAction("dojo_instructor_dashboard.action_my_todos"); }
+    openMarkAttendance() { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_today"); }
+
+    pct(rate) {
+        if (rate === undefined || rate === null) return "—";
+        return Math.round(rate) + "%";
+    }
+
+    async _reload() {
+        this.state.loading = true;
+        await this._loadData();
+    }
 
     async openQuickAttendance(sessionId) {
         // Pre-create the wizard server-side via orm.call so default_get fires

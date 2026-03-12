@@ -71,19 +71,18 @@
               name="Onboarding"
               sequence="5"
               groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"
-              web_icon="dojo_onboarding,static/description/icon.png"/>/>
+              web_icon="dojo_onboarding,static/description/icon.png"/>
+    <menuitem id="menu_dojo_onboarding_records"
+              name="Onboarding Records"
+              parent="menu_dojo_onboarding_root"
+              action="action_dojo_onboarding_records"
+              sequence="1"
+              groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
 
     <menuitem id="menu_dojo_onboarding_new"
               name="New Member"
               parent="menu_dojo_onboarding_root"
               action="action_dojo_onboarding_wizard"
-              sequence="1"
-              groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
-
-    <menuitem id="menu_dojo_onboarding_records"
-              name="Onboarding Records"
-              parent="menu_dojo_onboarding_root"
-              action="action_dojo_onboarding_records"
               sequence="2"
               groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
 

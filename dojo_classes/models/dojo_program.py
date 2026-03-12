@@ -15,6 +15,11 @@ class DojoProgram(models.Model):
     company_id = fields.Many2one(
         "res.company", default=lambda self: self.env.company, index=True
     )
+    style_id = fields.Many2one(
+        "dojo.martial.art.style",
+        string="Martial Art Style",
+        ondelete="set null",
+    )
 
     # ── Related records ───────────────────────────────────────────────────
     template_ids = fields.One2many(

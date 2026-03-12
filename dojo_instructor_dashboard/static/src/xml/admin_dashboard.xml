@@ -4,127 +4,182 @@
 <t t-name="dojo_instructor_dashboard.AdminDashboard">
 <div class="o_di_root" t-ref="root">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         LOADING
-    ═══════════════════════════════════════════════════════════ -->
     <t t-if="state.loading">
         <div class="d-flex justify-content-center align-items-center" style="min-height:360px">
-            <div class="spinner-border text-primary" role="status">
+            <div class="spinner-border" style="color:#1a73e8" role="status">
                 <span class="visually-hidden">Loading…</span>
             </div>
         </div>
     </t>
 
-    <!-- Dashboard content -->
     <t t-else="">
 
-        <!-- ── Admin Hero Banner ─────────────────────────────────── -->
-        <div class="o_ad_banner">
-            <div class="o_ad_banner_inner">
-                <div class="o_ad_banner_left">
-                    <div class="o_ad_banner_icon">
-                        <i class="fa fa-tachometer"/>
-                    </div>
-                    <div>
-                        <div class="o_ad_banner_label">Admin Overview</div>
-                        <div class="o_ad_banner_title">Dojo Dashboard</div>
-                        <div class="o_di_date" t-esc="todayLabel"/>
-                    </div>
+        <!-- ── Page Header ──────────────────────────────────────── -->
+        <div class="o_di_page_header">
+            <div class="o_di_header_left">
+                <div class="o_di_header_icon o_di_header_icon_indigo">
+                    <i class="fa fa-tachometer"/>
                 </div>
-                <div class="o_ad_banner_actions">
-                    <button class="o_ad_hdr_btn" t-on-click="openTodaysSessions">
-                        <i class="fa fa-calendar-check-o me-1"/>Today's Sessions
-                    </button>
-                    <button class="o_ad_hdr_btn" t-on-click="openCalendar">
-                        <i class="fa fa-calendar me-1"/>Calendar
-                    </button>
-                    <button class="o_ad_hdr_btn" t-on-click="openAllStudents">
-                        <i class="fa fa-users me-1"/>All Students
-                    </button>
-                    <button class="o_ad_hdr_btn o_ad_hdr_btn_refresh" t-on-click="_reload">
-                        <i class="fa fa-refresh"/>
-                    </button>
+                <div>
+                    <div class="o_di_header_title">Dojo Dashboard</div>
+                    <div class="o_di_header_date" t-esc="todayLabel"/>
                 </div>
+            </div>
+            <div class="o_di_header_actions">
+                <button class="o_di_hdr_btn" t-on-click="openTodaysSessions">
+                    <i class="fa fa-calendar-check-o"/>Today's Sessions
+                </button>
+                <button class="o_di_hdr_btn" t-on-click="openCalendar">
+                    <i class="fa fa-calendar"/>Calendar
+                </button>
+                <button class="o_di_hdr_btn" t-on-click="openAllStudents">
+                    <i class="fa fa-users"/>All Students
+                </button>
+                <button class="o_di_hdr_btn o_di_hdr_btn_icon" t-on-click="_reload" title="Refresh">
+                    <i class="fa fa-refresh"/>
+                </button>
             </div>
         </div>
 
-        <!-- ── Summary KPI Tiles ─────────────────────────────────── -->
-        <div class="o_di_kpi_row o_ad_kpi_row" t-if="state.summary">
+        <!-- ── KPI Stat Chips ────────────────────────────────────── -->
+        <t t-if="state.summary">
+            <div class="o_di_stat_row">
 
-            <div class="o_di_kpi_card o_ad_kpi_indigo" t-on-click="openInstructorKpis" style="cursor:pointer">
-                <div class="o_di_kpi_icon"><i class="fa fa-chalkboard-teacher fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value" t-esc="state.summary.total_instructors"/>
-                    <div class="o_di_kpi_label">Instructors</div>
+                <div class="o_di_stat_chip o_di_stat_indigo is-clickable" t-on-click="openInstructorKpis">
+                    <div class="o_di_stat_value" t-esc="state.summary.total_instructors"/>
+                    <div class="o_di_stat_label">Instructors</div>
                 </div>
-            </div>
 
-            <div class="o_di_kpi_card o_di_kpi_green" t-on-click="openAllStudents" style="cursor:pointer">
-                <div class="o_di_kpi_icon"><i class="fa fa-users fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value" t-esc="state.summary.total_active_students"/>
-                    <div class="o_di_kpi_label">Active Students</div>
+                <div class="o_di_stat_chip o_di_stat_green is-clickable" t-on-click="openAllStudents">
+                    <div class="o_di_stat_value" t-esc="state.summary.total_active_students"/>
+                    <div class="o_di_stat_label">Active Students</div>
                 </div>
-            </div>
 
-            <div class="o_di_kpi_card o_di_kpi_blue" t-on-click="openTodaysSessions" style="cursor:pointer">
-                <div class="o_di_kpi_icon"><i class="fa fa-calendar-check-o fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value" t-esc="state.summary.sessions_today"/>
-                    <div class="o_di_kpi_label">Sessions Today</div>
+                <div class="o_di_stat_chip o_di_stat_blue is-clickable" t-on-click="openTodaysSessions">
+                    <div class="o_di_stat_value" t-esc="state.summary.sessions_today"/>
+                    <div class="o_di_stat_label">Sessions Today</div>
                 </div>
-            </div>
 
-            <div class="o_di_kpi_card o_di_kpi_orange">
-                <div class="o_di_kpi_icon"><i class="fa fa-bar-chart fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value">
-                        <t t-esc="pct(state.summary.overall_fill_rate)"/>
-                    </div>
-                    <div class="o_di_kpi_label">Avg Fill Rate</div>
-                    <div class="o_di_kpi_sub">last 30 days</div>
+                <div class="o_di_stat_chip o_di_stat_orange">
+                    <div class="o_di_stat_value"><t t-esc="pct(state.summary.overall_fill_rate)"/></div>
+                    <div class="o_di_stat_label">Avg Fill Rate</div>
+                    <div class="o_di_stat_sub">last 30 days</div>
                 </div>
-            </div>
 
-            <div class="o_di_kpi_card o_di_kpi_purple">
-                <div class="o_di_kpi_icon"><i class="fa fa-check-circle fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value">
-                        <t t-esc="pct(state.summary.overall_attendance_rate)"/>
-                    </div>
-                    <div class="o_di_kpi_label">Attendance Rate</div>
-                    <div class="o_di_kpi_sub">last 30 days</div>
+                <div class="o_di_stat_chip o_di_stat_purple">
+                    <div class="o_di_stat_value"><t t-esc="pct(state.summary.overall_attendance_rate)"/></div>
+                    <div class="o_di_stat_label">Attendance Rate</div>
+                    <div class="o_di_stat_sub">last 30 days</div>
                 </div>
-            </div>
 
-            <div class="o_di_kpi_card o_ad_kpi_red">
-                <div class="o_di_kpi_icon"><i class="fa fa-user-times fa-fw"/></div>
-                <div class="o_di_kpi_body">
-                    <div class="o_di_kpi_value" t-esc="state.summary.total_dropped_60d"/>
-                    <div class="o_di_kpi_label">Dropped Enrollments</div>
-                    <div class="o_di_kpi_sub">last 60 days</div>
+                <div class="o_di_stat_chip o_di_stat_red">
+                    <div class="o_di_stat_value" t-esc="state.summary.total_dropped_60d"/>
+                    <div class="o_di_stat_label">Dropped Enrollments</div>
+                    <div class="o_di_stat_sub">last 60 days</div>
                 </div>
+
+                <div class="o_di_stat_chip o_di_stat_teal is-clickable" t-on-click="openInvoices">
+                    <div class="o_di_stat_value" t-esc="currency(state.summary.revenue_this_month)"/>
+                    <div class="o_di_stat_label">Revenue This Month</div>
+                </div>
+
+                <div class="o_di_stat_chip o_di_stat_teal is-clickable" t-on-click="openInvoices">
+                    <div class="o_di_stat_value" t-esc="currency(state.summary.revenue_ytd)"/>
+                    <div class="o_di_stat_label">Revenue YTD</div>
+                </div>
+
+                <div class="o_di_stat_chip o_di_stat_amber">
+                    <div class="o_di_stat_value" t-esc="currency(state.summary.outstanding_balance)"/>
+                    <div class="o_di_stat_label">Outstanding Balance</div>
+                </div>
+
+                <div class="o_di_stat_chip o_di_stat_green is-clickable" t-on-click="openAllStudents">
+                    <div class="o_di_stat_value" t-esc="state.summary.new_members_this_month"/>
+                    <div class="o_di_stat_label">New Members</div>
+                    <div class="o_di_stat_sub">this month</div>
+                </div>
+
             </div>
+        </t>
+
+        <!-- ── Quick Actions ─────────────────────────────────────── -->
+        <div class="o_di_section_label">Quick Actions</div>
+        <div class="o_di_quick_grid">
+
+            <button class="o_di_quick_item" t-on-click="openOnboarding">
+                <div class="o_di_quick_icon o_di_quick_icon_blue">
+                    <i class="fa fa-user-plus"/>
+                </div>
+                <span class="o_di_quick_label">New Onboarding</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openNewMember">
+                <div class="o_di_quick_icon o_di_quick_icon_teal">
+                    <i class="fa fa-id-card-o"/>
+                </div>
+                <span class="o_di_quick_label">Add Member</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openBeltTests">
+                <div class="o_di_quick_icon o_di_quick_icon_green">
+                    <i class="fa fa-trophy"/>
+                </div>
+                <span class="o_di_quick_label">Belt Tests</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openSubscriptions">
+                <div class="o_di_quick_icon o_di_quick_icon_orange">
+                    <i class="fa fa-credit-card"/>
+                </div>
+                <span class="o_di_quick_label">Subscriptions</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openCommunications">
+                <div class="o_di_quick_icon o_di_quick_icon_purple">
+                    <i class="fa fa-envelope"/>
+                </div>
+                <span class="o_di_quick_label">Send Message</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openInvoices">
+                <div class="o_di_quick_icon o_di_quick_icon_amber">
+                    <i class="fa fa-file-text-o"/>
+                </div>
+                <span class="o_di_quick_label">Invoices</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openTodaysSessions">
+                <div class="o_di_quick_icon o_di_quick_icon_indigo">
+                    <i class="fa fa-calendar-check-o"/>
+                </div>
+                <span class="o_di_quick_label">Today's Sessions</span>
+            </button>
+
+            <button class="o_di_quick_item" t-on-click="openCalendar">
+                <div class="o_di_quick_icon o_di_quick_icon_cyan">
+                    <i class="fa fa-calendar"/>
+                </div>
+                <span class="o_di_quick_label">Calendar</span>
+            </button>
 
         </div>
 
-        <!-- ── Content Grid ─────────────────────────────────────── -->
+        <!-- ── Content 2-col Grid ────────────────────────────────── -->
         <div class="o_di_content_grid o_ad_content_grid">
 
-            <!-- ════════ Instructor Performance Table ════════ -->
-            <div class="o_di_card o_di_card_full">
+            <!-- Instructor Performance -->
+            <div class="o_di_card">
                 <div class="o_di_card_header">
                     <div class="o_di_card_title">
-                        <span class="o_di_card_dot" style="background:#6f42c1"/>
                         Instructor Performance
-                        <small class="text-muted fw-normal ms-1">last 30 days</small>
+                        <span class="o_di_card_subtitle">last 30 days</span>
                     </div>
                     <button class="o_di_view_btn" t-on-click="openInstructorKpis">View All</button>
                 </div>
                 <div class="o_di_card_body">
                     <t t-if="state.instructors.length === 0">
                         <div class="o_di_empty">
-                            <i class="fa fa-users fa-2x mb-2"/>
+                            <i class="fa fa-users fa-2x"/>
                             <div>No instructor profiles found</div>
                         </div>
                     </t>
@@ -133,27 +188,23 @@
                             <thead>
                                 <tr>
                                     <th>Instructor</th>
-                                    <th class="text-center">Classes Today</th>
-                                    <th class="text-center">Total Students</th>
-                                    <th style="min-width:140px">Fill Rate (30d)</th>
-                                    <th style="min-width:140px">Attendance (30d)</th>
+                                    <th class="text-center">Today</th>
+                                    <th class="text-center">Students</th>
+                                    <th style="min-width:120px">Fill Rate</th>
+                                    <th style="min-width:120px">Attendance</th>
                                     <th/>
                                 </tr>
                             </thead>
                             <tbody>
                                 <t t-foreach="state.instructors" t-as="inst" t-key="inst.id">
                                     <tr>
-                                        <td class="fw-semibold">
-                                            <t t-esc="inst.name"/>
-                                        </td>
+                                        <td class="fw-semibold"><t t-esc="inst.name"/></td>
                                         <td class="text-center">
                                             <span t-attf-class="o_di_badge {{ inst.sessions_today > 0 ? 'o_di_badge_success' : 'o_di_badge_secondary' }}">
                                                 <t t-esc="inst.sessions_today"/>
                                             </span>
                                         </td>
-                                        <td class="text-center fw-semibold">
-                                            <t t-esc="inst.students_count"/>
-                                        </td>
+                                        <td class="text-center fw-semibold"><t t-esc="inst.students_count"/></td>
                                         <td>
                                             <div class="o_ad_bar_wrap">
                                                 <div class="o_ad_bar_bg">
@@ -190,13 +241,63 @@
                 </div>
             </div>
 
-            <!-- ════════ Recent Sessions Analytics ════════ -->
+            <!-- Dropped Enrollments -->
+            <div class="o_di_card">
+                <div class="o_di_card_header">
+                    <div class="o_di_card_title">
+                        Dropped Enrollments
+                        <span class="o_di_card_subtitle">last 60 days</span>
+                    </div>
+                    <t t-if="state.droppedStudents.length > 10">
+                        <button class="o_di_view_btn" t-on-click="toggleDropped">
+                            <t t-esc="state.droppedExpanded ? 'Show Less' : 'Show All (' + state.droppedStudents.length + ')'"/>
+                        </button>
+                    </t>
+                </div>
+                <div class="o_di_card_body">
+                    <t t-if="state.droppedStudents.length === 0">
+                        <div class="o_di_empty">
+                            <i class="fa fa-check-circle fa-2x" style="color:#1e8e3e"/>
+                            <div>No dropped enrollments in the last 60 days</div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <table class="o_di_table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Status</th>
+                                    <th>Class</th>
+                                    <th>Instructor</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="visibleDropped" t-as="d" t-key="d.member_id + '_' + d_index">
+                                    <tr>
+                                        <td class="fw-semibold"><t t-esc="d.member_name"/></td>
+                                        <td>
+                                            <span t-attf-class="o_di_badge {{ membershipBadgeClass(d.membership_state) }}">
+                                                <t t-esc="membershipLabel(d.membership_state)"/>
+                                            </span>
+                                        </td>
+                                        <td><t t-esc="d.class_name"/></td>
+                                        <td style="color:#5f6368"><t t-esc="d.instructor_name"/></td>
+                                        <td style="color:#5f6368" class="text-nowrap"><t t-esc="fmtDate(d.session_date)"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Recent Sessions — full width -->
             <div class="o_di_card o_di_card_full">
                 <div class="o_di_card_header">
                     <div class="o_di_card_title">
-                        <span class="o_di_card_dot" style="background:#0d6efd"/>
                         Recent Sessions
-                        <small class="text-muted fw-normal ms-1">last 30 days</small>
+                        <span class="o_di_card_subtitle">last 30 days</span>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="o_di_view_btn" t-on-click="openCalendar">
@@ -212,7 +313,7 @@
                 <div class="o_di_card_body">
                     <t t-if="state.recentSessions.length === 0">
                         <div class="o_di_empty">
-                            <i class="fa fa-calendar-o fa-2x mb-2"/>
+                            <i class="fa fa-calendar-o fa-2x"/>
                             <div>No recent sessions</div>
                         </div>
                     </t>
@@ -236,16 +337,12 @@
                                 <t t-foreach="visibleSessions" t-as="s" t-key="s.id">
                                     <tr>
                                         <td class="fw-semibold"><t t-esc="s.class_name"/></td>
-                                        <td class="text-muted"><t t-esc="s.instructor_name"/></td>
-                                        <td class="text-muted text-nowrap"><t t-esc="fmtDate(s.date)"/></td>
+                                        <td style="color:#5f6368"><t t-esc="s.instructor_name"/></td>
+                                        <td style="color:#5f6368" class="text-nowrap"><t t-esc="fmtDate(s.date)"/></td>
                                         <td class="text-center"><t t-esc="s.capacity"/></td>
                                         <td class="text-center"><t t-esc="s.enrolled"/></td>
-                                        <td class="text-center text-success fw-semibold">
-                                            <t t-esc="s.present"/>
-                                        </td>
-                                        <td class="text-center text-danger fw-semibold">
-                                            <t t-esc="s.absent"/>
-                                        </td>
+                                        <td class="text-center fw-semibold" style="color:#1e8e3e"><t t-esc="s.present"/></td>
+                                        <td class="text-center fw-semibold" style="color:#d93025"><t t-esc="s.absent"/></td>
                                         <td>
                                             <div class="o_ad_bar_wrap">
                                                 <div class="o_ad_bar_bg">
@@ -269,9 +366,7 @@
                                                     </span>
                                                 </div>
                                             </t>
-                                            <t t-else="">
-                                                <span class="text-muted">—</span>
-                                            </t>
+                                            <t t-else=""><span style="color:#9aa0a6">—</span></t>
                                         </td>
                                         <td>
                                             <span t-attf-class="o_di_badge {{ stateBadgeClass(s.state) }}">
@@ -286,66 +381,10 @@
                 </div>
             </div>
 
-            <!-- ════════ Dropped / Cancelled Students ════════ -->
-            <div class="o_di_card o_di_card_full">
-                <div class="o_di_card_header">
-                    <div class="o_di_card_title">
-                        <span class="o_di_card_dot" style="background:#dc3545"/>
-                        Dropped Enrollments
-                        <small class="text-muted fw-normal ms-1">last 60 days</small>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <t t-if="state.droppedStudents.length > 10">
-                            <button class="o_di_view_btn" t-on-click="toggleDropped">
-                                <t t-esc="state.droppedExpanded ? 'Show Less' : 'Show All (' + state.droppedStudents.length + ')'"/>
-                            </button>
-                        </t>
-                    </div>
-                </div>
-                <div class="o_di_card_body">
-                    <t t-if="state.droppedStudents.length === 0">
-                        <div class="o_di_empty">
-                            <i class="fa fa-user-times fa-2x mb-2" style="color:#28a745"/>
-                            <div>No dropped enrollments in the last 60 days</div>
-                        </div>
-                    </t>
-                    <t t-else="">
-                        <table class="o_di_table">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Membership</th>
-                                    <th>Class</th>
-                                    <th>Instructor</th>
-                                    <th>Session Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="visibleDropped" t-as="d" t-key="d.member_id + '_' + d_index">
-                                    <tr>
-                                        <td class="fw-semibold"><t t-esc="d.member_name"/></td>
-                                        <td>
-                                            <span t-attf-class="o_di_badge {{ membershipBadgeClass(d.membership_state) }}">
-                                                <t t-esc="membershipLabel(d.membership_state)"/>
-                                            </span>
-                                        </td>
-                                        <td><t t-esc="d.class_name"/></td>
-                                        <td class="text-muted"><t t-esc="d.instructor_name"/></td>
-                                        <td class="text-muted text-nowrap">
-                                            <t t-esc="fmtDate(d.session_date)"/>
-                                        </td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </t>
-                </div>
-            </div>
+        </div><!-- /.o_di_content_grid -->
+    </t>
 
-        </div><!-- /.o_ad_content_grid -->
-    </t><!-- /t-else -->
-
-</div><!-- /.o_di_root -->
+</div>
 </t>
 
 </templates>

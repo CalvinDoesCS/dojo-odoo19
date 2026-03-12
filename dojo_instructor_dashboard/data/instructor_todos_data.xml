@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Grant instructors project.group_project_user so that
+         project.task.role_ids (added by project_hr_skills) is readable ── -->
+    <record id="dojo_base.group_dojo_instructor" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('base.group_partner_manager')), (4, ref('project.group_project_user'))]"/>
+    </record>
+
+    <!-- ── Instructor Alerts project ─────────────────────────────────────── -->
+    <record id="project_instructor_alerts" model="project.project">
+        <field name="name">Instructor Alerts</field>
+        <field name="active">True</field>
+        <field name="privacy_visibility">employees</field>
+    </record>
+
+    <!-- ── Task stages ───────────────────────────────────────────────────── -->
+    <record id="stage_instructor_todo" model="project.task.type">
+        <field name="name">To Do</field>
+        <field name="fold">False</field>
+        <field name="sequence">1</field>
+        <field name="project_ids" eval="[(4, ref('project_instructor_alerts'))]"/>
+    </record>
+
+    <record id="stage_instructor_done" model="project.task.type">
+        <field name="name">Done</field>
+        <field name="fold">True</field>
+        <field name="sequence">10</field>
+        <field name="project_ids" eval="[(4, ref('project_instructor_alerts'))]"/>
+    </record>
+</odoo>

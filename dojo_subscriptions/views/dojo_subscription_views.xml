@@ -2,8 +2,6 @@
 <odoo>
     <!-- Remove legacy view that added billing_partner_id (field now removed) -->
     <delete model="ir.ui.view" search="[('name', '=', 'dojo.household.form.billing')]"/>
-    <!-- Remove stale Stripe Issuing view (fields moved to dojo_stripe module) -->
-    <delete id="view_dojo_household_form_billing_inherit" model="ir.ui.view"/>
 
     <record id="action_dojo_subscription_plans" model="ir.actions.act_window">
         <field name="name">Subscription Plans</field>

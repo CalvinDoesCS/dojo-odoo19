@@ -76,6 +76,16 @@ class AdminDashboard extends Component {
         return Math.round(v) + "%";
     }
 
+    /** 1234.56 → "$1,235" */
+    currency(v) {
+        if (v === null || v === undefined) return "—";
+        return new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0,
+        }).format(v);
+    }
+
     /** CSS class for a percentage bar fill */
     barFill(v) {
         return `width:${Math.min(Math.round(v || 0), 100)}%`;
@@ -145,6 +155,17 @@ class AdminDashboard extends Component {
     openTodaysSessions()    { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_today"); }
     openCalendar()          { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_calendar"); }
     openInstructorKpis()    { this.action.doAction("dojo_instructor_dashboard.action_all_instructor_kpis"); }
+    openInvoices() {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: "Invoices",
+            res_model: "account.move",
+            view_mode: "list,form",
+            views: [[false, "list"], [false, "form"]],
+            domain: [["move_type", "=", "out_invoice"], ["state", "=", "posted"]],
+            target: "current",
+        });
+    }
 
     openInstructorRecord(id) {
         this.action.doAction({
@@ -158,6 +179,27 @@ class AdminDashboard extends Component {
 
     toggleDropped()  { this.state.droppedExpanded  = !this.state.droppedExpanded; }
     toggleSessions() { this.state.sessionsExpanded = !this.state.sessionsExpanded; }
+
+    openOnboarding() {
+        this.action.doAction("dojo_onboarding.action_dojo_onboarding_wizard");
+    }
+    openNewMember() {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "dojo.member",
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+    openBeltTests() {
+        this.action.doAction("dojo_belt_progression.action_dojo_belt_tests");
+    }
+    openSubscriptions() {
+        this.action.doAction("dojo_subscriptions.action_dojo_member_subscriptions");
+    }
+    openCommunications() {
+        this.action.doAction("dojo_communications.action_dojo_send_message_wizard");
+    }
 }
 
 registry.category("actions").add("dojo_admin_dashboard", AdminDashboard);

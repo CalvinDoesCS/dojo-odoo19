@@ -73,6 +73,17 @@ class DojoMember(models.Model):
             move.action_post()
 
         self.test_invite_pending = True
+
+        # Create an instructor todo so the instructor knows to review/schedule the test
+        self.env["dojo.member"]._create_instructor_todo(
+            self._get_instructor_users_for_member(),
+            "🥋 Belt test ready: %s → %s" % (self.name, next_rank.name),
+            deadline=test_date,
+            description=(
+                "Auto-generated belt test on %s. Review, schedule, and confirm the student."
+                % fields.Date.to_string(test_date)
+            ),
+        )
         return test
 
     @api.model
