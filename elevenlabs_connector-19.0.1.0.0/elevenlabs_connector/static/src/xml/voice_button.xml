@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="elevenlabs_connector.VoiceAssistantButton" owl="1">
+        <button class="o_systray_item" t-on-click="openVoiceAssistant()" title="Voice Assistant">
+            <i class="fa fa-microphone fa-lg"/>
+        </button>
+    </t>
+
+    <t t-name="elevenlabs_connector.VoiceAssistantDialog" owl="1">
+        <div class="o_voice_assistant_dialog">
+                <div class="text-center p-4">
+                    <div class="mb-4">
+                        <button 
+                            t-attf-class="btn btn-lg rounded-circle #{state.isRecording ? 'btn-danger' : 'btn-primary'}"
+                            t-on-click="state.isRecording ? stopRecording() : startRecording()"
+                            t-att-disabled="state.isProcessing"
+                            style="width: 100px; height: 100px;">
+                            <i t-attf-class="fa fa-#{state.isRecording ? 'stop' : 'microphone'} fa-3x"></i>
+                        </button>
+                    </div>
+                    
+                    <p class="text-muted mb-4" style="font-size: 16px;">
+                        <t t-if="state.isRecording">Recording... Click to stop</t>
+                        <t t-elif="state.isProcessing">Processing your request...</t>
+                        <t t-else="">Click to start recording</t>
+                    </p>
+
+                    <div t-if="state.error" class="alert alert-danger mt-3" style="max-width: 600px; margin: 0 auto;">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <t t-esc="state.error"/>
+                    </div>
+
+                    <div t-if="state.transcribedText" class="mt-4 text-start" style="max-width: 800px; margin: 0 auto;">
+                        <div class="alert alert-info">
+                            <strong>You said:</strong>
+                            <p class="mb-0 mt-2" t-esc="state.transcribedText"/>
+                        </div>
+                    </div>
+
+                    <div t-if="state.aiResponse" class="mt-3 text-start" style="max-width: 800px; margin: 0 auto;">
+                        <div class="alert alert-success">
+                            <strong>AI Response:</strong>
+                            <p class="mb-0 mt-2" t-esc="state.aiResponse"/>
+                        </div>
+                    </div>
+
+                    <div t-if="state.transcribedText || state.aiResponse" class="mt-4">
+                        <button class="btn btn-secondary" t-on-click="clearConversation()">
+                            <i class="fa fa-times me-1"></i>
+                            Clear Conversation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
+

@@ -1,0 +1,28 @@
+IMPORTANT: Module Directory Name
+==================================
+
+Odoo modules cannot have spaces in their directory names. 
+
+Before installing this module:
+1. Rename the directory from "Eleven Labs Odoo connector" to "elevenlabs_connector"
+2. OR update the asset paths in __manifest__.py to match your directory name
+
+The module is configured to use "elevenlabs_connector" as the module name in the manifest.
+
+After renaming, the module structure should be:
+elevenlabs_connector/
+├── __init__.py
+├── __manifest__.py
+├── models/
+├── controllers/
+├── views/
+├── static/
+└── security/
+
+Installation Steps:
+1. Rename directory to "elevenlabs_connector" (no spaces)
+2. Copy to your Odoo addons directory
+3. Update apps list in Odoo
+4. Install "ElevenLabs Voice Connector"
+5. Configure in Settings → Integrations → ElevenLabs
+

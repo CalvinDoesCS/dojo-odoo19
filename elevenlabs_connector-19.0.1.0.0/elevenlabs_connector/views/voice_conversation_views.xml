@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_voice_conversation_tree" model="ir.ui.view">
+            <field name="name">voice.conversation.list</field>
+            <field name="model">voice.conversation</field>
+            <field name="arch" type="xml">
+                <list string="Voice Conversations">
+                    <field name="conversation_date"/>
+                    <field name="user_id"/>
+                    <field name="user_input"/>
+                    <field name="state"/>
+                    <field name="processing_time"/>
+                </list>
+            </field>
+        </record>
+        
+        <record id="view_voice_conversation_form" model="ir.ui.view">
+            <field name="name">voice.conversation.form</field>
+            <field name="model">voice.conversation</field>
+            <field name="arch" type="xml">
+                <form string="Voice Conversation">
+                    <header>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,processing,completed"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="user_id"/>
+                                <field name="conversation_date"/>
+                                <field name="processing_time"/>
+                            </group>
+                            <group>
+                                <field name="audio_input_id" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Input" name="input">
+                                <field name="user_input" nolabel="1" widget="text"/>
+                                <field name="audio_input_id" invisible="1"/>
+                            </page>
+                            <page string="AI Response" name="ai_response">
+                                <field name="ai_response" nolabel="1" widget="text"/>
+                            </page>
+                            <page string="Final Response" name="final_response">
+                                <field name="final_response" nolabel="1" widget="text"/>
+                            </page>
+                            <page string="Error" name="error" invisible="state != 'error'">
+                                <field name="error_message" nolabel="1" widget="text" readonly="state != 'error'"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+        
+        <record id="action_voice_conversation" model="ir.actions.act_window">
+            <field name="name">Voice Conversations</field>
+            <field name="res_model">voice.conversation</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('user_id', '=', uid)]</field>
+            <field name="context">{'default_user_id': uid}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No voice conversations yet!
+                </p>
+                <p>
+                    Start using the voice assistant to query your Odoo database.
+                </p>
+            </field>
+        </record>
+        
+        <record id="action_voice_assistant_client" model="ir.actions.client">
+            <field name="name">Voice Assistant</field>
+            <field name="tag">elevenlabs_connector.voice_assistant_action</field>
+        </record>
+        
+        <!-- Top-level menu for Voice Assistant -->
+        <menuitem id="menu_voice_assistant_root" name="Voice Assistant" sequence="100" groups="base.group_user"/>
+        
+        <menuitem id="menu_voice_assistant" name="Start Voice Assistant" parent="menu_voice_assistant_root" action="action_voice_assistant_client" sequence="5" groups="base.group_user"/>
+        
+        <menuitem id="menu_voice_conversations" name="Conversation History" parent="menu_voice_assistant_root" action="action_voice_conversation" sequence="10" groups="base.group_user"/>
+    </data>
+</odoo>
+
+

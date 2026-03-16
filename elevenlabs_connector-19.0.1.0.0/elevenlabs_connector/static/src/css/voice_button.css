@@ -1,0 +1,23 @@
+.o_systray_item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.o_systray_item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.o_systray_item i.fa-microphone {
+    color: #7c3aed;
+}
+
+.o_voice_assistant_dialog .btn-lg {
+    transition: all 0.3s ease;
+}
+
+.o_voice_assistant_dialog .btn-lg:hover:not(:disabled) {
+    transform: scale(1.05);
+}
+

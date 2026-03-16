@@ -1,0 +1,28 @@
+.o_dashboard_voice_assistant .card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.o_dashboard_voice_assistant .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem;
+}
+
+.o_dashboard_voice_assistant .card-body {
+    padding: 2rem;
+}
+
+.o_dashboard_voice_assistant button.btn-lg {
+    transition: all 0.3s ease;
+}
+
+.o_dashboard_voice_assistant button.btn-lg:hover:not(:disabled) {
+    transform: scale(1.05);
+}
+
+.o_dashboard_voice_assistant .alert {
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}

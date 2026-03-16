@@ -1,0 +1,77 @@
+/* Voice Page Styles */
+
+#voice-controls {
+    margin: 2rem 0;
+}
+
+#record-btn {
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#record-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+#record-btn.btn-danger {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+#status-text {
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    min-height: 1.5rem;
+}
+
+#conversation-display {
+    margin-top: 2rem;
+}
+
+#conversation-display .alert {
+    margin-bottom: 1rem;
+    word-wrap: break-word;
+}
+
+#audio-player {
+    margin: 1rem 0;
+}
+
+#audio-player audio {
+    width: 100%;
+}
+
+#conversation-history {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#conversation-history .list-group-item {
+    border-left: 3px solid #007bff;
+    margin-bottom: 0.5rem;
+}
+
+#error-display {
+    margin-top: 1rem;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+

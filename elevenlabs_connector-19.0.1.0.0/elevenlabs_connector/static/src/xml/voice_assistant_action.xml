@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="elevenlabs_connector.VoiceAssistantAction" owl="1">
+        <div class="o_voice_assistant_action">
+            <button class="btn btn-primary" t-on-click="openVoiceAssistant()">
+                <i class="fa fa-microphone me-2"></i>
+                Voice Assistant
+            </button>
+        </div>
+    </t>
+</templates>
+

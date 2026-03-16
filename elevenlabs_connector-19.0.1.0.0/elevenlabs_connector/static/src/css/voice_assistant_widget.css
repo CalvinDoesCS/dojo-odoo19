@@ -1,0 +1,43 @@
+.o_voice_assistant_widget {
+    min-width: 600px;
+    max-width: 800px;
+}
+
+.o_voice_assistant_widget .btn-primary {
+    background-color: #017e84;
+    border-color: #017e84;
+}
+
+.o_voice_assistant_widget .btn-primary:hover {
+    background-color: #016a6f;
+    border-color: #016a6f;
+}
+
+.o_voice_assistant_widget .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.o_voice_assistant_widget .btn-lg {
+    font-size: 1.25rem;
+    line-height: 1.5;
+    border-radius: 0.5rem;
+}
+
+.o_voice_assistant_widget .rounded-circle {
+    border-radius: 50% !important;
+}
+
+.o_voice_assistant_widget .alert {
+    text-align: left;
+}
+
+/* Make the current answer under the microphone a bit more prominent */
+.o_voice_assistant_widget #current-conversation-result .card-body {
+    font-size: 1.05rem;
+}
+
+.o_voice_assistant_widget #current-conversation-result h6 {
+    font-size: 1.1rem;
+}
+
