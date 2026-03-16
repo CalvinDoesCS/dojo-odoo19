@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="account_move_customer_signature_view" model="ir.ui.view">
+        <field name="name">customer signature view</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='other_info']" position="after">
+                <page string="Vendor Signature">
+                    <group>
+                        <field name="signed_person"/>
+                        <field name="signed_time"/>
+                        <field name="signature_in" widget="image"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <template id="invoice_report_digital_sign" inherit_id="account.report_invoice_document">
+        <xpath expr="//div[@id='qrcode']" position="before">
+            <div t-if="o.signature_in" class="mt-4 ml64 mr4" name="signature_in">
+                <div class="offset-8">
+                    <strong>Signature</strong>
+                </div>
+                <div class="offset-8">
+                    <img t-att-src="image_data_uri(o.signature_in)" style="max-height: 4cm; max-width: 8cm;"/>
+                </div>
+                <div class="offset-8 text-center">
+                    <p t-field="o.signed_person"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+</odoo>
+
