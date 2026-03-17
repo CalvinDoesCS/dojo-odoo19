@@ -368,20 +368,15 @@
             html += '<span>' + esc(fmtDate(sub.start_date)) + '</span>';
             html += '</div>';
         }
-        html += '<div class="d-flex flex-wrap gap-2 p-3">';
-        if (sub.state === 'active') {
-            html += '<button class="btn btn-outline-warning btn-sm" id="dojoBillingPause">' +
-                '<i class="fa fa-pause me-1"></i>Pause</button>';
-        }
         if (sub.state === 'paused') {
-            html += '<button class="btn btn-outline-success btn-sm" id="dojoBillingResume">' +
-                '<i class="fa fa-play me-1"></i>Resume</button>';
+            html += '<div class="d-flex flex-wrap gap-2 p-3">' +
+                '<button class="btn btn-outline-success btn-sm" id="dojoBillingResume">' +
+                '<i class="fa fa-play me-1"></i>Resume</button>' +
+                '</div>';
         }
         if (sub.state === 'active' || sub.state === 'paused') {
-            html += '<button class="btn btn-outline-danger btn-sm" id="dojoBillingCancel">' +
-                '<i class="fa fa-times me-1"></i>Cancel</button>';
+            html += '<div class="alert alert-info mx-3 mb-3" style="font-size:.875rem"><i class="fa fa-info-circle me-2"></i>To cancel your subscription, please contact the dojo directly.</div>';
         }
-        html += '</div>';
         html += '</div>';
 
         /* ── Payment method ────────────────────────────────────────────── */
@@ -1491,23 +1486,6 @@
                 render(root, state, isParent, members, students, isStudentOnly);
             });
         }
-        var pauseBtn = document.getElementById("dojoBillingPause");
-        if (pauseBtn) {
-            pauseBtn.addEventListener("click", function(){
-                openBillingConfirmOverlay(
-                    "Pause Subscription",
-                    "Pausing will stop automatic billing. You can resume at any time.",
-                    "Pause", "btn-warning",
-                    function(onErr){
-                        var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
-                        fetch("/my/dojo/billing/pause", { method:"POST", credentials:"same-origin", body: csrfForm })
-                            .then(function(r){ return r.json(); })
-                            .then(function(res){ if (res.ok) { closeOverlay(); refreshBilling(); } else onErr(res.error || "Could not pause."); })
-                            .catch(function(){ onErr("An error occurred."); });
-                    }
-                );
-            });
-        }
         var resumeBtn = document.getElementById("dojoBillingResume");
         if (resumeBtn) {
             resumeBtn.addEventListener("click", function(){
@@ -1517,24 +1495,6 @@
                     .then(function(res){ if (res.ok) refreshBilling(); });
             });
         }
-        var cancelSubBtn = document.getElementById("dojoBillingCancel");
-        if (cancelSubBtn) {
-            cancelSubBtn.addEventListener("click", function(){
-                openBillingConfirmOverlay(
-                    "Cancel Subscription",
-                    "This will permanently cancel your membership subscription. This action cannot be undone.",
-                    "Yes, Cancel", "btn-danger",
-                    function(onErr){
-                        var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
-                        fetch("/my/dojo/billing/cancel", { method:"POST", credentials:"same-origin", body: csrfForm })
-                            .then(function(r){ return r.json(); })
-                            .then(function(res){ if (res.ok) { closeOverlay(); refreshBilling(); } else onErr(res.error || "Could not cancel."); })
-                            .catch(function(){ onErr("An error occurred."); });
-                    }
-                );
-            });
-        }
-
         // ── Google Wallet push provisioning ──────────────────────────────
         var walletBtn = document.getElementById("dojoAddToWallet");
         if (walletBtn) {

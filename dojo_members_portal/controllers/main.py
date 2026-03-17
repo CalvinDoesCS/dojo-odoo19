@@ -1145,7 +1145,7 @@ class DojoMemberPortal(CustomerPortal):
         # Last 12 invoices for this household's subscriptions
         invoices_data = []
         if sub:
-            sorted_invoices = sub.invoice_ids.sorted(
+            sorted_invoices = (sub.invoice_ids | sub.household_invoice_ids).sorted(
                 key=lambda i: i.invoice_date or fields.Date.today(), reverse=True
             )[:12]
             for inv in sorted_invoices:
