@@ -3,9 +3,11 @@
 import { Component, useState, onWillStart, onMounted, useRef } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { DojoVoiceAssistant } from "./voice_assistant";
 
 class AdminDashboard extends Component {
     static template = "dojo_instructor_dashboard.AdminDashboard";
+    static components = { DojoVoiceAssistant };
 
     setup() {
         this.orm    = useService("orm");

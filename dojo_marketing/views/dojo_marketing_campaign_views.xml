@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         List View
+    ================================================================ -->
+    <record id="view_dojo_marketing_campaign_list" model="ir.ui.view">
+        <field name="name">dojo.marketing.campaign.list</field>
+        <field name="model">dojo.marketing.campaign</field>
+        <field name="arch" type="xml">
+            <list string="Marketing Campaigns" default_order="sequence,id">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-warning="state == 'paused'"
+                       decoration-muted="state == 'done'"
+                       decoration-info="state == 'draft'"/>
+                <field name="schedule_type"/>
+                <field name="scheduled_date"
+                       optional="show"
+                       invisible="schedule_type != 'one_time'"/>
+                <field name="next_send_date"
+                       optional="show"/>
+                <field name="recipient_count" string="Recipients"/>
+                <field name="send_email" widget="boolean_toggle" optional="show"/>
+                <field name="send_sms" widget="boolean_toggle" optional="show"/>
+                <field name="sent_count" string="Sent"/>
+                <field name="last_sent_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Form View
+    ================================================================ -->
+    <record id="view_dojo_marketing_campaign_form" model="ir.ui.view">
+        <field name="name">dojo.marketing.campaign.form</field>
+        <field name="model">dojo.marketing.campaign</field>
+        <field name="arch" type="xml">
+            <form string="Marketing Campaign">
+                <header>
+                    <button name="action_activate"
+                            string="Activate"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_resume"
+                            string="Resume"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'paused'"/>
+                    <button name="action_pause"
+                            string="Pause"
+                            type="object"
+                            invisible="state != 'active'"/>
+                    <button name="action_reset_draft"
+                            string="Reset to Draft"
+                            type="object"
+                            invisible="state not in ('paused', 'done')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,active,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="Campaign Name…"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Stats" invisible="state == 'draft'">
+                            <field name="recipient_count" readonly="1"/>
+                            <field name="sent_count" readonly="1"/>
+                            <field name="last_sent_date" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <!-- ── Targeting ─────────────────────────────── -->
+                    <group string="Audience">
+                        <field name="target_all"
+                               widget="boolean_toggle"
+                               string="All Active Members"/>
+                        <group invisible="target_all" colspan="2">
+                            <group string="Membership State">
+                                <field name="filter_lead"/>
+                                <field name="filter_trial"/>
+                                <field name="filter_active"/>
+                                <field name="filter_paused"/>
+                                <field name="filter_cancelled"/>
+                            </group>
+                            <group string="Role">
+                                <field name="filter_role_student"/>
+                                <field name="filter_role_parent"/>
+                                <field name="filter_role_both"/>
+                            </group>
+                        </group>
+                    </group>
+
+                    <!-- ── Schedule ──────────────────────────────── -->
+                    <group string="Schedule">
+                        <field name="schedule_type" widget="radio"/>
+                        <field name="scheduled_date"
+                               invisible="schedule_type != 'one_time'"
+                               required="schedule_type == 'one_time'"/>
+                        <group invisible="schedule_type != 'recurring'" colspan="2">
+                            <field name="interval_number" string="Every"/>
+                            <field name="interval_type" string="Unit"/>
+                            <field name="next_send_date" readonly="1"
+                                   invisible="state == 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- ── Channels ───────────────────────────────── -->
+                    <group string="Channels">
+                        <field name="send_email" widget="boolean_toggle"/>
+                        <field name="send_sms" widget="boolean_toggle"/>
+                    </group>
+
+                    <!-- ── Content ────────────────────────────────── -->
+                    <notebook>
+                        <page string="Email" invisible="not send_email">
+                            <group>
+                                <field name="subject" string="Subject"/>
+                            </group>
+                            <field name="body_email"
+                                   widget="html"
+                                   placeholder="Write your email content here…"/>
+                        </page>
+                        <page string="SMS" invisible="not send_sms">
+                            <field name="body_sms"
+                                   placeholder="Write your SMS message here…"
+                                   widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Search View
+    ================================================================ -->
+    <record id="view_dojo_marketing_campaign_search" model="ir.ui.view">
+        <field name="name">dojo.marketing.campaign.search</field>
+        <field name="model">dojo.marketing.campaign</field>
+        <field name="arch" type="xml">
+            <search string="Search Campaigns">
+                <field name="name"/>
+                <filter string="Draft"   name="draft"   domain="[('state','=','draft')]"/>
+                <filter string="Active"  name="active"  domain="[('state','=','active')]"/>
+                <filter string="Paused"  name="paused"  domain="[('state','=','paused')]"/>
+                <filter string="Done"    name="done"    domain="[('state','=','done')]"/>
+                <separator/>
+                <filter string="One-Time"  name="one_time"  domain="[('schedule_type','=','one_time')]"/>
+                <filter string="Recurring" name="recurring" domain="[('schedule_type','=','recurring')]"/>
+                <separator/>
+                <filter string="Group by State"         name="group_state"         context="{'group_by': 'state'}"/>
+                <filter string="Group by Schedule Type" name="group_schedule_type" context="{'group_by': 'schedule_type'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Action
+    ================================================================ -->
+    <record id="action_dojo_marketing_campaign" model="ir.actions.act_window">
+        <field name="name">Marketing Campaigns</field>
+        <field name="res_model">dojo.marketing.campaign</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No marketing campaigns yet.
+            </p>
+            <p>
+                Create a campaign to schedule automated SMS or email blasts to
+                targeted member groups. Campaigns can be one-time or recurring.
+            </p>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Menu — under Kiosk app root (alongside Marketing Cards)
+    ================================================================ -->
+    <menuitem
+        id="menu_dojo_marketing_campaigns"
+        name="Campaigns"
+        parent="dojo_kiosk.menu_dojo_kiosk_root"
+        action="action_dojo_marketing_campaign"
+        sequence="25"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"
+    />
+
+</odoo>

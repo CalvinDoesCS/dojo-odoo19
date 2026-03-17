@@ -371,6 +371,37 @@ class KioskController(http.Controller):
         svc = request.env["dojo.kiosk.service"].sudo()
         return svc.update_session(session_id, capacity=capacity)
 
+    @http.route(
+        "/kiosk/instructor/templates",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_templates(self, token=None, **kw):
+        """Return active class templates for use in the Create Session modal."""
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.get_templates()
+
+    @http.route(
+        "/kiosk/instructor/session/create",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_session_create(self, template_id=None, start_time=None, capacity=None, date=None, token=None, **kw):
+        """Create a new open session for today (or a given date) from a template."""
+        if not template_id or not start_time:
+            return {"success": False, "error": "template_id and start_time are required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.create_session_today(
+            int(template_id),
+            start_time,
+            capacity=int(capacity) if capacity is not None else None,
+            date=date,
+        )
+
     # ------------------------------------------------------------------
     # Instructor -- belt rank management
     # ------------------------------------------------------------------
@@ -463,14 +494,33 @@ class KioskController(http.Controller):
         type="jsonrpc", auth="public", methods=["POST"], csrf=False,
     )
     def kiosk_voice_command(
-        self, member_id=None, session_id=None, audio_data_b64=None, token=None, **kw
+        self, member_id=None, session_id=None, audio_data_b64=None, token=None, dry_run=False, **kw
     ):
         if not member_id or not audio_data_b64:
             return {"success": False, "error": "member_id and audio_data_b64 are required."}
         if not token:
             return {"success": False, "error": "token is required."}
         svc = request.env["dojo.kiosk.service"].sudo()
-        return svc.process_voice_command(token, member_id, session_id, audio_data_b64)
+        return svc.process_voice_command(token, member_id, session_id, audio_data_b64,
+                                         dry_run=bool(dry_run))
+
+    @http.route(
+        "/kiosk/instructor/voice_command/execute",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_voice_execute(
+        self, member_id=None, session_id=None, action=None, params=None, token=None, **kw
+    ):
+        """Execute a previously-interpreted voice action after instructor confirmation."""
+        if not member_id or not action:
+            return {"success": False, "error": "member_id and action are required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.execute_voice_action(
+            int(member_id), session_id, action, params or {}
+        )
 
 
 # ------------------------------------------------------------------

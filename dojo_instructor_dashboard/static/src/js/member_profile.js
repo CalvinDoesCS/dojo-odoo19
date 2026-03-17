@@ -17,6 +17,24 @@ class MemberProfile extends Component {
         this.state = useState({
             loading: true,
             member: null,
+            editOverlay: {
+                open: false,
+                saving: false,
+                error: null,
+                form: {
+                    name: "",
+                    email: "",
+                    phone: "",
+                    date_of_birth: "",
+                    role: "",
+                    blood_type: "",
+                    allergies: "",
+                    medical_notes: "",
+                    emergency_note: "",
+                },
+            },
+            subOverlay:  { open: false },
+            beltOverlay: { open: false, saving: false },
         });
 
         onWillStart(() => this._loadData());
@@ -60,30 +78,95 @@ class MemberProfile extends Component {
 
     editMember() {
         if (!this.memberId) return;
-        this.action.doAction({
-            type: "ir.actions.act_window",
-            res_model: "dojo.member",
-            res_id: this.memberId,
-            views: [[false, "form"]],
-            target: "current",
+        this.openEditOverlay();
+    }
+
+    openEditOverlay() {
+        const m = this.state.member;
+        if (!m) return;
+        Object.assign(this.state.editOverlay.form, {
+            name: m.name || "",
+            email: m.email || "",
+            phone: m.phone || "",
+            date_of_birth: m.date_of_birth || "",
+            role: m.role || "",
+            blood_type: m.blood_type || "",
+            allergies: m.allergies || "",
+            medical_notes: m.medical_notes || "",
+            emergency_note: m.emergency_note || "",
         });
+        this.state.editOverlay.error = null;
+        this.state.editOverlay.open = true;
+    }
+
+    closeEditOverlay() {
+        this.state.editOverlay.open = false;
+        this.state.editOverlay.error = null;
+        this.state.editOverlay.saving = false;
+    }
+
+    async saveEditOverlay() {
+        if (!this.memberId) return;
+        this.state.editOverlay.saving = true;
+        this.state.editOverlay.error = null;
+        try {
+            const f = this.state.editOverlay.form;
+            await this.orm.write("dojo.member", [this.memberId], {
+                name: f.name || false,
+                email: f.email || false,
+                phone: f.phone || false,
+                date_of_birth: f.date_of_birth || false,
+                role: f.role || "student",
+                blood_type: f.blood_type || false,
+                allergies: f.allergies || false,
+                medical_notes: f.medical_notes || false,
+                emergency_note: f.emergency_note || false,
+            });
+            await this._loadData();
+            this.closeEditOverlay();
+            this.notification.add("Member updated.", { type: "success" });
+        } catch (e) {
+            this.state.editOverlay.error = e.message || "An error occurred while saving.";
+            this.state.editOverlay.saving = false;
+        }
+    }
+
+    onEditFieldChange(ev) {
+        const field = ev.target.dataset.field;
+        if (field) {
+            this.state.editOverlay.form[field] = ev.target.value;
+        }
+    }
+
+    stopProp(ev) {
+        ev.stopPropagation();
     }
 
     async addCredits() {
         if (!this.memberId) return;
-        // Try to open the credit grant wizard; fall back to subscription form
         try {
             await this.action.doAction("dojo_credits.action_dojo_credit_grant_wizard", {
                 additionalContext: { active_id: this.memberId, active_model: "dojo.member" },
             });
         } catch {
-            // If the wizard action doesn't exist, navigate to subscription
-            this.viewSubscription();
+            this.notification.add("Credits module not configured.", { type: "warning" });
         }
     }
 
     viewSubscription() {
         if (!this.memberId) return;
+        this.openSubOverlay();
+    }
+
+    openSubOverlay() {
+        this.state.subOverlay.open = true;
+    }
+
+    closeSubOverlay() {
+        this.state.subOverlay.open = false;
+    }
+
+    openSubFull() {
         const subId = this.state.member?.subscription?.id;
         if (subId) {
             this.action.doAction({
@@ -91,7 +174,7 @@ class MemberProfile extends Component {
                 res_model: "dojo.member.subscription",
                 res_id: subId,
                 views: [[false, "form"]],
-                target: "current",
+                target: "new",
             });
         } else {
             this.action.doAction({
@@ -99,7 +182,7 @@ class MemberProfile extends Component {
                 res_model: "dojo.member.subscription",
                 views: [[false, "list"], [false, "form"]],
                 domain: [["member_id", "=", this.memberId]],
-                target: "current",
+                target: "new",
             });
         }
     }
@@ -117,28 +200,55 @@ class MemberProfile extends Component {
 
     inviteBeltTest() {
         if (!this.memberId) return;
-        // Toggle test_invite_pending or open belt test registration form
+        this.openBeltOverlay();
+    }
+
+    openBeltOverlay() {
+        this.state.beltOverlay.open = true;
+    }
+
+    closeBeltOverlay() {
+        this.state.beltOverlay.open = false;
+        this.state.beltOverlay.saving = false;
+    }
+
+    async toggleBeltTestInvite() {
+        if (!this.memberId) return;
+        this.state.beltOverlay.saving = true;
         try {
-            this.action.doAction({
-                type: "ir.actions.act_window",
-                res_model: "dojo.member",
-                res_id: this.memberId,
-                views: [[false, "form"]],
-                target: "current",
+            const current = this.state.member?.test_invite_pending || false;
+            await this.orm.write("dojo.member", [this.memberId], {
+                test_invite_pending: !current,
             });
-        } catch {
-            this.notification.add("Belt test action not available.", { type: "warning" });
+            await this._loadData();
+            this.notification.add(
+                !current ? "Belt test invite sent." : "Belt test invite removed.",
+                { type: "success" }
+            );
+        } catch (e) {
+            this.notification.add(
+                e.message || "Could not update belt test invite.",
+                { type: "danger" }
+            );
+        } finally {
+            this.state.beltOverlay.saving = false;
         }
     }
 
     sendMessage() {
-        if (!this.memberId) return;
+        this.contactGuardian(this.memberId);
+    }
+
+    contactGuardian(memberId) {
+        const id = (memberId !== undefined && memberId !== null) ? memberId : this.memberId;
+        if (!id) return;
         try {
             this.action.doAction("dojo_communications.action_dojo_send_message_wizard", {
                 additionalContext: {
-                    active_id: this.memberId,
+                    active_id: id,
                     active_model: "dojo.member",
-                    active_ids: [this.memberId],
+                    active_ids: [id],
+                    default_member_ids: [id],
                 },
             });
         } catch {

@@ -472,11 +472,15 @@ class DojoKioskService(models.AbstractModel):
                 "end": fields.Datetime.to_string(s.end_datetime) if s.end_datetime else "",
             })
 
-        # Active plan name
+        # Active plan name + credit balance
         plan_name = ""
+        credit_balance = 0
+        credits_per_period = 0
         sub = member.active_subscription_id
         if sub and sub.plan_id:
             plan_name = sub.plan_id.name or ""
+            credits_per_period = getattr(sub.plan_id, 'credits_per_period', 0) or 0
+            credit_balance = getattr(sub, 'credit_balance', 0) or 0
 
         # Household + emergency contacts
         hh = member.household_id
@@ -576,6 +580,8 @@ class DojoKioskService(models.AbstractModel):
             "total_attendance": total_attendance,
             "sessions_used_this_week": used,
             "sessions_allowed_per_week": allowed,
+            "credit_balance": credit_balance,
+            "credits_per_period": credits_per_period,
             "issues": issues,
             "enrolled_in_session": enrolled,
             "attendance_state": attendance_state,
@@ -602,9 +608,12 @@ class DojoKioskService(models.AbstractModel):
         elif sub.state in ("expired", "cancelled"):
             flags.append({"code": "membership_expired", "label": "Membership Expired"})
 
+        # Only flag credits exhausted when the plan has a credit limit (credits_per_period > 0).
+        # credits_per_period == 0 means unlimited — never show this flag for those members.
+        cpp = getattr(sub.plan_id, "credits_per_period", 0) if sub else 0
         allowed = member.sessions_allowed_per_week
         used = member.sessions_used_this_week
-        if allowed > 0 and used >= allowed:
+        if cpp > 0 and allowed > 0 and used >= allowed:
             flags.append({"code": "credits_exhausted", "label": "Ran Out of Credits"})
 
         return flags
@@ -926,6 +935,104 @@ class DojoKioskService(models.AbstractModel):
             except (TypeError, ValueError):
                 return {"success": False, "error": "Invalid capacity value."}
         return {"success": True}
+
+    @api.model
+    def get_templates(self):
+        """Return active class templates for the current company, for use in the
+        kiosk 'Create Session' flow."""
+        templates = self.env["dojo.class.template"].search([
+            ("active", "=", True),
+            ("company_id", "in", [self.env.company.id, False]),
+        ], order="name asc")
+        result = []
+        for t in templates:
+            # recurrence_time is a float (e.g. 18.5 = 18:30); fall back to 09:00
+            rt = t.recurrence_time or 9.0
+            h = int(rt)
+            m = int(round((rt - h) * 60))
+            # Guard against rounding to 60 minutes
+            if m >= 60:
+                h += 1
+                m = 0
+            result.append({
+                "id": t.id,
+                "name": t.name,
+                "program_name": t.program_id.name if t.program_id else "",
+                "duration_minutes": t.duration_minutes or 60,
+                "capacity": t.max_capacity or 20,
+                "default_start": f"{h:02d}:{m:02d}",
+            })
+        return result
+
+    @api.model
+    def create_session_today(self, template_id, start_time, capacity=None, date=None):
+        """Create an open session from *template_id* for the given date (defaults to today).
+
+        Args:
+            template_id (int): ID of the dojo.class.template to use.
+            start_time (str): Local start time in "HH:MM" format.
+            capacity (int|None): Override capacity; falls back to template max_capacity.
+            date (str|None): ISO date "YYYY-MM-DD"; defaults to today in company tz.
+
+        Returns:
+            dict: {"success": True, "session": <serialized>} or {"success": False, "error": str}
+        """
+        template = self.env["dojo.class.template"].browse(template_id)
+        if not template.exists():
+            return {"success": False, "error": "Template not found."}
+
+        tz_name = (
+            self.env.context.get("tz")
+            or self.env.user.tz
+            or self.env.company.partner_id.tz
+            or "UTC"
+        )
+        tz = pytz.timezone(tz_name)
+
+        if date:
+            try:
+                local_date = datetime.strptime(date, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                local_date = datetime.now(tz).replace(tzinfo=None)
+        else:
+            local_date = datetime.now(tz).replace(tzinfo=None)
+
+        try:
+            parts = start_time.split(":")
+            h, m = int(parts[0]), int(parts[1])
+        except Exception:
+            return {"success": False, "error": "Invalid start_time format. Use HH:MM."}
+
+        local_start = local_date.replace(hour=h, minute=m, second=0, microsecond=0)
+        duration = template.duration_minutes or 60
+        local_end = local_start + timedelta(minutes=duration)
+
+        utc_start = tz.localize(local_start).astimezone(pytz.utc).replace(tzinfo=None)
+        utc_end = tz.localize(local_end).astimezone(pytz.utc).replace(tzinfo=None)
+
+        cap = int(capacity) if capacity is not None else (template.max_capacity or 20)
+
+        session = self.env["dojo.class.session"].create({
+            "template_id": template_id,
+            "start_datetime": fields.Datetime.to_string(utc_start),
+            "end_datetime": fields.Datetime.to_string(utc_end),
+            "capacity": cap,
+            "state": "open",
+        })
+
+        return {
+            "success": True,
+            "session": {
+                "id": session.id,
+                "name": session.name,
+                "template_name": session.template_id.name if session.template_id else "",
+                "start": fields.Datetime.to_string(session.start_datetime),
+                "end": fields.Datetime.to_string(session.end_datetime),
+                "seats_taken": 0,
+                "capacity": session.capacity,
+                "instructor": session.instructor_profile_id.name if session.instructor_profile_id else "",
+            },
+        }
 
     # -------------------------------------------------------------------------
     # PIN verification
@@ -1320,8 +1427,13 @@ class DojoKioskService(models.AbstractModel):
     # -------------------------------------------------------------------------
 
     @api.model
-    def process_voice_command(self, token, member_id, session_id, audio_data_b64):
-        """Process a voice command: STT → AI → execute action → return result."""
+    def process_voice_command(self, token, member_id, session_id, audio_data_b64, dry_run=False):
+        """Process a voice command: STT → AI → (optionally execute) → return result.
+
+        When dry_run=True the action is interpreted but NOT executed; the caller
+        receives the parsed action + params so it can show a confirmation step
+        before calling execute_voice_action().
+        """
         import base64
         import json as _json
         import re as _re
@@ -1432,23 +1544,52 @@ class DojoKioskService(models.AbstractModel):
         except Exception:
             pass
 
-        # Step 5: Execute action
+        # Step 5: Execute action (skipped when dry_run=True)
+        if dry_run or action == "info":
+            return {
+                "success": True,
+                "transcribed_text": transcribed,
+                "response_text": response_text,
+                "action": action,
+                "params": params,
+                "action_taken": None,
+                "action_data": {},
+            }
+
+        return self.execute_voice_action(member_id, session_id, action, params,
+                                         transcribed_text=transcribed,
+                                         response_text=response_text)
+
+    @api.model
+    def execute_voice_action(self, member_id, session_id, action, params,
+                             transcribed_text="", response_text=""):
+        """Execute a previously-interpreted voice action.
+
+        Separated from process_voice_command so the kiosk can show a
+        confirmation prompt before any mutation takes place.
+        """
+        import logging
+        _log = logging.getLogger(__name__)
+
         action_taken = None
         action_data = {}
 
-        if action == "promote_rank" and next_rank_id and not next_rank_data.get("is_highest_rank"):
-            try:
-                award_result = self.award_belt_rank(member_id, next_rank_id)
-                if award_result.get("success"):
-                    action_taken = "promote_rank"
-                    action_data = award_result
-            except Exception as e:
-                _log.error("Voice promote_rank error: %s", e)
+        if action == "promote_rank":
+            next_rank_data = self.get_next_belt_rank(member_id)
+            next_rank_id = (next_rank_data.get("next_rank") or {}).get("id")
+            if next_rank_id and not next_rank_data.get("is_highest_rank"):
+                try:
+                    award_result = self.award_belt_rank(member_id, next_rank_id)
+                    if award_result.get("success"):
+                        action_taken = "promote_rank"
+                        action_data = award_result
+                except Exception as e:
+                    _log.error("Voice promote_rank error: %s", e)
 
         elif action == "send_message":
             try:
                 gids = params.get("guardian_member_ids") or []
-                msg = params.get("message") or transcribed
+                msg = params.get("message") or transcribed_text
                 msg_result = self.send_parent_message(
                     member_id,
                     subject="Message from your Instructor",
@@ -1487,7 +1628,7 @@ class DojoKioskService(models.AbstractModel):
 
         return {
             "success": True,
-            "transcribed_text": transcribed,
+            "transcribed_text": transcribed_text,
             "response_text": response_text,
             "action_taken": action_taken,
             "action_data": action_data,

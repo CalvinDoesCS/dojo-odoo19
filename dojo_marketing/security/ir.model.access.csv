@@ -2,3 +2,6 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_dojo_marketing_card_admin,dojo.marketing.card admin,model_dojo_marketing_card,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_marketing_card_user,dojo.marketing.card internal read,model_dojo_marketing_card,base.group_user,1,0,0,0
 access_dojo_marketing_card_portal,dojo.marketing.card portal read,model_dojo_marketing_card,base.group_portal,1,0,0,0
+access_dojo_marketing_campaign_admin,dojo.marketing.campaign admin,model_dojo_marketing_campaign,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_marketing_campaign_instructor,dojo.marketing.campaign instructor,model_dojo_marketing_campaign,dojo_base.group_dojo_instructor,1,1,1,0
+access_dojo_marketing_campaign_user,dojo.marketing.campaign user read,model_dojo_marketing_campaign,base.group_user,1,0,0,0

@@ -333,14 +333,15 @@ class MemberProfileCard extends Component {
                             </div>
                             <div class="k-stat">
                                 <span class="k-stat__value">
-                                    <t t-esc="props.member.sessions_used_this_week"/>
-                                    <t t-if="props.member.sessions_allowed_per_week > 0">
-                                        <span style="font-size:13px;font-weight:400;color:var(--k-text-3);">
-                                            / <t t-esc="props.member.sessions_allowed_per_week"/>
-                                        </span>
+                                    <t t-if="props.member.credits_per_period === 0">
+                                        <span style="font-size:13px;font-weight:600;">Unlimited</span>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-esc="props.member.credit_balance"/>
+                                        <span style="font-size:13px;font-weight:400;color:var(--k-text-3);"> / <t t-esc="props.member.credits_per_period"/></span>
                                     </t>
                                 </span>
-                                <span class="k-stat__label">This Week</span>
+                                <span class="k-stat__label">Credits</span>
                             </div>
                         </div>
 
@@ -752,26 +753,39 @@ class MemberProfileCard extends Component {
 
                 <!-- ── Voice AI floating button (instructor mode) ── -->
                 <t t-if="props.instructorMode">
-                    <button t-attf-class="k-voice-btn #{state.voiceState === 'recording' ? 'k-voice-btn--recording' : ''} #{state.voiceState === 'processing' ? 'k-voice-btn--processing' : ''}"
+                    <button t-attf-class="k-voice-btn #{state.voiceState === 'recording' ? 'k-voice-btn--recording' : ''} #{state.voiceState === 'processing' || state.voiceState === 'executing' ? 'k-voice-btn--processing' : ''}"
                         t-on-click="onVoiceClick"
                         title="Voice Command — tap to record, tap again to send">
                         <t t-if="state.voiceState === 'recording'">⏹</t>
-                        <t t-elif="state.voiceState === 'processing'">⌛</t>
+                        <t t-elif="state.voiceState === 'processing' or state.voiceState === 'executing'">⌛</t>
                         <t t-else="">🎤</t>
                     </button>
                     <t t-if="state.voiceState !== 'idle'">
-                        <div class="k-voice-result" t-on-click="dismissVoice">
+                        <div t-attf-class="k-voice-result #{state.voiceState === 'confirm' ? 'k-voice-result--confirm' : ''}"
+                            t-on-click="() => (state.voiceState !== 'confirm' &amp;&amp; state.voiceState !== 'executing') ? this.dismissVoice() : null">
                             <t t-if="state.voiceTranscript">
                                 <div class="k-voice-result__transcript">"<t t-esc="state.voiceTranscript"/>"</div>
                             </t>
-                            <t t-if="state.voiceState === 'processing'">
-                                <div class="k-voice-result__response">Processing…</div>
+                            <t t-if="state.voiceState === 'processing' or state.voiceState === 'executing'">
+                                <div class="k-voice-result__response">
+                                    <t t-if="state.voiceState === 'executing'">Executing…</t>
+                                    <t t-else="">Processing…</t>
+                                </div>
                             </t>
-                            <t t-if="state.voiceResponse and state.voiceState !== 'processing'">
+                            <t t-if="state.voiceResponse and state.voiceState !== 'processing' and state.voiceState !== 'executing'">
                                 <div class="k-voice-result__response" t-esc="state.voiceResponse"/>
                             </t>
-                            <t t-if="state.voiceActionText">
+                            <t t-if="state.voiceActionText and state.voiceState === 'done'">
                                 <div class="k-voice-result__action" t-esc="state.voiceActionText"/>
+                            </t>
+                            <!-- Confirmation buttons (shown only for non-info actions) -->
+                            <t t-if="state.voiceState === 'confirm'">
+                                <div class="k-voice-result__confirm-row">
+                                    <button class="k-btn k-btn--secondary k-voice-result__cancel-btn"
+                                        t-on-click.stop="dismissVoice">Cancel</button>
+                                    <button class="k-btn k-btn--primary k-voice-result__confirm-btn"
+                                        t-on-click.stop="confirmVoiceAction">✓ Confirm</button>
+                                </div>
                             </t>
                         </div>
                     </t>
@@ -813,10 +827,11 @@ class MemberProfileCard extends Component {
             sessionsLoadError: "",
             sessionRemoveMsg: "",
             // Voice AI
-            voiceState: "idle",  // idle | recording | processing | done | error
+            voiceState: "idle",  // idle | recording | processing | confirm | executing | done | error
             voiceTranscript: "",
             voiceResponse: "",
             voiceActionText: "",
+            voicePendingAction: null,  // { action, params } awaiting confirmation
         });
         onWillUnmount(() => {
             clearTimeout(this._voiceDismissTimer);
@@ -1074,24 +1089,22 @@ class MemberProfileCard extends Component {
                 member_id: this.props.member.member_id,
                 session_id: this.props.sessionId,
                 audio_data_b64: b64,
+                dry_run: true,
             });
             if (result && result.success) {
                 this.state.voiceTranscript = result.transcribed_text || "";
                 this.state.voiceResponse = result.response_text || "";
-                this.state.voiceActionText = result.action_taken
-                    ? `✓ Action: ${result.action_taken.replace(/_/g, " ")}`
-                    : "";
-                this.state.voiceState = "done";
-                if (result.action_taken && this.props.onRefreshProfile) {
-                    await this.props.onRefreshProfile(this.props.member);
-                }
-                clearTimeout(this._voiceDismissTimer);
-                this._voiceDismissTimer = setTimeout(() => {
-                    this.state.voiceState = "idle";
-                    this.state.voiceTranscript = "";
-                    this.state.voiceResponse = "";
+                // For info-only responses execute immediately (no side effects);
+                // for all mutating actions, require explicit confirmation first.
+                if (!result.action || result.action === "info") {
                     this.state.voiceActionText = "";
-                }, 8000);
+                    this.state.voiceState = "done";
+                    clearTimeout(this._voiceDismissTimer);
+                    this._voiceDismissTimer = setTimeout(() => this.dismissVoice(), 8000);
+                } else {
+                    this.state.voicePendingAction = { action: result.action, params: result.params || {} };
+                    this.state.voiceState = "confirm";
+                }
             } else {
                 this.state.voiceState = "error";
                 this.state.voiceResponse = (result && result.error) || "Voice command failed.";
@@ -1102,12 +1115,45 @@ class MemberProfileCard extends Component {
         }
     }
 
+    async confirmVoiceAction() {
+        if (!this.state.voicePendingAction) return;
+        const { action, params } = this.state.voicePendingAction;
+        this.state.voicePendingAction = null;
+        this.state.voiceState = "executing";
+        try {
+            const result = await jsonPost("/kiosk/instructor/voice_command/execute", {
+                member_id: this.props.member.member_id,
+                session_id: this.props.sessionId,
+                action,
+                params,
+            });
+            if (result && result.success) {
+                this.state.voiceActionText = result.action_taken
+                    ? `✓ Action: ${result.action_taken.replace(/_/g, " ")}`
+                    : "";
+                this.state.voiceState = "done";
+                if (result.action_taken && this.props.onRefreshProfile) {
+                    await this.props.onRefreshProfile(this.props.member);
+                }
+                clearTimeout(this._voiceDismissTimer);
+                this._voiceDismissTimer = setTimeout(() => this.dismissVoice(), 6000);
+            } else {
+                this.state.voiceState = "error";
+                this.state.voiceResponse = (result && result.error) || "Action failed.";
+            }
+        } catch {
+            this.state.voiceState = "error";
+            this.state.voiceResponse = "Network error executing action.";
+        }
+    }
+
     dismissVoice() {
         clearTimeout(this._voiceDismissTimer);
         this.state.voiceState = "idle";
         this.state.voiceTranscript = "";
         this.state.voiceResponse = "";
         this.state.voiceActionText = "";
+        this.state.voicePendingAction = null;
     }
 }
 
@@ -1580,6 +1626,151 @@ class SessionEditModal extends Component {
             }
         } catch {
             this.state.error = "Network error.";
+        } finally {
+            this.state.saving = false;
+        }
+    }
+}
+
+// ─── CreateSessionModal ───────────────────────────────────────────────────────
+
+class CreateSessionModal extends Component {
+    static template = xml`
+        <div class="k-modal-backdrop" t-on-click.self="props.onClose">
+            <div class="k-modal k-modal--edit-session">
+                <div class="k-modal__header">
+                    <span class="k-modal__title">➕ Create Session</span>
+                    <button class="k-modal__close" t-on-click="props.onClose">✕</button>
+                </div>
+                <div class="k-modal__body">
+                    <t t-if="state.loadingTemplates">
+                        <div style="text-align:center;padding:24px;"><div class="k-spinner"/></div>
+                    </t>
+                    <t t-elif="state.loadError">
+                        <div class="k-field-error" t-esc="state.loadError"/>
+                    </t>
+                    <t t-else="">
+                        <div class="k-field">
+                            <label class="k-field__label">Class Template</label>
+                            <select class="k-field__input" t-on-change="onTemplateChange">
+                                <option value="">— Select a template —</option>
+                                <t t-foreach="state.templates" t-as="tmpl" t-key="tmpl.id">
+                                    <option t-att-value="tmpl.id"
+                                        t-att-selected="state.selectedTemplateId === tmpl.id or undefined">
+                                        <t t-esc="tmpl.name"/>
+                                        <t t-if="tmpl.program_name"> · <t t-esc="tmpl.program_name"/></t>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="k-field">
+                            <label class="k-field__label">Start Time</label>
+                            <input class="k-field__input"
+                                type="time"
+                                t-att-value="state.startTime"
+                                t-on-input="onStartTimeInput"/>
+                        </div>
+                        <div class="k-field">
+                            <label class="k-field__label">Capacity</label>
+                            <input class="k-field__input"
+                                type="number"
+                                min="0"
+                                t-att-value="state.capacity"
+                                t-on-input="onCapacityInput"
+                                placeholder="Unlimited"/>
+                        </div>
+                        <t t-if="state.error">
+                            <div class="k-field-error" t-esc="state.error"/>
+                        </t>
+                    </t>
+                </div>
+                <div class="k-modal__footer">
+                    <button class="k-btn k-btn--secondary" t-on-click="props.onClose">Cancel</button>
+                    <button class="k-btn k-btn--primary"
+                        t-on-click="create"
+                        t-att-disabled="state.saving or state.loadingTemplates or !state.selectedTemplateId or undefined">
+                        <t t-if="state.saving">Creating…</t>
+                        <t t-else="">Create Session</t>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    static props = ["date", "onClose", "onCreated"];
+
+    setup() {
+        this.state = useState({
+            templates: [],
+            loadingTemplates: true,
+            loadError: "",
+            selectedTemplateId: null,
+            startTime: this._defaultTime(),
+            capacity: "",
+            saving: false,
+            error: "",
+        });
+        onMounted(() => this._loadTemplates());
+    }
+
+    _defaultTime() {
+        const now = new Date();
+        return String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    }
+
+    async _loadTemplates() {
+        try {
+            const templates = await jsonPost("/kiosk/instructor/templates", {});
+            this.state.templates = templates || [];
+            this.state.loadingTemplates = false;
+        } catch (e) {
+            this.state.loadingTemplates = false;
+            this.state.loadError = "Could not load templates: " + (e.message || "network error");
+        }
+    }
+
+    onTemplateChange(ev) {
+        const id = parseInt(ev.target.value, 10) || null;
+        this.state.selectedTemplateId = id;
+        this.state.error = "";
+        if (id) {
+            const tmpl = this.state.templates.find(t => t.id === id);
+            if (tmpl) {
+                this.state.startTime = tmpl.default_start;
+                this.state.capacity = tmpl.capacity || "";
+            }
+        }
+    }
+
+    onStartTimeInput(ev) { this.state.startTime = ev.target.value; this.state.error = ""; }
+    onCapacityInput(ev) { this.state.capacity = ev.target.value; this.state.error = ""; }
+
+    async create() {
+        if (!this.state.selectedTemplateId) {
+            this.state.error = "Please select a template.";
+            return;
+        }
+        if (!this.state.startTime) {
+            this.state.error = "Please enter a start time.";
+            return;
+        }
+        this.state.saving = true;
+        this.state.error = "";
+        try {
+            const cap = this.state.capacity === "" ? null : parseInt(this.state.capacity, 10);
+            const result = await jsonPost("/kiosk/instructor/session/create", {
+                template_id: this.state.selectedTemplateId,
+                start_time: this.state.startTime,
+                capacity: cap,
+                date: this.props.date || null,
+            });
+            if (result.success) {
+                this.props.onCreated(result.session);
+            } else {
+                this.state.error = result.error || "Failed to create session.";
+            }
+        } catch (e) {
+            this.state.error = "Network error: " + (e.message || "unknown");
         } finally {
             this.state.saving = false;
         }
@@ -2073,6 +2264,10 @@ class KioskApp extends Component {
                         <div class="k-empty">
                             <div class="k-empty__icon">📅</div>
                             <div class="k-empty__text">No open sessions today</div>
+                            <button class="k-btn k-btn--primary" style="margin-top:16px;"
+                                t-on-click="openCreateSession">
+                                ➕ Create Session
+                            </button>
                         </div>
                     </t>
                     <t t-else="">
@@ -2096,6 +2291,11 @@ class KioskApp extends Component {
                                     onEdit="(session) => this.openEditSession(session)"
                                     onAssignRoster="(session) => this.openAssignRoster(session)"/>
                             </t>
+                        </div>
+                        <div style="display:flex;justify-content:center;padding:12px 0 4px;">
+                            <button class="k-btn k-btn--secondary" t-on-click="openCreateSession">
+                                ➕ Create Session
+                            </button>
                         </div>
                     </t>
                 </t>
@@ -2159,6 +2359,14 @@ class KioskApp extends Component {
                     onSaved="() => this.onSessionSaved()"/>
             </t>
 
+            <!-- ── Create session modal ── -->
+            <t t-if="state.showCreateSession">
+                <CreateSessionModal
+                    date="state.filterDate"
+                    onClose="() => this.state.showCreateSession = false"
+                    onCreated="(session) => this.onSessionCreated(session)"/>
+            </t>
+
             <!-- ── Assign roster modal ── -->
             <t t-if="state.assignRosterSession">
                 <AssignRosterModal
@@ -2200,6 +2408,7 @@ class KioskApp extends Component {
         IdleScreen,
         SessionEditModal,
         KioskSettingsModal,
+        CreateSessionModal,
     };
 
     setup() {
@@ -2234,6 +2443,7 @@ class KioskApp extends Component {
             showSettings: false,
             editingSession: null,
             assignRosterSession: null,
+            showCreateSession: false,
 
             // Misc
             idle: false,
@@ -2716,6 +2926,14 @@ class KioskApp extends Component {
 
     async onSessionSaved() {
         this.state.editingSession = null;
+        await this._loadSessions(this.state.filterDate || null);
+        this._loadAllSessionRosters();
+    }
+
+    openCreateSession() { this.state.showCreateSession = true; }
+
+    async onSessionCreated(session) {
+        this.state.showCreateSession = false;
         await this._loadSessions(this.state.filterDate || null);
         this._loadAllSessionRosters();
     }

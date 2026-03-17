@@ -44,6 +44,7 @@ class DojoMemberProfile(models.Model):
                 "grace_period_end": str(sub.grace_period_end) if getattr(sub, "grace_period_end", None) else "",
                 "credit_balance": credit_balance,
                 "credit_pending": credit_pending,
+                "credits_per_period": getattr(plan, "credits_per_period", 0) if plan else 0,
             }
 
         # ── Basics ────────────────────────────────────────────────────────

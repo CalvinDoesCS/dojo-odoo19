@@ -3211,6 +3211,20 @@ body.kiosk-theme-light .k-profile-tab--manage.k-profile-tab--active {
     font-weight: 600;
     margin-top: 6px;
 }
+.k-voice-result--confirm {
+    cursor: default;
+}
+.k-voice-result__confirm-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+.k-voice-result__cancel-btn,
+.k-voice-result__confirm-btn {
+    flex: 1;
+    font-size: 13px;
+    padding: 8px 10px;
+}
 
 /* ── Dark theme overrides for new classes ── */
 body.kiosk-theme-dark .k-promote-confirm { background: var(--k-surface-2); border-color: var(--k-border); }

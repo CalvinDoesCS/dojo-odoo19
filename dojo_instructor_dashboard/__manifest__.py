@@ -19,8 +19,10 @@
     'depends': [
         'dojo_classes',
         'dojo_attendance',
+        'dojo_communications',
         'project',
         'account',
+        'elevenlabs_connector',
     ],
     'data': [
         'security/ir.model.access.csv',
@@ -39,6 +41,8 @@
             'dojo_instructor_dashboard/static/src/js/admin_dashboard.js',
             'dojo_instructor_dashboard/static/src/xml/member_profile.xml',
             'dojo_instructor_dashboard/static/src/js/member_profile.js',
+            'dojo_instructor_dashboard/static/src/xml/voice_assistant.xml',
+            'dojo_instructor_dashboard/static/src/js/voice_assistant.js',
         ],
     },
 }

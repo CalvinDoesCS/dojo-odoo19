@@ -437,6 +437,9 @@
         </div><!-- /.o_di_content_grid -->
     </t>
 
+    <!-- ── AI Voice Assistant (floating) ──────────────── -->
+    <DojoVoiceAssistant/>
+
 </div>
 </t>
 

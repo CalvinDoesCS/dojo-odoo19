@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Dojo AI Voice Assistant
+     Floating FAB button + slide-in chat panel
+═══════════════════════════════════════════════════════════════════════ -->
+<t t-name="dojo_instructor_dashboard.VoiceAssistant">
+
+    <!-- ── Floating action button ──────────────────────────────────────── -->
+    <div t-attf-class="dojo-va-fab {{ state.open ? 'dojo-va-fab--open' : '' }}"
+         t-on-click="toggle"
+         title="AI Assistant (Ctrl+Shift+A)">
+        <i t-if="!state.open"  class="fa fa-microphone"/>
+        <i t-if="state.open"   class="fa fa-times"/>
+    </div>
+
+    <!-- ── Assistant panel ─────────────────────────────────────────────── -->
+    <div t-if="state.open" class="dojo-va-panel">
+
+        <!-- Header -->
+        <div class="dojo-va-header">
+            <div class="dojo-va-header-left">
+                <div class="dojo-va-avatar">
+                    <i class="fa fa-robot"/>
+                </div>
+                <div>
+                    <div class="dojo-va-title">Dojo AI Assistant</div>
+                    <div class="dojo-va-subtitle">Ask me anything about students or classes</div>
+                </div>
+            </div>
+            <div class="dojo-va-header-actions">
+                <button class="dojo-va-icon-btn"
+                        t-attf-class="dojo-va-icon-btn {{ state.ttsEnabled ? 'dojo-va-icon-btn--active' : '' }}"
+                        t-on-click="toggleTts"
+                        title="Toggle voice responses">
+                    <i class="fa fa-volume-up"/>
+                </button>
+                <button class="dojo-va-icon-btn" t-on-click="close" title="Close">
+                    <i class="fa fa-times"/>
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="dojo-va-messages">
+
+            <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                <div t-attf-class="dojo-va-msg {{ msg.role === 'user' ? 'dojo-va-msg--user' : 'dojo-va-msg--assistant' }}">
+                    <t t-if="msg.role === 'assistant'">
+                        <div class="dojo-va-msg-avatar">
+                            <i class="fa fa-robot"/>
+                        </div>
+                    </t>
+                    <div class="dojo-va-msg-bubble">
+                        <div class="dojo-va-msg-text" t-esc="msg.text"/>
+                        <div class="dojo-va-msg-time" t-esc="msg.time"/>
+                    </div>
+                </div>
+            </t>
+
+            <!-- Typing indicator -->
+            <t t-if="state.processing">
+                <div class="dojo-va-msg dojo-va-msg--assistant">
+                    <div class="dojo-va-msg-avatar">
+                        <i class="fa fa-robot"/>
+                    </div>
+                    <div class="dojo-va-msg-bubble dojo-va-typing">
+                        <span/><span/><span/>
+                    </div>
+                </div>
+            </t>
+
+            <!-- Contact-parent Action Card -->
+            <t t-if="state.pendingAction and !state.processing">
+                <div class="dojo-va-action-card">
+                    <div class="dojo-va-action-header">
+                        <i class="fa fa-envelope me-2"/>
+                        Message to parent of <strong t-esc="state.pendingAction.member_name"/>
+                    </div>
+                    <div class="dojo-va-action-guardian">
+                        <i class="fa fa-user me-1"/>
+                        <t t-esc="state.pendingAction.guardian_name"/>
+                        <t t-if="state.pendingAction.guardian_email">
+                            <span class="ms-2 dojo-va-guardian-detail">
+                                <i class="fa fa-at me-1"/>
+                                <t t-esc="state.pendingAction.guardian_email"/>
+                            </span>
+                        </t>
+                        <t t-if="state.pendingAction.guardian_phone">
+                            <span class="ms-2 dojo-va-guardian-detail">
+                                <i class="fa fa-phone me-1"/>
+                                <t t-esc="state.pendingAction.guardian_phone"/>
+                            </span>
+                        </t>
+                    </div>
+                    <div class="dojo-va-action-field">
+                        <label>Subject</label>
+                        <input class="dojo-va-input"
+                               type="text"
+                               t-att-value="state.actionSubject"
+                               t-on-input="onActionSubjectChange"/>
+                    </div>
+                    <div class="dojo-va-action-field">
+                        <label>Message</label>
+                        <textarea class="dojo-va-textarea"
+                                  rows="4"
+                                  t-on-input="onActionBodyChange"
+                                  t-att-value="state.actionBody"/>
+                    </div>
+                    <div class="dojo-va-action-channels">
+                        <label class="dojo-va-check">
+                            <input type="checkbox"
+                                   t-att-checked="state.actionEmail"
+                                   t-on-change="onActionEmailChange"/>
+                            <i class="fa fa-envelope ms-1 me-1"/> Send Email
+                        </label>
+                        <label class="dojo-va-check">
+                            <input type="checkbox"
+                                   t-att-checked="state.actionSms"
+                                   t-on-change="onActionSmsChange"/>
+                            <i class="fa fa-mobile ms-1 me-1"/> Send SMS
+                        </label>
+                    </div>
+                    <div class="dojo-va-action-btns">
+                        <button class="dojo-va-btn-cancel" t-on-click="cancelAction">
+                            Cancel
+                        </button>
+                        <button class="dojo-va-btn-send" t-on-click="confirmAction">
+                            <i class="fa fa-paper-plane me-1"/>Send
+                        </button>
+                    </div>
+                </div>
+            </t>
+
+            <!-- Scroll anchor -->
+            <div t-ref="msgEnd"/>
+        </div>
+
+        <!-- Input bar -->
+        <div class="dojo-va-input-bar">
+            <textarea class="dojo-va-chat-input"
+                      rows="1"
+                      placeholder="Ask about a student, class, or type 'send message to parent of…'"
+                      t-ref="msgInput"
+                      t-att-value="state.input"
+                      t-on-input="onInputChange"
+                      t-on-keydown="onInputKeydown"/>
+            <div class="dojo-va-input-actions">
+                <!-- Mic button -->
+                <button t-attf-class="dojo-va-mic-btn {{ state.recording ? 'dojo-va-mic-btn--recording' : '' }}"
+                        t-on-click="toggleRecording"
+                        t-att-disabled="state.processing"
+                        title="Click to record voice">
+                    <i t-if="!state.recording" class="fa fa-microphone"/>
+                    <i t-if="state.recording"  class="fa fa-stop"/>
+                </button>
+                <!-- Send button -->
+                <button class="dojo-va-send-btn"
+                        t-on-click="send"
+                        t-att-disabled="state.processing or !state.input.trim()">
+                    <i class="fa fa-paper-plane"/>
+                </button>
+            </div>
+        </div>
+
+        <!-- Recording indicator -->
+        <t t-if="state.recording">
+            <div class="dojo-va-recording-strip">
+                <span class="dojo-va-rec-dot"/>
+                Recording… click the stop button when done
+            </div>
+        </t>
+
+    </div>
+
+</t>
+
+</templates>
