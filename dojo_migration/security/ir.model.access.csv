@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_migration_log_admin,dojo.migration.log admin,model_dojo_migration_log,dojo_migration.group_migration_admin,1,1,1,1
+access_migration_log_line_admin,dojo.migration.log.line admin,model_dojo_migration_log_line,dojo_migration.group_migration_admin,1,1,1,1
+access_import_programs_admin,dojo.migration.import.programs admin,model_dojo_migration_import_programs,dojo_migration.group_migration_admin,1,1,1,1
+access_import_members_admin,dojo.migration.import.members admin,model_dojo_migration_import_members,dojo_migration.group_migration_admin,1,1,1,1
+access_import_subscriptions_admin,dojo.migration.import.subscriptions admin,model_dojo_migration_import_subscriptions,dojo_migration.group_migration_admin,1,1,1,1
+access_import_ranks_admin,dojo.migration.import.ranks admin,model_dojo_migration_import_ranks,dojo_migration.group_migration_admin,1,1,1,1
+access_import_attendance_admin,dojo.migration.import.attendance admin,model_dojo_migration_import_attendance,dojo_migration.group_migration_admin,1,1,1,1

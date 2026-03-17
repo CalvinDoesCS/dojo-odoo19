@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_members_wizard_form" model="ir.ui.view">
+        <field name="name">dojo.migration.import.members.form</field>
+        <field name="model">dojo.migration.import.members</field>
+        <field name="arch" type="xml">
+            <form string="Import Members &amp; Households">
+                <header>
+                    <button name="action_preview" string="Preview" type="object"
+                            class="btn-primary" invisible="state != 'upload'"/>
+                    <button name="action_download_template" string="Download Template"
+                            type="object" class="btn-secondary"/>
+                    <button name="action_import" string="Import" type="object"
+                            class="btn-primary" invisible="state != 'preview'"/>
+                    <button name="action_preview" string="Re-preview" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Import Members &amp; Households</h1>
+                    </div>
+                    <group invisible="state == 'done'">
+                        <field name="csv_file" widget="binary" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="state" invisible="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="state != 'upload'">
+                        <strong>Expected columns:</strong>
+                        <code>first_name</code>+<code>last_name</code> or <code>full_name</code> (required),
+                        <code>email</code>, <code>phone</code>, <code>mobile</code>,
+                        <code>date_of_birth</code> (YYYY-MM-DD),
+                        <code>role</code> (student/parent/both),
+                        <code>family_account</code> (groups members into a household),
+                        <code>membership_state</code>,
+                        <code>member_number</code> (SparkMembership ID),
+                        <code>emergency_contact_name</code>,
+                        <code>emergency_contact_phone</code>,
+                        <code>emergency_contact_relationship</code>,
+                        <code>emergency_contact_email</code>
+                    </div>
+                    <group invisible="state != 'preview'" string="Preview (first 5 rows)">
+                        <field name="preview_html" widget="html" nolabel="1"/>
+                    </group>
+                    <div class="alert alert-success" role="alert" invisible="state != 'done'">
+                        Import complete.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_import_members_wizard" model="ir.actions.act_window">
+        <field name="name">Import Members &amp; Households</field>
+        <field name="res_model">dojo.migration.import.members</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

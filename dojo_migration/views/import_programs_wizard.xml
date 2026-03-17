@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_programs_wizard_form" model="ir.ui.view">
+        <field name="name">dojo.migration.import.programs.form</field>
+        <field name="model">dojo.migration.import.programs</field>
+        <field name="arch" type="xml">
+            <form string="Import Programs &amp; Styles">
+                <header>
+                    <!-- Upload state -->
+                    <button name="action_preview" string="Preview" type="object"
+                            class="btn-primary" invisible="state != 'upload'"/>
+                    <button name="action_download_template" string="Download Template"
+                            type="object" class="btn-secondary"/>
+                    <!-- Preview state -->
+                    <button name="action_import" string="Import" type="object"
+                            class="btn-primary" invisible="state != 'preview'"/>
+                    <button name="action_preview" string="Re-preview" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Import Programs &amp; Styles</h1>
+                    </div>
+                    <group invisible="state == 'done'">
+                        <field name="csv_file" widget="binary" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="state" invisible="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="state != 'upload'">
+                        <strong>Expected columns:</strong>
+                        <code>name</code> (required),
+                        <code>code</code>,
+                        <code>style_name</code>
+                        — Download the template for a ready-to-fill example.
+                    </div>
+                    <!-- Preview table -->
+                    <group invisible="state != 'preview'" string="Preview (first 5 rows)">
+                        <field name="preview_html" widget="html" nolabel="1"/>
+                    </group>
+                    <!-- Done state: show log link -->
+                    <div class="alert alert-success" role="alert" invisible="state != 'done'">
+                        Import complete. 
+                        <a type="object" name="action_open_log">View log →</a>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_import_programs_wizard" model="ir.actions.act_window">
+        <field name="name">Import Programs &amp; Styles</field>
+        <field name="res_model">dojo.migration.import.programs</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

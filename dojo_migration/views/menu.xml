@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Top-level Migration menu ──────────────────────────────────── -->
+    <menuitem id="menu_dojo_migration_root"
+              name="Migration"
+              sequence="99"
+              web_icon="dojo_migration,static/description/icon.png"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <!-- ── Import submenu ─────────────────────────────────────────────── -->
+    <menuitem id="menu_dojo_migration_import"
+              name="Import from SparkMembership"
+              parent="menu_dojo_migration_root"
+              sequence="10"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_programs"
+              name="1. Programs &amp; Styles"
+              parent="menu_dojo_migration_import"
+              action="action_import_programs_wizard"
+              sequence="10"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_members"
+              name="2. Members &amp; Households"
+              parent="menu_dojo_migration_import"
+              action="action_import_members_wizard"
+              sequence="20"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_subscriptions"
+              name="3. Subscriptions"
+              parent="menu_dojo_migration_import"
+              action="action_import_subscriptions_wizard"
+              sequence="30"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_ranks"
+              name="4. Belt Rank History"
+              parent="menu_dojo_migration_import"
+              action="action_import_ranks_wizard"
+              sequence="40"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_attendance"
+              name="5. Attendance History"
+              parent="menu_dojo_migration_import"
+              action="action_import_attendance_wizard"
+              sequence="50"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <!-- ── History submenu ────────────────────────────────────────────── -->
+    <menuitem id="menu_dojo_migration_history"
+              name="Import History"
+              parent="menu_dojo_migration_root"
+              action="action_migration_log"
+              sequence="90"
+              groups="dojo_migration.group_migration_admin"/>
+</odoo>
