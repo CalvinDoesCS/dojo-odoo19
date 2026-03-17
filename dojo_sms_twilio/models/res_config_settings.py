@@ -1,4 +1,8 @@
+import uuid as _uuid
+
 from odoo import api, fields, models
+
+from odoo.addons.dojo_sms_twilio.tools.sms_api_twilio import SmsApiTwilio
 
 
 class ResConfigSettings(models.TransientModel):
@@ -21,12 +25,16 @@ class ResConfigSettings(models.TransientModel):
     def action_test_twilio_sms(self):
         """Send a test SMS to the company's phone number to verify Twilio config."""
         self.ensure_one()
-        self.env["sms.api"]._send_sms_batch(
+        SmsApiTwilio(self.env)._send_sms_batch(
             [
                 {
-                    "res_id": self.id,
-                    "number": self.twilio_from_number or "",
                     "content": "Dojo Twilio test: configuration is working.",
+                    "numbers": [
+                        {
+                            "uuid": str(_uuid.uuid4()),
+                            "number": self.twilio_from_number or "",
+                        }
+                    ],
                 }
             ]
         )
