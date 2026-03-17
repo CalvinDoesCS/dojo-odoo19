@@ -1,32 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Waiver tab on the member backend form -->
+    <!-- ── Waiver tab on the member backend form ──────────────────────────── -->
     <record id="view_dojo_member_form_waiver_inherit" model="ir.ui.view">
         <field name="name">dojo.member.form.waiver.inherit</field>
         <field name="model">dojo.member</field>
         <field name="inherit_id" ref="dojo_base.view_dojo_member_form"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="Waiver">
-                    <group>
-                        <field name="waiver_request_id"/>
-                        <field name="waiver_state" readonly="1" invisible="not waiver_request_id"/>
-                        <field name="has_signed_waiver" readonly="1" widget="boolean_toggle"
-                               invisible="not waiver_request_id"/>
-                    </group>
+                <page string="Waiver" name="waiver">
+                    <!-- Status banner -->
                     <div class="alert alert-warning mt-2"
-                         invisible="not waiver_request_id or has_signed_waiver"
+                         invisible="has_signed_waiver"
                          role="alert">
-                        <b>Waiver pending signature.</b>
-                        Portal access will be granted automatically once the member signs the waiver.
+                        <i class="fa fa-exclamation-circle me-1" title="Warning"/>
+                        <b>Waiver not yet signed.</b>
+                        This member has not completed the waiver signing step.
                     </div>
                     <div class="alert alert-success mt-2"
                          invisible="not has_signed_waiver"
                          role="alert">
-                        <i class="fa fa-check me-1"/><b>Waiver signed.</b>
+                        <i class="fa fa-check-circle me-1" title="Success"/>
+                        <b>Waiver signed.</b>
+                        The member signed the liability waiver during onboarding.
                     </div>
+
+                    <!-- Signing details -->
+                    <group invisible="not has_signed_waiver">
+                        <group string="Signing Details">
+                            <field name="waiver_signed_by" readonly="1"/>
+                            <field name="waiver_signed_on" readonly="1"/>
+                        </group>
+                        <group string="Signature Preview">
+                            <field name="waiver_signature"
+                                   widget="image"
+                                   readonly="1"
+                                   style="max-height:100px;"
+                                   options="{'size': [300, 100]}"/>
+                        </group>
+                    </group>
+
+                    <!-- Download / print waiver PDF -->
+                    <div class="mt-3" invisible="not waiver_attachment_id">
+                        <button name="action_view_waiver_pdf"
+                                type="object"
+                                string="Download Signed Waiver PDF"
+                                class="btn btn-outline-secondary btn-sm"
+                                icon="fa-file-pdf-o"/>
+                    </div>
+
+                    <!-- Hidden fields used in conditions -->
+                    <field name="waiver_state" invisible="1"/>
+                    <field name="waiver_attachment_id" invisible="1"/>
                 </page>
             </xpath>
         </field>
     </record>
 </odoo>
+

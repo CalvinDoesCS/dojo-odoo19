@@ -1,25 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherits the subscription plan form to add the waiver template field. -->
-    <record id="view_dojo_subscription_plan_form_waiver_inherit" model="ir.ui.view">
-        <field name="name">dojo.subscription.plan.form.waiver.inherit</field>
-        <field name="model">dojo.subscription.plan</field>
-        <field name="inherit_id" ref="dojo_subscriptions.view_dojo_subscription_plan_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//group[last()]" position="before">
-                <group string="Waiver">
-                    <field name="sign_template_id"
-                           placeholder="Leave blank if no waiver is required for this plan"/>
-                    <div class="alert alert-info small py-1 px-2"
-                         invisible="not sign_template_id"
-                         colspan="2" role="alert">
-                        <i class="fa fa-file-text me-1"/>
-                        New members enrolled in this plan will be sent this waiver for electronic
-                        signature via Odoo Sign.  Portal access is held until the waiver is signed.
-                        The signed document is stored in the <b>Waivers</b> Documents folder.
-                    </div>
-                </group>
-            </xpath>
-        </field>
-    </record>
+    <!--
+        Per-plan waiver template removed: waiver configuration is now global
+        (dojo.waiver.config singleton) and does not require Odoo Enterprise Sign.
+        This file intentionally left empty to avoid breaking any dependent XPath.
+    -->
 </odoo>

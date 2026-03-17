@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Report Action ──────────────────────────────────────────────────── -->
+    <record id="action_report_member_waiver" model="ir.actions.report">
+        <field name="name">Member Waiver</field>
+        <field name="model">dojo.member</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">dojo_sign.report_member_waiver_document</field>
+        <field name="report_file">dojo_sign.report_member_waiver_document</field>
+        <field name="print_report_name">'Waiver - %s' % object.name</field>
+        <field name="binding_model_id" ref="dojo_base.model_dojo_member"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- ── Report Template ────────────────────────────────────────────────── -->
+    <template id="report_member_waiver_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <!-- Load waiver config singleton once per page -->
+                <t t-set="waiver_config"
+                   t-value="env['dojo.waiver.config'].sudo().get_singleton()"/>
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <!-- Title block -->
+                        <div class="text-center mb-4">
+                            <h2 t-esc="waiver_config.name or 'Member Liability Waiver'"/>
+                        </div>
+
+                        <!-- Member info block -->
+                        <table class="table table-sm table-bordered mb-4"
+                               style="width:100%; font-size:0.9em;">
+                            <tbody>
+                                <tr>
+                                    <th style="width:30%;">Member Name</th>
+                                    <td><t t-esc="o.name"/></td>
+                                </tr>
+                                <tr t-if="o.date_of_birth">
+                                    <th>Date of Birth</th>
+                                    <td>
+                                        <t t-esc="o.date_of_birth"
+                                           t-options="{'widget': 'date'}"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="o.email">
+                                    <th>Email</th>
+                                    <td><t t-esc="o.email"/></td>
+                                </tr>
+                                <tr t-if="o.phone">
+                                    <th>Phone</th>
+                                    <td><t t-esc="o.phone"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Waiver body text -->
+                        <div class="mb-5"
+                             t-out="waiver_config.content_html or ''"/>
+
+                        <!-- Signature block ─ mirrors bi_all_digital_sign pattern -->
+                        <div class="mt-5"
+                             style="border-top:1px solid #333; padding-top:16px;">
+                            <div class="row">
+                                <!-- Left: drawn signature image -->
+                                <div class="col-6">
+                                    <p class="mb-1"><strong>Signature</strong></p>
+                                    <t t-if="o.waiver_signature">
+                                        <img t-att-src="image_data_uri(o.waiver_signature)"
+                                             style="max-height:4cm; max-width:10cm;
+                                                    border:1px solid #ccc; padding:4px;"/>
+                                    </t>
+                                    <t t-else="">
+                                        <p class="text-muted fst-italic">No signature captured</p>
+                                    </t>
+                                    <p class="mt-1 mb-0" style="font-size:0.85em;">
+                                        <t t-esc="o.waiver_signed_by or o.name"/>
+                                    </p>
+                                </div>
+                                <!-- Right: signing metadata -->
+                                <div class="col-6">
+                                    <p class="mb-1"><strong>Signing details</strong></p>
+                                    <table class="table table-sm" style="font-size:0.85em;">
+                                        <tbody>
+                                            <tr>
+                                                <th>Signed by</th>
+                                                <td>
+                                                    <t t-esc="o.waiver_signed_by or o.name"/>
+                                                </td>
+                                            </tr>
+                                            <tr t-if="o.waiver_signed_on">
+                                                <th>Date &amp; Time (UTC)</th>
+                                                <td>
+                                                    <t t-esc="o.waiver_signed_on"
+                                                       t-options="{'widget': 'datetime'}"/>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th>Legal Authority</th>
+                                                <td>
+                                                    Confirmed — the signatory acknowledged
+                                                    legal authority to execute this waiver.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

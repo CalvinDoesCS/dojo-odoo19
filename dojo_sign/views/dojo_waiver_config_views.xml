@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view for dojo.waiver.config ──────────────────────────────── -->
+    <record id="view_dojo_waiver_config_form" model="ir.ui.view">
+        <field name="name">dojo.waiver.config.form</field>
+        <field name="model">dojo.waiver.config</field>
+        <field name="arch" type="xml">
+            <form string="Waiver Text Configuration">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Waiver Title"/>
+                        <h1>
+                            <field name="name" placeholder="Liability Waiver &amp; Release of Claims"/>
+                        </h1>
+                    </div>
+
+                    <div class="alert alert-info" role="alert">
+                        <i class="fa fa-info-circle me-1"/>
+                        This waiver text is displayed to every new member during the onboarding
+                        wizard (after they select a subscription plan).  The signed version —
+                        with the member's drawn signature embedded — is saved as a PDF that is
+                        attached to their member record.
+                    </div>
+
+                    <group>
+                        <field name="content_html"
+                               widget="html"
+                               nolabel="1"
+                               colspan="2"
+                               style="min-height:400px;"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── List view ─────────────────────────────────────────────────────── -->
+    <record id="view_dojo_waiver_config_list" model="ir.ui.view">
+        <field name="name">dojo.waiver.config.list</field>
+        <field name="model">dojo.waiver.config</field>
+        <field name="arch" type="xml">
+            <list string="Waiver Configurations">
+                <field name="name"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Window action ─────────────────────────────────────────────────── -->
+    <record id="action_dojo_waiver_config" model="ir.actions.act_window">
+        <field name="name">Waiver Text</field>
+        <field name="res_model">dojo.waiver.config</field>
+        <field name="view_mode">form,list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No waiver text configured yet.
+            </p>
+            <p>
+                Create a waiver to display during member onboarding.
+                Members will be asked to read and sign this document
+                before their portal account is created.
+            </p>
+        </field>
+    </record>
+
+    <!-- ── Menu entry under Classes > Configuration ─────────────────────── -->
+    <menuitem id="menu_dojo_waiver_config"
+              name="Waiver Text"
+              parent="dojo_classes.menu_dojo_classes_configuration"
+              action="action_dojo_waiver_config"
+              sequence="40"
+              groups="dojo_base.group_dojo_admin"/>
+
+</odoo>

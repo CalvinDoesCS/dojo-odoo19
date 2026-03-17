@@ -1,178 +1,179 @@
-from odoo import _, fields, models
+import base64
+
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
 class DojoOnboardingWizard(models.TransientModel):
-    """Extends the onboarding wizard with waiver-sending logic when Sign is installed."""
+    """Extends the onboarding wizard with an inline, blocking waiver-signing step.
+
+    This replaces the previous Odoo Enterprise ``sign`` workflow with a
+    Community-compatible approach:
+
+    1.  A ``waiver`` step is injected between ``subscription`` and
+        ``portal_access`` in the wizard step order.
+    2.  The member (or admin on their behalf) draws a signature on a canvas
+        widget (``widget="signature"``) and ticks a legal-authority checkbox.
+    3.  On ``action_confirm()`` the signature is written to the newly created
+        ``dojo.member``, a QWeb PDF is rendered with the full waiver text plus
+        the embedded signature image, and the PDF is attached to the member.
+    4.  Portal access is granted immediately — no daily cron required.
+    """
 
     _inherit = "dojo.onboarding.wizard"
 
     # ── Extra step ────────────────────────────────────────────────────────────
-    # Override the selection to add the waiver step.
     step = fields.Selection(
         selection_add=[("waiver", "6. Waiver")],
         ondelete={"waiver": "set default"},
     )
 
-    send_waiver = fields.Boolean(
-        "Send Waiver for Signing",
-        default=True,
+    # ── Waiver-specific wizard fields ─────────────────────────────────────────
+    waiver_signature = fields.Image(
+        string="Signature",
+        attachment=True,
+        max_width=800,
+        max_height=400,
+        help="Draw your signature using the mouse or a touchscreen stylus.",
+    )
+    waiver_signed_by = fields.Char(
+        string="Signing As",
         help=(
-            "When checked, an Odoo Sign waiver request will be emailed to the member "
-            "using the template configured on the selected subscription plan.  "
-            "Portal access will only be granted after the member has signed the waiver."
+            "Full name of the person signing.  Auto-filled from the member's name; "
+            "edit if a legal guardian is signing on behalf of the member."
         ),
     )
-    has_waiver_template = fields.Boolean(
-        compute="_compute_has_waiver_template",
-        help="True when the selected plan has a Sign waiver template configured.",
+    waiver_legal_authority = fields.Boolean(
+        string=(
+            "I confirm I have the legal authority to sign this waiver "
+            "(on my own behalf, or as the legal guardian/representative of the "
+            "above member)"
+        ),
+        default=False,
+    )
+    waiver_preview_html = fields.Html(
+        string="Waiver",
+        compute="_compute_waiver_preview_html",
+        sanitize=False,
     )
 
-    def _compute_has_waiver_template(self):
-        for rec in self:
-            rec.has_waiver_template = bool(
-                rec.plan_id and rec.plan_id.sign_template_id
-            )
-
-    # ── Override navigation to inject/skip the waiver step ───────────────────
+    # ── Step order (includes auto_enroll — fixes omission in previous version) ─
     _STEP_ORDER = [
         "member_info",
         "household",
         "guardian_setup",
         "enrollment",
+        "auto_enroll",
         "subscription",
         "waiver",
         "portal_access",
     ]
 
+    # ── Compute ───────────────────────────────────────────────────────────────
+    def _compute_waiver_preview_html(self):
+        config = self.env["dojo.waiver.config"].sudo().get_singleton()
+        html = config.content_html or ""
+        for rec in self:
+            rec.waiver_preview_html = html
+
+    # ── Skip logic ────────────────────────────────────────────────────────────
+    def _should_skip_step(self, step_name):
+        if step_name == "waiver":
+            return False  # waiver is always required; never skip
+        return super()._should_skip_step(step_name)
+
+    # ── Navigation overrides ──────────────────────────────────────────────────
     def action_next(self):
+        """Validate the waiver step before advancing; auto-fill signed_by on entry."""
         self.ensure_one()
-        # Perform base validations by calling the parent implementation but
-        # intercept after to handle the waiver step skip.
+        # Validate waiver content before letting the user leave that step
+        if self.step == "waiver":
+            if not self.waiver_legal_authority:
+                raise UserError(
+                    _(
+                        "Please tick the legal authority checkbox to confirm you are "
+                        "authorised to sign this waiver before continuing."
+                    )
+                )
+            if not self.waiver_signature:
+                raise UserError(
+                    _(
+                        "A drawn signature is required. "
+                        "Please sign in the signature box before continuing."
+                    )
+                )
+
         result = super().action_next()
-        # If base logic landed us on 'portal_access' but there is no waiver
-        # template, that's fine — waiver step would be skipped automatically
-        # because the base _STEP_ORDER doesn't include 'waiver'.
-        # When Sign IS installed we need to potentially stop at 'waiver'.
-        # Re-examine: if current step is 'subscription' and a waiver template
-        # exists, override the result to land on 'waiver' instead.
-        # (Base already advanced; we need to re-check.)
-        if self.step == "portal_access" and self.has_waiver_template:
-            self.step = "waiver"
-            return self._reopen_wizard()
+
+        # Auto-fill signed_by when the wizard lands on the waiver step
+        if self.step == "waiver" and not self.waiver_signed_by:
+            self.waiver_signed_by = self.name
+
         return result
 
-    def action_back(self):
-        self.ensure_one()
-        if self.step == "portal_access" and self.has_waiver_template:
-            self.step = "waiver"
-            return self._reopen_wizard()
-        if self.step == "waiver":
-            self.step = "subscription"
-            return self._reopen_wizard()
-        return super().action_back()
-
-    # ── Override action_confirm to send the waiver before granting portal ─────
+    # ── Confirm override ──────────────────────────────────────────────────────
     def action_confirm(self):
-        # Let the base wizard run first (creates member, subscription, etc.)
-        # by calling super() but we need the member reference.
-        # We re-implement the portal + onboarding-record portion.
+        """Create the member (via super), then write the signed waiver PDF."""
         self.ensure_one()
 
-        # Temporarily disable portal creation in case we need to gate it.
-        original_create_portal = self.create_portal_login
-        waiver_needed = (
-            self.plan_id
-            and self.plan_id.sign_template_id
-            and self.send_waiver
-        )
-        if waiver_needed:
-            # Prevent base from creating the portal login; we'll do it here.
-            self.create_portal_login = False
+        # Ensure signed_by is set even if the user skipped back and re-confirmed
+        if not self.waiver_signed_by and self.name:
+            self.waiver_signed_by = self.name
 
-        try:
-            result = super().action_confirm()
-        finally:
-            self.create_portal_login = original_create_portal
+        result = super().action_confirm()
 
-        if not waiver_needed:
-            return result
+        # Apply waiver data to the newly created member
+        member = self.created_member_id
+        if member and self.waiver_signature:
+            self._apply_waiver_to_member(member)
 
-        # Locate the member that was just created (base wizard opened its form).
-        member_id = result.get("res_id")
-        if not member_id:
-            return result
-        member = self.env["dojo.member"].browse(member_id)
-        if not member.exists():
-            return result
+        return result
 
-        if not member.email:
-            raise UserError(
-                _(
-                    "An email address is required to send the waiver. "
-                    "Please add an email in Step 1."
-                )
-            )
+    # ── Waiver application helper ─────────────────────────────────────────────
+    def _apply_waiver_to_member(self, member):
+        """Write signature fields to *member* and generate/attach the signed PDF.
 
-        template = self.plan_id.sign_template_id
-        roles = template.sign_item_ids.mapped("responsible_id")
-        if not roles:
-            raise UserError(
-                _(
-                    'The waiver template "%s" has no signature items with assigned roles. '
-                    "Please configure the template in the Sign module before enrolling members.",
-                    template.name,
-                )
-            )
+        Called after ``super().action_confirm()`` has created the member record.
+        PDF generation failure is non-fatal: the signature data is already saved
+        on the member, so staff can regenerate the PDF manually if needed.
+        """
+        now = fields.Datetime.now()
+        signed_by = self.waiver_signed_by or member.name
 
-        request_items = [
-            (0, 0, {"partner_id": member.partner_id.id, "role_id": role.id})
-            for role in roles[:1]
-        ]
-        sign_request = self.env["sign.request"].create(
+        member.sudo().write(
             {
-                "template_id": template.id,
-                "reference": _("Waiver \u2014 %s") % member.name,
-                "request_item_ids": request_items,
+                "waiver_signature": self.waiver_signature,
+                "waiver_signed_by": signed_by,
+                "waiver_signed_on": now,
             }
         )
-        try:
-            sign_request.action_sent()
-        except Exception:
-            pass  # falls back to draft; admin can send manually from Sign
 
-        member.waiver_request_id = sign_request.id
-
-        # Store document in Waivers Documents folder (if documents module available)
+        # Generate the signed PDF and store it as an attachment
         try:
-            folder = (
-                self.env["documents.folder"]
+            pdf_content, _mime = (
+                self.env["ir.actions.report"]
                 .sudo()
-                .search([("name", "=", "Waivers")], limit=1)
-            )
-            if not folder:
-                folder = (
-                    self.env["documents.folder"]
-                    .sudo()
-                    .create({"name": "Waivers"})
+                ._render_qweb_pdf(
+                    "dojo_sign.action_report_member_waiver", member.ids
                 )
-            self.env["documents.document"].sudo().create(
-                {
-                    "name": _("Waiver \u2014 %s") % member.name,
-                    "folder_id": folder.id,
-                    "res_model": "sign.request",
-                    "res_id": sign_request.id,
-                    "partner_id": member.partner_id.id,
-                }
             )
+            attachment = (
+                self.env["ir.attachment"]
+                .sudo()
+                .create(
+                    {
+                        "name": f"Waiver \u2013 {member.name}.pdf",
+                        "type": "binary",
+                        "datas": base64.b64encode(pdf_content),
+                        "res_model": "dojo.member",
+                        "res_id": member.id,
+                        "mimetype": "application/pdf",
+                    }
+                )
+            )
+            member.sudo().waiver_attachment_id = attachment.id
         except Exception:
-            pass  # documents module may not be installed
+            # Non-fatal: signature image is already saved on the member record.
+            # Staff can print the waiver PDF manually from the member form.
+            pass
 
-        # Update onboarding record: mark waiver sent, portal NOT yet granted.
-        onb = self.env["dojo.onboarding.record"].search(
-            [("member_id", "=", member.id)], limit=1, order="create_date desc"
-        )
-        if onb:
-            onb.step_portal_access = False  # portal held until waiver signed
-
-        return result
