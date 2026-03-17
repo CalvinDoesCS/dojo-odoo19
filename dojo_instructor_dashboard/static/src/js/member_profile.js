@@ -6,7 +6,7 @@ import { useService } from "@web/core/utils/hooks";
 
 class MemberProfile extends Component {
     static template = "dojo_instructor_dashboard.MemberProfile";
-    static props = ["action", "actionType?"];
+    static props = ["*"];
 
     setup() {
         this.orm    = useService("orm");
@@ -145,7 +145,7 @@ class MemberProfile extends Component {
     async addCredits() {
         if (!this.memberId) return;
         try {
-            await this.action.doAction("dojo_credits.action_dojo_credit_grant_wizard", {
+            await this.action.doAction("dojo_credits.action_dojo_credit_adjustment_wizard", {
                 additionalContext: { active_id: this.memberId, active_model: "dojo.member" },
             });
         } catch {
