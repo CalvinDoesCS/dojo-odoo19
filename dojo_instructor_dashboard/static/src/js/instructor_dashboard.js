@@ -19,6 +19,8 @@ class InstructorDashboard extends Component {
             upcomingSessions: [],
             todos: [],
             kiosks: [],
+            recentStudents: [],
+            studentPage: 0,
         });
 
         onWillStart(() => this._loadData());
@@ -56,6 +58,8 @@ class InstructorDashboard extends Component {
         }
 
         this.state.profile = profile;
+        this.state.recentStudents = (profile && profile.recent_students) || [];
+        this.state.studentPage = 0;
 
         const [sessionsToday, upcomingSessions, todos, kiosks] = await Promise.all([
             this.orm.searchRead(
@@ -158,6 +162,42 @@ class InstructorDashboard extends Component {
 
     stateLabel(s) {
         return { draft: "Draft", open: "Open", done: "Done", cancelled: "Cancelled" }[s] || s;
+    }
+
+    // ── Student carousel ──────────────────────────────────────────────
+    static STUDENT_PAGE_SIZE = 8;
+
+    get visibleStudents() {
+        const ps = InstructorDashboard.STUDENT_PAGE_SIZE;
+        return this.state.recentStudents.slice(
+            this.state.studentPage * ps,
+            (this.state.studentPage + 1) * ps
+        );
+    }
+
+    get totalStudentPages() {
+        return Math.max(
+            1,
+            Math.ceil(this.state.recentStudents.length / InstructorDashboard.STUDENT_PAGE_SIZE)
+        );
+    }
+
+    prevStudentPage() {
+        if (this.state.studentPage > 0) this.state.studentPage--;
+    }
+
+    nextStudentPage() {
+        if (this.state.studentPage < this.totalStudentPages - 1) this.state.studentPage++;
+    }
+
+    openStudentProfile(memberId) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "dojo.member",
+            res_id: memberId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 
     openTodaysClasses() { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_today"); }

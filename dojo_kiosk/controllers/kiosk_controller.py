@@ -371,6 +371,107 @@ class KioskController(http.Controller):
         svc = request.env["dojo.kiosk.service"].sudo()
         return svc.update_session(session_id, capacity=capacity)
 
+    # ------------------------------------------------------------------
+    # Instructor -- belt rank management
+    # ------------------------------------------------------------------
+
+    @http.route(
+        "/kiosk/instructor/belt_ranks",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_belt_ranks(self, member_id=None, program_id=None, token=None, **kw):
+        if not member_id:
+            return {"success": False, "error": "member_id is required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.get_available_belt_ranks(member_id, program_id=program_id)
+
+    @http.route(
+        "/kiosk/instructor/award_rank",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_award_rank(self, member_id=None, rank_id=None, program_id=None, notes="", token=None, **kw):
+        if not member_id or not rank_id:
+            return {"success": False, "error": "member_id and rank_id are required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.award_belt_rank(member_id, rank_id, program_id=program_id, notes=notes)
+
+    # ------------------------------------------------------------------
+    # Instructor -- contact parent / guardian
+    # ------------------------------------------------------------------
+
+    @http.route(
+        "/kiosk/instructor/send_message",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_send_message(
+        self, member_id=None, subject=None, message=None,
+        send_sms=True, send_email=True, guardian_member_ids=None, token=None, **kw
+    ):
+        if not member_id or not message:
+            return {"success": False, "error": "member_id and message are required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.send_parent_message(
+            member_id,
+            subject=subject or "Message from your Dojo",
+            message=message,
+            send_sms=bool(send_sms),
+            send_email=bool(send_email),
+            guardian_member_ids=guardian_member_ids or [],
+        )
+
+    # ------------------------------------------------------------------
+    # Instructor -- next rank / available sessions / voice command
+    # ------------------------------------------------------------------
+
+    @http.route(
+        "/kiosk/instructor/next_rank",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_next_rank(self, member_id=None, program_id=None, token=None, **kw):
+        if not member_id:
+            return {"success": False, "error": "member_id is required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.get_next_belt_rank(member_id, program_id=program_id)
+
+    @http.route(
+        "/kiosk/instructor/available_sessions",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_available_sessions(self, member_id=None, token=None, **kw):
+        if not member_id:
+            return {"success": False, "error": "member_id is required."}
+        guard = self._guard_token(token, {"success": False, "error": "Invalid kiosk token."})
+        if guard is not None:
+            return guard
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.get_available_sessions(member_id)
+
+    @http.route(
+        "/kiosk/instructor/voice_command",
+        type="jsonrpc", auth="public", methods=["POST"], csrf=False,
+    )
+    def kiosk_voice_command(
+        self, member_id=None, session_id=None, audio_data_b64=None, token=None, **kw
+    ):
+        if not member_id or not audio_data_b64:
+            return {"success": False, "error": "member_id and audio_data_b64 are required."}
+        if not token:
+            return {"success": False, "error": "token is required."}
+        svc = request.env["dojo.kiosk.service"].sudo()
+        return svc.process_voice_command(token, member_id, session_id, audio_data_b64)
+
 
 # ------------------------------------------------------------------
 # Utils

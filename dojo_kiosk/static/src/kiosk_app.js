@@ -306,6 +306,10 @@ class MemberProfileCard extends Component {
                         t-on-click="() => this.state.tab = 'progress'">Progress</button>
                     <button t-attf-class="k-profile-tab #{state.tab === 'household' ? 'k-profile-tab--active' : ''}"
                         t-on-click="() => this.state.tab = 'household'">Household</button>
+                    <t t-if="props.instructorMode">
+                        <button t-attf-class="k-profile-tab k-profile-tab--manage #{state.tab === 'manage' ? 'k-profile-tab--active' : ''}"
+                            t-on-click="() => this.switchToManage()">⚙ Manage</button>
+                    </t>
                 </div>
 
                 <!-- ══ Profile tab ══ -->
@@ -518,14 +522,311 @@ class MemberProfileCard extends Component {
                     </div>
                 </t>
 
+                <!-- ══ Manage tab (instructor only) ══ -->
+                <t t-if="state.tab === 'manage' and props.instructorMode">
+                    <div class="k-profile__scroll-body">
+
+                        <!-- ── Belt Rank Promotion ── -->
+                        <div class="k-manage-section">
+                            <div class="k-manage-section__title">🥋 Belt Rank Promotion</div>
+                            <t t-if="state.nextRankLoading">
+                                <div style="text-align:center;padding:16px 0;"><div class="k-spinner"/></div>
+                            </t>
+                            <t t-elif="state.nextRankError">
+                                <div class="k-field-error" t-esc="state.nextRankError"/>
+                            </t>
+                            <t t-elif="state.isHighestRank">
+                                <div class="k-promote-highest">
+                                    🏆 <t t-esc="props.member.name"/> is already at the highest rank
+                                    <t t-if="state.currentRank">
+                                        <span class="k-progress__rank-badge"
+                                            t-attf-style="background:#{state.currentRank.color};color:#{computeContrast(state.currentRank.color)};"
+                                            t-esc="state.currentRank.name"/>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <div class="k-promote-step">
+                                    <div class="k-promote-step__rank">
+                                        <t t-if="state.currentRank">
+                                            <span class="k-promote-step__chip"
+                                                t-attf-style="background:#{state.currentRank.color};color:#{computeContrast(state.currentRank.color)};"
+                                                t-esc="state.currentRank.name"/>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="k-promote-step__chip k-promote-step__chip--none">No Rank</span>
+                                        </t>
+                                    </div>
+                                    <div class="k-promote-step__arrow">→</div>
+                                    <div class="k-promote-step__rank">
+                                        <t t-if="state.nextRank">
+                                            <span class="k-promote-step__chip k-promote-step__chip--next"
+                                                t-attf-style="background:#{state.nextRank.color};color:#{computeContrast(state.nextRank.color)};"
+                                                t-esc="state.nextRank.name"/>
+                                        </t>
+                                    </div>
+                                </div>
+                                <t t-if="!state.promoteConfirming">
+                                    <t t-if="state.promoteSuccess">
+                                        <div class="k-manage__success-banner">✓ <t t-esc="state.promoteSuccess"/></div>
+                                    </t>
+                                    <t t-if="state.promoteError">
+                                        <div class="k-field-error" t-esc="state.promoteError"/>
+                                    </t>
+                                    <button class="k-btn k-btn--primary k-manage__award-btn"
+                                        t-on-click="startPromote"
+                                        t-att-disabled="!state.nextRank or undefined">
+                                        🥋 Promote to <t t-esc="state.nextRank ? state.nextRank.name : '...'"/>
+                                    </button>
+                                </t>
+                                <t t-if="state.promoteConfirming">
+                                    <div class="k-promote-confirm">
+                                        <div class="k-promote-confirm__text">
+                                            Promote <strong><t t-esc="props.member.name"/></strong>
+                                            from <strong><t t-esc="state.currentRank ? state.currentRank.name : 'No Rank'"/></strong>
+                                            to <strong><t t-esc="state.nextRank ? state.nextRank.name : ''"/></strong>?
+                                        </div>
+                                        <div class="k-promote-confirm__actions">
+                                            <button class="k-btn k-btn--danger" t-on-click="cancelPromote">Cancel</button>
+                                            <button class="k-btn k-btn--primary"
+                                                t-on-click="confirmPromote"
+                                                t-att-disabled="state.promoteAwarding or undefined">
+                                                <t t-if="state.promoteAwarding">Promoting…</t>
+                                                <t t-else="">Confirm Promotion</t>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </t>
+                            </t>
+                        </div>
+
+                        <!-- ── Contact Guardians ── -->
+                        <div class="k-manage-section">
+                            <div class="k-manage-section__title">💬 Contact Guardians</div>
+                            <t t-if="props.member.guardians and props.member.guardians.length">
+                                <div class="k-guardian-list">
+                                    <t t-foreach="props.member.guardians" t-as="g" t-key="g.member_id">
+                                        <div t-attf-class="k-guardian-item #{state.checkedGuardianIds.includes(g.member_id) ? 'k-guardian-item--checked' : ''}"
+                                            t-on-click="() => this.toggleGuardian(g.member_id)">
+                                            <input type="checkbox"
+                                                class="k-guardian-item__check"
+                                                t-att-checked="state.checkedGuardianIds.includes(g.member_id) or undefined"
+                                                t-on-click.stop="() => this.toggleGuardian(g.member_id)"/>
+                                            <div class="k-guardian-item__info">
+                                                <div class="k-guardian-item__name">
+                                                    <t t-esc="g.name"/>
+                                                    <span class="k-guardian-item__relation" t-esc="' · ' + g.relation"/>
+                                                    <t t-if="g.is_primary and g.relation !== 'self'">
+                                                        <span class="k-guardian-item__primary">Primary</span>
+                                                    </t>
+                                                </div>
+                                                <div class="k-guardian-item__contact">
+                                                    <t t-if="g.phone"><span>📱 <t t-esc="g.phone"/></span></t>
+                                                    <t t-if="g.email"><span>✉ <t t-esc="g.email"/></span></t>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                            <div class="k-field" style="margin-bottom:8px;">
+                                <label class="k-field__label">Subject</label>
+                                <input class="k-field__input" type="text"
+                                    t-model="state.msgSubject"
+                                    placeholder="Message from your Dojo"/>
+                            </div>
+                            <div class="k-field" style="margin-bottom:8px;">
+                                <label class="k-field__label">Message</label>
+                                <textarea class="k-field__input k-field__textarea" rows="3"
+                                    t-model="state.msgBody"
+                                    placeholder="Type your message here…"/>
+                            </div>
+                            <div class="k-manage__msg-channels">
+                                <label class="k-check-label">
+                                    <input type="checkbox"
+                                        t-att-checked="state.msgSendSms or undefined"
+                                        t-on-change="(ev) => this.state.msgSendSms = ev.target.checked"/>
+                                    📱 SMS
+                                </label>
+                                <label class="k-check-label">
+                                    <input type="checkbox"
+                                        t-att-checked="state.msgSendEmail or undefined"
+                                        t-on-change="(ev) => this.state.msgSendEmail = ev.target.checked"/>
+                                    ✉ Email
+                                </label>
+                            </div>
+                            <t t-if="state.msgSuccess">
+                                <div class="k-manage__success-banner">✓ <t t-esc="state.msgSuccess"/></div>
+                            </t>
+                            <t t-if="state.msgError">
+                                <div class="k-field-error" t-esc="state.msgError"/>
+                            </t>
+                            <button class="k-btn k-btn--primary k-manage__award-btn"
+                                t-on-click="sendMessage"
+                                t-att-disabled="state.msgSending or undefined">
+                                <t t-if="state.msgSending">Sending…</t>
+                                <t t-else="">Send Message</t>
+                            </button>
+                        </div>
+
+                        <!-- ── Session Management ── -->
+                        <div class="k-manage-section">
+                            <div class="k-manage-section__title">📅 Session Management</div>
+                            <t t-if="props.member.appointments and props.member.appointments.length">
+                                <div class="k-manage__session-list">
+                                    <t t-foreach="props.member.appointments" t-as="appt" t-key="appt.session_id">
+                                        <div class="k-manage__session-row">
+                                            <div class="k-manage__session-info">
+                                                <div class="k-manage__session-name" t-esc="appt.name"/>
+                                                <div class="k-manage__session-time" t-esc="formatDateTime(appt.start)"/>
+                                            </div>
+                                            <button class="k-btn k-btn--danger k-manage__session-remove"
+                                                t-on-click="() => this.removeFromSession(appt.session_id)"
+                                                title="Remove from this session">✕</button>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <div class="k-empty" style="padding:10px 0;">
+                                    <div class="k-empty__text">No upcoming sessions enrolled</div>
+                                </div>
+                            </t>
+                            <t t-if="props.sessionId and !props.member.enrolled_in_session">
+                                <button class="k-btn k-btn--secondary" style="width:100%;margin-top:8px;"
+                                    t-on-click="onRosterAddFromManage">
+                                    + Add to Current Session
+                                </button>
+                                <t t-if="state.rosterAddError">
+                                    <div class="k-field-error" style="margin-top:6px;white-space:pre-line;"
+                                        t-esc="state.rosterAddError"/>
+                                </t>
+                            </t>
+                            <button class="k-btn k-btn--secondary k-session-picker__toggle"
+                                t-on-click="toggleSessionPicker">
+                                <t t-if="state.showSessionPicker">▲ Close Session Picker</t>
+                                <t t-else="">＋ Add to Another Session</t>
+                            </button>
+                            <t t-if="state.showSessionPicker">
+                                <div class="k-session-picker">
+                                    <t t-if="state.sessionsLoading">
+                                        <div style="text-align:center;padding:12px;"><div class="k-spinner"/></div>
+                                    </t>
+                                    <t t-elif="state.sessionsLoadError">
+                                        <div class="k-field-error" t-esc="state.sessionsLoadError"/>
+                                    </t>
+                                    <t t-elif="!state.availableSessions.length">
+                                        <div class="k-empty" style="padding:10px 12px;">
+                                            <div class="k-empty__text">No other sessions available for this student</div>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-foreach="state.availableSessions" t-as="s" t-key="s.session_id">
+                                            <div class="k-session-picker__row">
+                                                <div class="k-session-picker__info">
+                                                    <div class="k-session-picker__name" t-esc="s.name"/>
+                                                    <div class="k-session-picker__meta">
+                                                        <t t-if="s.program_name"><t t-esc="s.program_name"/> · </t>
+                                                        <t t-esc="formatDateTime(s.start)"/>
+                                                        <t t-if="s.seats_available and s.seats_available &lt; 99">
+                                                            · <t t-esc="s.seats_available"/> seats
+                                                        </t>
+                                                    </div>
+                                                </div>
+                                                <button class="k-btn k-btn--secondary k-session-picker__add-btn"
+                                                    t-on-click="() => this.addToSession(s.session_id)">Add</button>
+                                            </div>
+                                        </t>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-if="state.sessionRemoveMsg">
+                                <div class="k-manage__success-banner" style="margin-top:8px;">
+                                    ✓ <t t-esc="state.sessionRemoveMsg"/>
+                                </div>
+                            </t>
+                        </div>
+
+                    </div>
+                </t>
+
+                <!-- ── Voice AI floating button (instructor mode) ── -->
+                <t t-if="props.instructorMode">
+                    <button t-attf-class="k-voice-btn #{state.voiceState === 'recording' ? 'k-voice-btn--recording' : ''} #{state.voiceState === 'processing' ? 'k-voice-btn--processing' : ''}"
+                        t-on-click="onVoiceClick"
+                        title="Voice Command — tap to record, tap again to send">
+                        <t t-if="state.voiceState === 'recording'">⏹</t>
+                        <t t-elif="state.voiceState === 'processing'">⌛</t>
+                        <t t-else="">🎤</t>
+                    </button>
+                    <t t-if="state.voiceState !== 'idle'">
+                        <div class="k-voice-result" t-on-click="dismissVoice">
+                            <t t-if="state.voiceTranscript">
+                                <div class="k-voice-result__transcript">"<t t-esc="state.voiceTranscript"/>"</div>
+                            </t>
+                            <t t-if="state.voiceState === 'processing'">
+                                <div class="k-voice-result__response">Processing…</div>
+                            </t>
+                            <t t-if="state.voiceResponse and state.voiceState !== 'processing'">
+                                <div class="k-voice-result__response" t-esc="state.voiceResponse"/>
+                            </t>
+                            <t t-if="state.voiceActionText">
+                                <div class="k-voice-result__action" t-esc="state.voiceActionText"/>
+                            </t>
+                        </div>
+                    </t>
+                </t>
+
             </div>
         </div>
     `;
 
-    static props = ["member", "sessionId", "instructorMode", "onClose", "onCheckin", "onMarkAttendance", "onRosterAdd", "onRosterRemove", "onCheckout"];
+    static props = ["member", "sessionId", "instructorMode", "onClose", "onCheckin", "onMarkAttendance", "onRosterAdd", "onRosterRemove", "onCheckout", "onRosterRemoveBySession", "onRefreshProfile"];
 
     setup() {
-        this.state = useState({ tab: "profile", rosterAddError: "" });
+        this.state = useState({
+            tab: "profile",
+            rosterAddError: "",
+            // Manage tab — rank promotion
+            nextRankLoading: false,
+            nextRankError: "",
+            currentRank: null,
+            nextRank: null,
+            isHighestRank: false,
+            promoteConfirming: false,
+            promoteAwarding: false,
+            promoteSuccess: "",
+            promoteError: "",
+            // Manage tab — guardians & messaging
+            checkedGuardianIds: [],
+            msgSubject: "Message from your Dojo",
+            msgBody: "",
+            msgSendSms: true,
+            msgSendEmail: true,
+            msgSending: false,
+            msgSuccess: "",
+            msgError: "",
+            // Manage tab — sessions
+            showSessionPicker: false,
+            availableSessions: [],
+            sessionsLoading: false,
+            sessionsLoadError: "",
+            sessionRemoveMsg: "",
+            // Voice AI
+            voiceState: "idle",  // idle | recording | processing | done | error
+            voiceTranscript: "",
+            voiceResponse: "",
+            voiceActionText: "",
+        });
+        onWillUnmount(() => {
+            clearTimeout(this._voiceDismissTimer);
+            if (this._voiceRecorder && this._voiceRecorder.state === "recording") {
+                this._voiceRecorder.stop();
+            }
+            if (this._voiceStream) {
+                this._voiceStream.getTracks().forEach(t => t.stop());
+            }
+        });
     }
 
     initials(name) { return initials(name); }
@@ -545,6 +846,269 @@ class MemberProfileCard extends Component {
         }
     }
     onRosterRemove() { this.props.onRosterRemove(this.props.member, this.props.sessionId); this.props.onClose(); }
+
+    // ── Manage tab ──────────────────────────────────────────────
+
+    async switchToManage() {
+        this.state.tab = "manage";
+        this.state.checkedGuardianIds = (this.props.member.guardians || []).map(g => g.member_id);
+        if (!this.state.nextRankLoading && !this.state.currentRank && !this.state.nextRank && !this.state.isHighestRank) {
+            await this._loadNextRank();
+        }
+    }
+
+    async _loadNextRank() {
+        this.state.nextRankLoading = true;
+        this.state.nextRankError = "";
+        try {
+            const result = await jsonPost("/kiosk/instructor/next_rank", {
+                member_id: this.props.member.member_id,
+            });
+            if (result && result.success) {
+                this.state.currentRank = result.current_rank;
+                this.state.nextRank = result.next_rank;
+                this.state.isHighestRank = result.is_highest_rank || false;
+            } else {
+                this.state.nextRankError = (result && result.error) || "Could not load rank info.";
+            }
+        } catch {
+            this.state.nextRankError = "Network error loading rank info.";
+        } finally {
+            this.state.nextRankLoading = false;
+        }
+    }
+
+    startPromote() {
+        this.state.promoteConfirming = true;
+        this.state.promoteError = "";
+        this.state.promoteSuccess = "";
+    }
+
+    cancelPromote() {
+        this.state.promoteConfirming = false;
+    }
+
+    async confirmPromote() {
+        if (!this.state.nextRank) return;
+        this.state.promoteAwarding = true;
+        this.state.promoteError = "";
+        this.state.promoteSuccess = "";
+        try {
+            const result = await jsonPost("/kiosk/instructor/award_rank", {
+                member_id: this.props.member.member_id,
+                rank_id: this.state.nextRank.id,
+            });
+            if (result && result.success) {
+                this.state.promoteSuccess = `🥋 ${result.rank_name} awarded to ${this.props.member.name}!`;
+                this.state.promoteConfirming = false;
+                this.state.currentRank = null;
+                this.state.nextRank = null;
+                this.state.isHighestRank = false;
+                await this._loadNextRank();
+                if (this.props.onRefreshProfile) await this.props.onRefreshProfile(this.props.member);
+            } else {
+                this.state.promoteError = (result && result.error) || "Could not award rank.";
+                this.state.promoteConfirming = false;
+            }
+        } catch {
+            this.state.promoteError = "Network error.";
+            this.state.promoteConfirming = false;
+        } finally {
+            this.state.promoteAwarding = false;
+        }
+    }
+
+    toggleGuardian(memberId) {
+        const idx = this.state.checkedGuardianIds.indexOf(memberId);
+        if (idx >= 0) {
+            this.state.checkedGuardianIds = this.state.checkedGuardianIds.filter(id => id !== memberId);
+        } else {
+            this.state.checkedGuardianIds = [...this.state.checkedGuardianIds, memberId];
+        }
+    }
+
+    async sendMessage() {
+        if (!this.state.msgBody.trim()) {
+            this.state.msgError = "Please enter a message.";
+            return;
+        }
+        if (!this.state.msgSendSms && !this.state.msgSendEmail) {
+            this.state.msgError = "Select at least one channel (SMS or Email).";
+            return;
+        }
+        this.state.msgSending = true;
+        this.state.msgError = "";
+        this.state.msgSuccess = "";
+        try {
+            const result = await jsonPost("/kiosk/instructor/send_message", {
+                member_id: this.props.member.member_id,
+                guardian_member_ids: this.state.checkedGuardianIds,
+                subject: this.state.msgSubject || "Message from your Dojo",
+                message: this.state.msgBody,
+                send_sms: this.state.msgSendSms,
+                send_email: this.state.msgSendEmail,
+            });
+            if (result && result.success) {
+                const channels = (result.sent_via || []).join(" & ") || "message";
+                const toNames = (result.recipients || (result.recipient_name ? [result.recipient_name] : [])).join(", ");
+                this.state.msgSuccess = `Sent via ${channels}${toNames ? " to " + toNames : ""}.`;
+                this.state.msgBody = "";
+            } else {
+                this.state.msgError = (result && result.error) || "Failed to send message.";
+            }
+        } catch {
+            this.state.msgError = "Network error.";
+        } finally {
+            this.state.msgSending = false;
+        }
+    }
+
+    async toggleSessionPicker() {
+        this.state.showSessionPicker = !this.state.showSessionPicker;
+        if (this.state.showSessionPicker && !this.state.availableSessions.length && !this.state.sessionsLoading) {
+            await this._loadAvailableSessions();
+        }
+    }
+
+    async _loadAvailableSessions() {
+        this.state.sessionsLoading = true;
+        this.state.sessionsLoadError = "";
+        try {
+            const result = await jsonPost("/kiosk/instructor/available_sessions", {
+                member_id: this.props.member.member_id,
+            });
+            if (result && result.success) {
+                this.state.availableSessions = result.sessions || [];
+            } else {
+                this.state.sessionsLoadError = (result && result.error) || "Could not load sessions.";
+            }
+        } catch {
+            this.state.sessionsLoadError = "Network error.";
+        } finally {
+            this.state.sessionsLoading = false;
+        }
+    }
+
+    async addToSession(sessionId) {
+        try {
+            const result = await jsonPost("/kiosk/instructor/roster/add", {
+                session_id: sessionId,
+                member_id: this.props.member.member_id,
+                override_settings: true,
+            });
+            if (result && result.success) {
+                this.state.sessionRemoveMsg = "Added to session.";
+                this.state.showSessionPicker = false;
+                this.state.availableSessions = [];
+                if (this.props.onRefreshProfile) await this.props.onRefreshProfile(this.props.member);
+            } else {
+                this.state.sessionsLoadError = (result && result.error) || "Could not add to session.";
+            }
+        } catch {
+            this.state.sessionsLoadError = "Network error.";
+        }
+    }
+
+    async onRosterAddFromManage() {
+        this.state.rosterAddError = "";
+        const result = await this.props.onRosterAdd(this.props.member, this.props.sessionId);
+        if (result && result.success) {
+            this.state.sessionRemoveMsg = `${this.props.member.name} added to current session.`;
+        } else {
+            this.state.rosterAddError = (result && result.error) || "Could not add to roster.";
+        }
+    }
+
+    async removeFromSession(sessionId) {
+        this.state.sessionRemoveMsg = "";
+        await this.props.onRosterRemoveBySession(this.props.member, sessionId);
+        this.state.sessionRemoveMsg = "Removed from session.";
+    }
+
+    // ── Voice AI ──────────────────────────────────────────────────
+
+    onVoiceClick() {
+        if (this.state.voiceState === "idle") this.startVoice();
+        else if (this.state.voiceState === "recording") this.stopVoice();
+        else this.dismissVoice();
+    }
+
+    async startVoice() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this._voiceStream = stream;
+            this._voiceChunks = [];
+            this._voiceRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+            this._voiceRecorder.ondataavailable = ev => {
+                if (ev.data && ev.data.size > 0) this._voiceChunks.push(ev.data);
+            };
+            this._voiceRecorder.onstop = () => this._onVoiceStop();
+            this._voiceRecorder.start();
+            this.state.voiceState = "recording";
+            this.state.voiceTranscript = "";
+            this.state.voiceResponse = "";
+            this.state.voiceActionText = "";
+        } catch {
+            this.state.voiceState = "error";
+            this.state.voiceResponse = "Microphone access denied. Please allow mic in browser settings.";
+        }
+    }
+
+    stopVoice() {
+        if (this._voiceRecorder && this._voiceRecorder.state === "recording") {
+            this._voiceRecorder.stop();
+        }
+        if (this._voiceStream) this._voiceStream.getTracks().forEach(t => t.stop());
+    }
+
+    async _onVoiceStop() {
+        this.state.voiceState = "processing";
+        try {
+            const blob = new Blob(this._voiceChunks, { type: "audio/webm" });
+            const ab = await blob.arrayBuffer();
+            const bytes = new Uint8Array(ab);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            const b64 = btoa(binary);
+            const result = await jsonPost("/kiosk/instructor/voice_command", {
+                member_id: this.props.member.member_id,
+                session_id: this.props.sessionId,
+                audio_data_b64: b64,
+            });
+            if (result && result.success) {
+                this.state.voiceTranscript = result.transcribed_text || "";
+                this.state.voiceResponse = result.response_text || "";
+                this.state.voiceActionText = result.action_taken
+                    ? `✓ Action: ${result.action_taken.replace(/_/g, " ")}`
+                    : "";
+                this.state.voiceState = "done";
+                if (result.action_taken && this.props.onRefreshProfile) {
+                    await this.props.onRefreshProfile(this.props.member);
+                }
+                clearTimeout(this._voiceDismissTimer);
+                this._voiceDismissTimer = setTimeout(() => {
+                    this.state.voiceState = "idle";
+                    this.state.voiceTranscript = "";
+                    this.state.voiceResponse = "";
+                    this.state.voiceActionText = "";
+                }, 8000);
+            } else {
+                this.state.voiceState = "error";
+                this.state.voiceResponse = (result && result.error) || "Voice command failed.";
+            }
+        } catch {
+            this.state.voiceState = "error";
+            this.state.voiceResponse = "Network error processing voice command.";
+        }
+    }
+
+    dismissVoice() {
+        clearTimeout(this._voiceDismissTimer);
+        this.state.voiceState = "idle";
+        this.state.voiceTranscript = "";
+        this.state.voiceResponse = "";
+        this.state.voiceActionText = "";
+    }
 }
 
 // ─── HomeContent ──────────────────────────────────────────────────────────────
@@ -747,9 +1311,7 @@ class StudentCheckinModal extends Component {
 class InstructorRosterTile extends Component {
     static template = xml`
         <div t-attf-class="k-roster-tile k-roster-tile--#{props.entry.attendance_state || 'pending'}"
-             t-on-pointerdown="onPointerDown"
-             t-on-pointerup="onPointerUp"
-             t-on-pointercancel="onPointerUp"
+             t-on-click="onTileTap"
              t-on-contextmenu.prevent="">
 
             <!-- Warning badge: top-right — membership issue or known flags -->
@@ -761,7 +1323,6 @@ class InstructorRosterTile extends Component {
             <t t-if="props.entry.attendance_state === 'present' or props.entry.attendance_state === 'late'">
                 <button class="k-roster-tile__remove"
                     t-on-click.stop="onRemove"
-                    t-on-pointerdown.stop=""
                     title="Remove attendance">✕</button>
             </t>
 
@@ -769,7 +1330,6 @@ class InstructorRosterTile extends Component {
             <t t-elif="props.entry.attendance_state === 'pending' or props.entry.attendance_state === 'absent' or !props.entry.attendance_state">
                 <button class="k-roster-tile__check"
                     t-on-click.stop="onCheck"
-                    t-on-pointerdown.stop=""
                     title="Mark present">✓</button>
             </t>
 
@@ -781,35 +1341,25 @@ class InstructorRosterTile extends Component {
             </div>
 
             <div class="k-roster-tile__name" t-esc="props.entry.name"/>
+            <!-- Manage indicator -->
+            <div class="k-roster-tile__info-hint">👤</div>
         </div>
     `;
 
     static props = ["entry", "sessionId", "onMark", "onProfile", "onRemoveAttendance"];
 
-    setup() { this._pressTimer = null; }
-
     avatarUrl(id) { return avatarUrl(id); }
 
     hasWarning() {
-        // Check explicit issue flags first
         if (this.props.entry.issues && this.props.entry.issues.length) return true;
-        // Fall back to checking membership_state if present in roster entry
         const state = this.props.entry.membership_state;
         return state && state !== "active" && state !== "trial";
     }
 
-    onPointerDown(ev) {
+    onTileTap(ev) {
+        // Don't open profile when clicking action buttons
         if (ev.target.closest(".k-roster-tile__check, .k-roster-tile__remove")) return;
-        clearTimeout(this._pressTimer);
-        this._pressTimer = setTimeout(() => {
-            this._pressTimer = null;
-            this.props.onProfile(this.props.entry.member_id);
-        }, 500);
-    }
-
-    onPointerUp() {
-        clearTimeout(this._pressTimer);
-        this._pressTimer = null;
+        this.props.onProfile(this.props.entry.member_id);
     }
 
     onCheck() { this.props.onMark(this.props.entry.member_id, "present"); }
@@ -1576,7 +2126,9 @@ class KioskApp extends Component {
                     onCheckout="(member, sessionId) => this.doCheckout(member, sessionId)"
                     onMarkAttendance="(member, sessionId, status) => this.markAttendanceFromProfile(member, sessionId, status)"
                     onRosterAdd="(member, sessionId) => this.rosterAdd(member, sessionId)"
-                    onRosterRemove="(member, sessionId) => this.rosterRemove(member, sessionId)"/>
+                    onRosterRemove="(member, sessionId) => this.rosterRemove(member, sessionId)"
+                    onRosterRemoveBySession="(member, sessionId) => this.rosterRemoveBySession(member, sessionId)"
+                    onRefreshProfile="(member) => this.refreshProfile(member)"/>
             </t>
 
             <!-- ── Remove attendance confirm ── -->
@@ -2077,6 +2629,37 @@ class KioskApp extends Component {
             await this._loadSessionRoster(sessionId);
         } catch (e) {
             console.error("Kiosk: roster remove failed", e);
+        }
+    }
+
+    async refreshProfile(member) {
+        try {
+            const profile = await jsonPost("/kiosk/member/profile", {
+                member_id: member.member_id,
+                session_id: this.state.profileSessionId,
+            });
+            if (profile && this.state.profileMember) this.state.profileMember = profile;
+        } catch (e) {
+            console.error("Kiosk: refresh profile failed", e);
+        }
+    }
+
+    async rosterRemoveBySession(member, sessionId) {
+        try {
+            await jsonPost("/kiosk/instructor/roster/remove", {
+                session_id: sessionId,
+                member_id: member.member_id,
+            });
+            // Reload the affected session roster
+            await this._loadSessionRoster(sessionId);
+            // Reload the profile to refresh appointments list
+            const profile = await jsonPost("/kiosk/member/profile", {
+                member_id: member.member_id,
+                session_id: this.state.profileSessionId,
+            });
+            if (this.state.profileMember) this.state.profileMember = profile;
+        } catch (e) {
+            console.error("Kiosk: roster remove by session failed", e);
         }
     }
 

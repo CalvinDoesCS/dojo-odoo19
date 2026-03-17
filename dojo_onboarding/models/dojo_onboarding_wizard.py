@@ -174,6 +174,10 @@ class DojoOnboardingWizard(models.TransientModel):
         'Send Welcome Email to Member',
         default=True,
     )
+    send_welcome_sms = fields.Boolean(
+        'Send Welcome SMS to Member',
+        default=False,
+    )
     create_guardian_portal_login = fields.Boolean(
         'Create Portal Login for Guardian',
         default=True,
@@ -182,6 +186,10 @@ class DojoOnboardingWizard(models.TransientModel):
     send_guardian_welcome_email = fields.Boolean(
         'Send Welcome Email to Guardian',
         default=True,
+    )
+    send_guardian_welcome_sms = fields.Boolean(
+        'Send Welcome SMS to Guardian',
+        default=False,
     )
 
     # ── Result (set after confirm) ────────────────────────────────────────────
@@ -465,6 +473,17 @@ class DojoOnboardingWizard(models.TransientModel):
             creds = member._grant_portal_access_credentials()
             if creds:
                 portal_credentials.append(creds)
+                if self.send_welcome_email:
+                    user = self.env['res.users'].sudo().search(
+                        [('partner_id', '=', member.partner_id.id)], limit=1
+                    )
+                    if user:
+                        try:
+                            user.action_reset_password()
+                        except Exception:
+                            pass  # non-fatal — credentials are shown on screen
+                if self.send_welcome_sms:
+                    self._send_welcome_sms(member)
 
         # ── Portal login — guardian (new household path only) ─────────────────
         if self.create_new_household and guardian_member and self.create_guardian_portal_login:
@@ -476,6 +495,17 @@ class DojoOnboardingWizard(models.TransientModel):
             creds = guardian_member._grant_portal_access_credentials()
             if creds:
                 portal_credentials.append(creds)
+                if self.send_guardian_welcome_email:
+                    user = self.env['res.users'].sudo().search(
+                        [('partner_id', '=', guardian_member.partner_id.id)], limit=1
+                    )
+                    if user:
+                        try:
+                            user.action_reset_password()
+                        except Exception:
+                            pass  # non-fatal — credentials are shown on screen
+                if self.send_guardian_welcome_sms:
+                    self._send_welcome_sms(guardian_member)
 
         # ── Onboarding record ──────────────────────────────────────────────────
         self.env['dojo.onboarding.record'].create({
@@ -523,3 +553,28 @@ class DojoOnboardingWizard(models.TransientModel):
             }
 
         return member_form_action
+
+    def _send_welcome_sms(self, member):
+        """Send a welcome SMS to the member's mobile/phone via sms.sms (Twilio)."""
+        partner = member.partner_id
+        number = partner.mobile or partner.phone
+        if not number:
+            return
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        portal_url = base_url.rstrip('/') + '/my/dojo'
+        company_name = self.env.company.name
+        body = _(
+            'Welcome to %(company)s, %(name)s! '
+            'Your member portal is ready — log in at %(url)s',
+            company=company_name,
+            name=member.name,
+            url=portal_url,
+        )
+        try:
+            self.env['sms.sms'].sudo().create({
+                'number': number,
+                'body': body,
+                'partner_id': partner.id,
+            }).send()
+        except Exception:
+            pass  # non-fatal — welcome SMS failure should not block onboarding

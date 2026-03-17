@@ -155,6 +155,32 @@ class DojoInstructorProfile(models.Model):
     )
 
     @api.model
+    def _get_recent_students(self, domain, limit=24):
+        """Return up to `limit` unique recently-enrolled members matching `domain`.
+        Oversamples the enrollment query to compensate for duplicates."""
+        Enrollment = self.env['dojo.class.enrollment']
+        enrollments = Enrollment.search(
+            domain,
+            order='create_date desc',
+            limit=limit * 4,
+        )
+        seen = set()
+        result = []
+        for e in enrollments:
+            m = e.member_id
+            if not m or m.id in seen:
+                continue
+            seen.add(m.id)
+            result.append({
+                'id': m.id,
+                'name': m.name or '—',
+                'partner_id': m.partner_id.id,
+            })
+            if len(result) >= limit:
+                break
+        return result
+
+    @api.model
     def get_my_profile_data(self):
         """Returns KPI data for the currently logged-in instructor.
         Uses self.env.uid (always correct server-side) so no client-side
@@ -162,6 +188,10 @@ class DojoInstructorProfile(models.Model):
         profile = self.search([('user_id', '=', self.env.uid)], limit=1)
         if not profile:
             return False
+        recent_students = self._get_recent_students([
+            ('session_id.instructor_profile_id', '=', profile.id),
+            ('status', 'in', ['registered', 'attended']),
+        ])
         return {
             'id': profile.id,
             'name': profile.name,
@@ -170,6 +200,7 @@ class DojoInstructorProfile(models.Model):
             'students_total_count': profile.students_total_count,
             'avg_fill_rate': profile.avg_fill_rate,
             'attendance_rate': profile.attendance_rate,
+            'recent_students': recent_students,
         }
 
     @api.depends('user_id')
@@ -469,9 +500,14 @@ class DojoInstructorProfile(models.Model):
                 'state': s.state,
             })
 
+        recent_students = self._get_recent_students([
+            ('status', 'in', ['registered', 'attended']),
+        ])
+
         return {
             'summary': summary,
             'instructors': instructors,
             'dropped_students': dropped_students,
             'recent_sessions': recent_sessions_data,
+            'recent_students': recent_students,
         }

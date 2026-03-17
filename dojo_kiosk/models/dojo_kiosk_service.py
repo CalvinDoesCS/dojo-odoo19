@@ -529,12 +529,37 @@ class DojoKioskService(models.AbstractModel):
                     prog_attendance[pid] = prog_attendance.get(pid, 0) + 1
             for prog_key, info in prog_ranks.items():
                 programs.append({
+                    "program_id": prog_key if prog_key != 0 else None,
                     "program_name": info["program_name"],
                     "rank_name": info["rank_name"],
                     "rank_color": info["rank_color"],
                     "attendance_count": prog_attendance.get(prog_key, 0),
                 })
             programs.sort(key=lambda p: p["program_name"])
+
+        # Guardians: people linked as guardians for this student
+        guardians = []
+        if hasattr(member, "dependent_link_ids") and member.dependent_link_ids:
+            for link in member.dependent_link_ids:
+                gm = link.guardian_member_id
+                if gm and gm.exists():
+                    guardians.append({
+                        "member_id": gm.id,
+                        "name": gm.name or "",
+                        "relation": link.relation or "guardian",
+                        "is_primary": bool(link.is_primary),
+                        "phone": gm.phone or "",
+                        "email": gm.email or "",
+                    })
+        if not guardians:
+            guardians.append({
+                "member_id": member.id,
+                "name": member.name or "",
+                "relation": "self",
+                "is_primary": True,
+                "phone": member.phone or "",
+                "email": member.email or "",
+            })
 
         return {
             "member_id": member.id,
@@ -559,6 +584,7 @@ class DojoKioskService(models.AbstractModel):
             "household": household,
             "attendance_since_last_rank": att_since_rank,
             "programs": programs,
+            "guardians": guardians,
         }
 
     def _compute_issue_flags(self, member):
@@ -977,4 +1003,492 @@ class DojoKioskService(models.AbstractModel):
         return {
             "success": True,
             "checkout_datetime": fields.Datetime.to_string(log.checkout_datetime),
+        }
+
+    # -------------------------------------------------------------------------
+    # Instructor — belt rank management
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_available_belt_ranks(self, member_id, program_id=None):
+        """Return all active belt ranks, with the member's current rank marked.
+
+        If program_id is provided, ranks are filtered/ordered by the program's
+        belt_rank_ids if that field exists; otherwise all company ranks are returned.
+        """
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+
+        # Determine current rank per program
+        current_rank_id = None
+        if hasattr(member, "current_rank_id") and member.current_rank_id:
+            current_rank_id = member.current_rank_id.id
+
+        # Build the candidate ranks list
+        if program_id:
+            program = self.env["dojo.program"].browse(program_id)
+            if hasattr(program, "belt_rank_ids") and program.belt_rank_ids:
+                ranks = program.belt_rank_ids.filtered("active").sorted("sequence")
+            else:
+                ranks = self.env["dojo.belt.rank"].search([
+                    ("active", "=", True),
+                    ("company_id", "in", [self.env.company.id, False]),
+                ], order="sequence, name")
+        else:
+            ranks = self.env["dojo.belt.rank"].search([
+                ("active", "=", True),
+                ("company_id", "in", [self.env.company.id, False]),
+            ], order="sequence, name")
+
+        # Also get per-program current ranks from rank history
+        prog_current = {}
+        if hasattr(member, "rank_history_ids"):
+            for rh in member.rank_history_ids:
+                pid = rh.program_id.id if rh.program_id else 0
+                if pid not in prog_current or rh.date_awarded > prog_current[pid]["date"]:
+                    prog_current[pid] = {
+                        "rank_id": rh.rank_id.id if rh.rank_id else None,
+                        "date": rh.date_awarded,
+                    }
+
+        current_for_prog = prog_current.get(program_id or 0, {}).get("rank_id") or current_rank_id
+
+        return {
+            "success": True,
+            "current_rank_id": current_for_prog,
+            "ranks": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "color": r.color or "#ffffff",
+                    "sequence": r.sequence,
+                    "is_current": r.id == current_for_prog,
+                }
+                for r in ranks
+            ],
+        }
+
+    @api.model
+    def award_belt_rank(self, member_id, rank_id, program_id=None, notes=""):
+        """Award a belt rank to a member and record in rank history."""
+        member = self.env["dojo.member"].browse(member_id)
+        rank = self.env["dojo.belt.rank"].browse(rank_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+        if not rank.exists():
+            return {"success": False, "error": "Rank not found."}
+
+        vals = {
+            "member_id": member.id,
+            "rank_id": rank.id,
+            "date_awarded": fields.Date.today(),
+        }
+        if program_id:
+            vals["program_id"] = program_id
+        if notes:
+            vals["notes"] = notes
+
+        self.env["dojo.member.rank"].create(vals)
+
+        # Update the member's current_rank_id (the model stores the most recent)
+        if hasattr(member, "current_rank_id"):
+            member.invalidate_recordset()
+
+        return {
+            "success": True,
+            "rank_name": rank.name,
+            "rank_color": rank.color or "#ffffff",
+        }
+
+    # -------------------------------------------------------------------------
+    # Instructor — message parent / guardian
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def send_parent_message(self, member_id, subject, message, send_sms=True, send_email=True, guardian_member_ids=None):
+        """Send SMS/email to guardian(s) for a member.
+
+        If guardian_member_ids is provided, sends to each of those members.
+        Falls back to the primary guardian or the member's own contact info.
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+
+        if not subject or not message:
+            return {"success": False, "error": "Subject and message are required."}
+
+        # Build target list: (partner, name)
+        targets = []
+        if guardian_member_ids:
+            for gid in guardian_member_ids:
+                gm = self.env["dojo.member"].browse(gid)
+                if gm.exists() and gm.partner_id:
+                    targets.append((gm.partner_id, gm.name or ""))
+        if not targets:
+            household = member.household_id
+            if household and household.primary_guardian_id:
+                guardian = household.primary_guardian_id
+                targets.append((guardian.partner_id, guardian.name or ""))
+            else:
+                targets.append((member.partner_id, member.name or ""))
+
+        sent_email_total = False
+        sent_sms_total = False
+        errors = []
+        recipient_names = []
+
+        for partner, name in targets:
+            if not partner:
+                continue
+            recipient_names.append(name)
+            try:
+                if send_email and partner.email:
+                    mail = self.env["mail.mail"].create({
+                        "subject": subject,
+                        "body_html": f"<p>{message}</p>",
+                        "email_to": partner.email,
+                        "auto_delete": True,
+                    })
+                    mail.send()
+                    sent_email_total = True
+            except Exception as exc:
+                _logger.error("Kiosk send_parent_message email failed: %s", exc)
+                errors.append("Email failed: %s" % str(exc)[:80])
+
+            try:
+                if send_sms:
+                    phone = partner.mobile or partner.phone
+                    if phone:
+                        self.env["sms.sms"].create({
+                            "number": phone,
+                            "body": message,
+                            "partner_id": partner.id,
+                        }).send()
+                        sent_sms_total = True
+                    elif not errors:
+                        errors.append("No mobile number on file for %s." % name)
+            except Exception as exc:
+                _logger.error("Kiosk send_parent_message SMS failed: %s", exc)
+                errors.append("SMS failed: %s" % str(exc)[:80])
+
+        if not sent_email_total and not sent_sms_total and errors:
+            return {"success": False, "error": "; ".join(errors)}
+
+        summary = []
+        if sent_email_total:
+            summary.append("email")
+        if sent_sms_total:
+            summary.append("SMS")
+        return {
+            "success": True,
+            "sent_via": summary,
+            "recipient_name": ", ".join(recipient_names),
+            "recipients": recipient_names,
+        }
+
+    # -------------------------------------------------------------------------
+    # Instructor — belt rank: next rank helper
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_next_belt_rank(self, member_id, program_id=None):
+        """Return the immediate next rank above the member's current rank in sequence."""
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+
+        if program_id:
+            program = self.env["dojo.program"].browse(program_id)
+            if hasattr(program, "belt_rank_ids") and program.belt_rank_ids:
+                ranks = list(program.belt_rank_ids.filtered("active").sorted("sequence"))
+            else:
+                ranks = list(self.env["dojo.belt.rank"].search([
+                    ("active", "=", True),
+                    ("company_id", "in", [self.env.company.id, False]),
+                ], order="sequence, name"))
+        else:
+            ranks = list(self.env["dojo.belt.rank"].search([
+                ("active", "=", True),
+                ("company_id", "in", [self.env.company.id, False]),
+            ], order="sequence, name"))
+
+        if not ranks:
+            return {"success": True, "is_highest_rank": False, "current_rank": None, "next_rank": None}
+
+        # Determine current rank
+        current_rank_id = None
+        if program_id and hasattr(member, "rank_history_ids"):
+            best_date = None
+            for rh in member.rank_history_ids:
+                pid = rh.program_id.id if rh.program_id else None
+                if pid == program_id and rh.rank_id:
+                    if best_date is None or rh.date_awarded > best_date:
+                        current_rank_id = rh.rank_id.id
+                        best_date = rh.date_awarded
+        if current_rank_id is None and hasattr(member, "current_rank_id") and member.current_rank_id:
+            current_rank_id = member.current_rank_id.id
+
+        def _rank_dict(r):
+            return {"id": r.id, "name": r.name, "color": r.color or "#ffffff"}
+
+        rank_ids = [r.id for r in ranks]
+        if current_rank_id is None:
+            return {
+                "success": True,
+                "is_highest_rank": False,
+                "current_rank": None,
+                "next_rank": _rank_dict(ranks[0]),
+            }
+        if current_rank_id not in rank_ids:
+            return {
+                "success": True,
+                "is_highest_rank": False,
+                "current_rank": None,
+                "next_rank": _rank_dict(ranks[0]),
+            }
+        idx = rank_ids.index(current_rank_id)
+        current_rank = ranks[idx]
+        if idx >= len(ranks) - 1:
+            return {
+                "success": True,
+                "is_highest_rank": True,
+                "current_rank": _rank_dict(current_rank),
+                "next_rank": None,
+            }
+        return {
+            "success": True,
+            "is_highest_rank": False,
+            "current_rank": _rank_dict(current_rank),
+            "next_rank": _rank_dict(ranks[idx + 1]),
+        }
+
+    # -------------------------------------------------------------------------
+    # Instructor — available sessions to assign
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def get_available_sessions(self, member_id):
+        """Return upcoming sessions for the member's enrolled templates (excluding already enrolled)."""
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+
+        enrolled_template_ids = []
+        if hasattr(member, "enrolled_template_ids"):
+            enrolled_template_ids = member.enrolled_template_ids.ids
+        if not enrolled_template_ids:
+            return {"success": True, "sessions": []}
+
+        now = fields.Datetime.now()
+        sixty_days = now + timedelta(days=60)
+        sessions = self.env["dojo.class.session"].search([
+            ("template_id", "in", enrolled_template_ids),
+            ("state", "in", ["draft", "open"]),
+            ("start_datetime", ">=", fields.Datetime.to_string(now)),
+            ("start_datetime", "<=", fields.Datetime.to_string(sixty_days)),
+            ("company_id", "in", [self.env.company.id, False]),
+        ], order="start_datetime asc")
+
+        already_enrolled = set(self.env["dojo.class.enrollment"].search([
+            ("member_id", "=", member_id),
+            ("status", "=", "registered"),
+            ("session_id", "in", sessions.ids),
+        ]).mapped("session_id").ids)
+
+        result = []
+        for s in sessions:
+            if s.id in already_enrolled:
+                continue
+            seats_available = (s.capacity - s.seats_taken) if s.capacity > 0 else 99
+            result.append({
+                "session_id": s.id,
+                "name": s.template_id.name if s.template_id else "",
+                "program_name": s.template_id.program_id.name if (s.template_id and s.template_id.program_id) else "",
+                "start": fields.Datetime.to_string(s.start_datetime),
+                "end": fields.Datetime.to_string(s.end_datetime),
+                "seats_available": seats_available,
+            })
+        return {"success": True, "sessions": result}
+
+    # -------------------------------------------------------------------------
+    # Instructor — voice command (STT + AI + action execution)
+    # -------------------------------------------------------------------------
+
+    @api.model
+    def process_voice_command(self, token, member_id, session_id, audio_data_b64):
+        """Process a voice command: STT → AI → execute action → return result."""
+        import base64
+        import json as _json
+        import re as _re
+        import logging
+        _log = logging.getLogger(__name__)
+
+        self.validate_token(token)
+        member = self.env["dojo.member"].browse(member_id)
+        if not member.exists():
+            return {"success": False, "error": "Member not found."}
+
+        # Step 1: Speech-to-text
+        try:
+            audio_bytes = base64.b64decode(audio_data_b64)
+            transcribed = self.env["elevenlabs.service"].sudo().transcribe_audio(audio_bytes)
+        except Exception as e:
+            _log.error("Voice STT error: %s", e)
+            return {"success": False, "error": "Could not transcribe audio. Check ElevenLabs API key."}
+
+        if not transcribed or not transcribed.strip():
+            return {"success": False, "error": "Could not understand the audio."}
+
+        # Step 2: Build context for AI prompt
+        next_rank_data = self.get_next_belt_rank(member_id)
+        avail_sessions_data = self.get_available_sessions(member_id)
+        profile = self._member_profile_dict(member, session_id=session_id)
+
+        enrolled_txt = ""
+        for appt in (profile.get("appointments") or []):
+            enrolled_txt += f"  - session_id={appt['session_id']}: {appt['name']} at {appt['start']}\n"
+
+        avail_txt = ""
+        for s in (avail_sessions_data.get("sessions") or [])[:10]:
+            avail_txt += (
+                f"  - session_id={s['session_id']}: {s['name']} "
+                f"({s['program_name']}) at {s['start']} [{s['seats_available']} seats]\n"
+            )
+
+        guardians_txt = ""
+        for g in (profile.get("guardians") or []):
+            line = f"  - member_id={g['member_id']}: {g['name']} ({g['relation']})"
+            if g.get("phone"):
+                line += f" phone:{g['phone']}"
+            if g.get("email"):
+                line += f" email:{g['email']}"
+            guardians_txt += line + "\n"
+
+        current_rank_name = (next_rank_data.get("current_rank") or {}).get("name", "None")
+        next_rank_name = (next_rank_data.get("next_rank") or {}).get("name", "None")
+        next_rank_id = (next_rank_data.get("next_rank") or {}).get("id")
+
+        system_prompt = (
+            f"You are a voice assistant for a martial arts dojo instructor at a tablet kiosk.\n"
+            f"The instructor is managing student: {member.name}\n"
+            f"Current belt rank: {current_rank_name}\n"
+            f"Next rank in sequence: {next_rank_name} (id: {next_rank_id})\n"
+            f"Is already at highest rank: {str(next_rank_data.get('is_highest_rank', False))}\n"
+            f"Currently enrolled upcoming sessions:\n{enrolled_txt or '  (none)\n'}"
+            f"Available sessions to add (same program/templates):\n{avail_txt or '  (none)\n'}"
+            f"Guardians/contacts:\n{guardians_txt or f'  - member_id={member.id}: {member.name} (self)\n'}"
+            "IMPORTANT: Respond ONLY with valid JSON (no markdown, no extra text):\n"
+            '{"action": "promote_rank" or "send_message" or "add_session" or "remove_session" or "info",\n'
+            ' "params": {\n'
+            '   <for send_message>: "guardian_member_ids": [int,...], "message": "...", "send_sms": true, "send_email": false\n'
+            '   <for add_session or remove_session>: "session_id": int\n'
+            '   <for promote_rank or info>: {}\n'
+            ' },\n'
+            ' "response_text": "Brief 1-2 sentence confirmation for the instructor"\n'
+            "}\n"
+            "Rules:\n"
+            f"- promote_rank: awards next_rank_id={next_rank_id} to student (1 step up)\n"
+            "- send_message: default to send_sms=true, send_email=false; compose a brief professional message\n"
+            "- If instructor says 'contact all' or 'message everyone', include ALL guardian member_ids\n"
+            "- If instructor names a specific guardian, map to their member_id from the list above\n"
+            "- For info queries, use action=info and put the answer in response_text\n"
+            "- If unclear, use action=info"
+        )
+
+        # Step 3: AI processing
+        try:
+            ai_proc = self.env["ai.processor"].sudo()
+            provider = ai_proc._get_provider()
+            if provider == "gemini":
+                ai_response = ai_proc._process_gemini(transcribed, system_prompt, {})
+            else:
+                ai_response = ai_proc._process_openai(transcribed, system_prompt, {})
+        except Exception as e:
+            _log.error("Voice AI error: %s", e)
+            return {
+                "success": True,
+                "transcribed_text": transcribed,
+                "response_text": "AI is not configured. Please check ElevenLabs connector settings.",
+                "action_taken": None,
+                "action_data": {},
+            }
+
+        # Step 4: Parse JSON action from AI response
+        action = "info"
+        params = {}
+        response_text = ai_response or ""
+        try:
+            match = _re.search(r'\{.*\}', ai_response or "", _re.DOTALL)
+            if match:
+                parsed = _json.loads(match.group())
+                action = parsed.get("action", "info")
+                params = parsed.get("params") or {}
+                response_text = parsed.get("response_text") or ai_response
+        except Exception:
+            pass
+
+        # Step 5: Execute action
+        action_taken = None
+        action_data = {}
+
+        if action == "promote_rank" and next_rank_id and not next_rank_data.get("is_highest_rank"):
+            try:
+                award_result = self.award_belt_rank(member_id, next_rank_id)
+                if award_result.get("success"):
+                    action_taken = "promote_rank"
+                    action_data = award_result
+            except Exception as e:
+                _log.error("Voice promote_rank error: %s", e)
+
+        elif action == "send_message":
+            try:
+                gids = params.get("guardian_member_ids") or []
+                msg = params.get("message") or transcribed
+                msg_result = self.send_parent_message(
+                    member_id,
+                    subject="Message from your Instructor",
+                    message=msg,
+                    send_sms=bool(params.get("send_sms", True)),
+                    send_email=bool(params.get("send_email", False)),
+                    guardian_member_ids=gids,
+                )
+                if msg_result.get("success"):
+                    action_taken = "send_message"
+                    action_data = msg_result
+            except Exception as e:
+                _log.error("Voice send_message error: %s", e)
+
+        elif action == "add_session":
+            try:
+                sid = params.get("session_id")
+                if sid:
+                    add_result = self.roster_add(sid, member_id, override_settings=True)
+                    if add_result.get("success"):
+                        action_taken = "add_session"
+                        action_data = add_result
+            except Exception as e:
+                _log.error("Voice add_session error: %s", e)
+
+        elif action == "remove_session":
+            try:
+                sid = params.get("session_id")
+                if sid:
+                    rm_result = self.roster_remove(sid, member_id)
+                    if rm_result.get("success"):
+                        action_taken = "remove_session"
+                        action_data = rm_result
+            except Exception as e:
+                _log.error("Voice remove_session error: %s", e)
+
+        return {
+            "success": True,
+            "transcribed_text": transcribed,
+            "response_text": response_text,
+            "action_taken": action_taken,
+            "action_data": action_data,
         }

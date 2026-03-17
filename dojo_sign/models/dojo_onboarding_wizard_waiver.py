@@ -57,17 +57,30 @@ class DojoOnboardingWizard(models.TransientModel):
         sanitize=False,
     )
 
-    # ── Step order (includes auto_enroll — fixes omission in previous version) ─
-    _STEP_ORDER = [
-        "member_info",
-        "household",
-        "guardian_setup",
-        "enrollment",
-        "auto_enroll",
-        "subscription",
-        "waiver",
-        "portal_access",
-    ]
+    # ── Step order ────────────────────────────────────────────────────────────
+    # Defined as a @property so that, when dojo_onboarding_stripe is also
+    # installed (detected via its sentinel field), the 'payment' step is
+    # automatically inserted between 'waiver' and 'portal_access'.
+    # This matters because dojo_sign is loaded *after* dojo_onboarding_stripe
+    # (both depend on dojo_onboarding; alphabetically s > o_s), so a static
+    # class attribute here would clobber the one set by dojo_onboarding_stripe.
+    @property
+    def _STEP_ORDER(self):
+        order = [
+            "member_info",
+            "household",
+            "guardian_setup",
+            "enrollment",
+            "auto_enroll",
+            "subscription",
+            "waiver",
+        ]
+        # Include the Stripe payment-capture step when dojo_onboarding_stripe
+        # is installed (it adds stripe_payment_method_id to the wizard fields).
+        if "stripe_payment_method_id" in self._fields:
+            order.append("payment")
+        order.append("portal_access")
+        return order
 
     # ── Compute ───────────────────────────────────────────────────────────────
     def _compute_waiver_preview_html(self):

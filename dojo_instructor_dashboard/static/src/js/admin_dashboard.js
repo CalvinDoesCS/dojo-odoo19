@@ -18,6 +18,8 @@ class AdminDashboard extends Component {
             instructors: [],
             droppedStudents: [],
             recentSessions: [],
+            recentStudents: [],
+            studentPage: 0,
             // which section is expanded in dropped table
             droppedExpanded: false,
             sessionsExpanded: false,
@@ -51,6 +53,8 @@ class AdminDashboard extends Component {
         this.state.instructors    = data.instructors;
         this.state.droppedStudents = data.dropped_students;
         this.state.recentSessions  = data.recent_sessions;
+        this.state.recentStudents  = data.recent_students || [];
+        this.state.studentPage     = 0;
         this.state.loading        = false;
     }
 
@@ -199,6 +203,42 @@ class AdminDashboard extends Component {
     }
     openCommunications() {
         this.action.doAction("dojo_communications.action_dojo_send_message_wizard");
+    }
+
+    // ── Student carousel ──────────────────────────────────────────────
+    static STUDENT_PAGE_SIZE = 8;
+
+    get visibleStudents() {
+        const ps = AdminDashboard.STUDENT_PAGE_SIZE;
+        return this.state.recentStudents.slice(
+            this.state.studentPage * ps,
+            (this.state.studentPage + 1) * ps
+        );
+    }
+
+    get totalStudentPages() {
+        return Math.max(
+            1,
+            Math.ceil(this.state.recentStudents.length / AdminDashboard.STUDENT_PAGE_SIZE)
+        );
+    }
+
+    prevStudentPage() {
+        if (this.state.studentPage > 0) this.state.studentPage--;
+    }
+
+    nextStudentPage() {
+        if (this.state.studentPage < this.totalStudentPages - 1) this.state.studentPage++;
+    }
+
+    openStudentProfile(memberId) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "dojo.member",
+            res_id: memberId,
+            views: [[false, "form"]],
+            target: "current",
+        });
     }
 }
 

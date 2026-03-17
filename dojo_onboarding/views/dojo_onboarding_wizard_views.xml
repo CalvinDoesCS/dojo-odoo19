@@ -282,11 +282,13 @@
                     <group string="New Member Account">
                         <field name="create_portal_login"/>
                         <field name="send_welcome_email" invisible="not create_portal_login"/>
+                        <field name="send_welcome_sms" invisible="not create_portal_login"/>
                     </group>
                     <div class="alert alert-info" invisible="not create_portal_login" role="alert">
                         A portal account will be created for <b><field name="name" readonly="1" nolabel="1"/></b>
                         using their email as the login.
-                        They will receive a password-reset email if "Send Welcome Email" is checked.
+                        They will receive a password-reset email if "Send Welcome Email" is checked,
+                        and/or a welcome SMS if "Send Welcome SMS" is checked.
                     </div>
                     <div class="alert alert-warning" invisible="create_portal_login" role="alert">
                         No portal login will be created for the new member. They cannot log in until
@@ -297,6 +299,8 @@
                     <group string="Guardian Account" invisible="not create_new_household or role in ('both', 'parent')">
                         <field name="create_guardian_portal_login"/>
                         <field name="send_guardian_welcome_email"
+                               invisible="not create_guardian_portal_login"/>
+                        <field name="send_guardian_welcome_sms"
                                invisible="not create_guardian_portal_login"/>
                     </group>
                     <div class="alert alert-info"

@@ -9,7 +9,7 @@
         "dojo_attendance",
         "dojo_classes",
         "dojo_members",
-        "dojo_sms_twilio",
+        "sms_twilio",
         "sms",
         "mail",
     ],
