@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_dojo_social_account_list" model="ir.ui.view">
+        <field name="name">dojo.social.account.list</field>
+        <field name="model">dojo.social.account</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="platform"/>
+                <field name="name"/>
+                <field name="page_id"/>
+                <field name="status" widget="badge"
+                    decoration-success="status == 'connected'"
+                    decoration-danger="status == 'error'"
+                    decoration-muted="status == 'disconnected'"/>
+                <field name="post_count" string="Posts"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_social_account_form" model="ir.ui.view">
+        <field name="name">dojo.social.account.form</field>
+        <field name="model">dojo.social.account</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_connect_facebook" string="Connect Facebook"
+                        type="object" class="btn-primary"
+                        invisible="status == 'connected' or platform != 'facebook'"/>
+                    <button name="action_test_connection" string="Test Connection"
+                        type="object"
+                        invisible="not access_token or not page_id"/>
+                    <button name="action_disconnect" string="Disconnect"
+                        type="object" class="btn-secondary"
+                        invisible="status == 'disconnected'"
+                        confirm="Disconnect this account? The stored token will be cleared."/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_posts" type="object"
+                            class="oe_stat_button" icon="fa-newspaper-o"
+                            invisible="post_count == 0">
+                            <field name="post_count" widget="statinfo" string="Posts"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Account Name"/>
+                        </h1>
+                        <div>
+                            <field name="status" widget="badge"
+                                decoration-success="status == 'connected'"
+                                decoration-danger="status == 'error'"
+                                decoration-muted="status == 'disconnected'"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group string="Connection">
+                            <field name="platform"/>
+                            <field name="page_id" placeholder="Your Facebook Page ID"/>
+                            <field name="access_token" password="True"/>
+                        </group>
+                        <group string="Status" invisible="not error_message">
+                            <field name="error_message" nolabel="1" class="text-danger"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_dojo_social_account" model="ir.actions.act_window">
+        <field name="name">Social Accounts</field>
+        <field name="res_model">dojo.social.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first social media account
+            </p>
+            <p>
+                Connect a Facebook Page or Instagram Business account to start
+                publishing and scheduling posts directly from Odoo.
+            </p>
+        </field>
+    </record>
+
+</odoo>

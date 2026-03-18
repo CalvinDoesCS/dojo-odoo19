@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_dojo_social_root"
+        name="Social Media"
+        sequence="60"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
+
+    <menuitem id="menu_dojo_social_posts"
+        name="Posts"
+        parent="menu_dojo_social_root"
+        action="action_dojo_social_post"
+        sequence="10"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem id="menu_dojo_social_accounts"
+        name="Accounts"
+        parent="menu_dojo_social_root"
+        action="action_dojo_social_account"
+        sequence="20"
+        groups="dojo_base.group_dojo_admin"/>
+
+</odoo>

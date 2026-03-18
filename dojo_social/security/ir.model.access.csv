@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_dojo_social_account_admin,dojo.social.account admin,model_dojo_social_account,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_social_account_instructor,dojo.social.account instructor,model_dojo_social_account,dojo_base.group_dojo_instructor,1,0,0,0
+access_dojo_social_post_admin,dojo.social.post admin,model_dojo_social_post,dojo_base.group_dojo_admin,1,1,1,1
+access_dojo_social_post_instructor,dojo.social.post instructor,model_dojo_social_post,dojo_base.group_dojo_instructor,1,0,0,0

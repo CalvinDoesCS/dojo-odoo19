@@ -41,6 +41,9 @@ _AUTO_EXECUTE_INTENTS = {
     "subscription_lookup",
     "attendance_history",
     "schedule_today",
+    "at_risk_members",
+    "campaign_lookup",
+    "marketing_card_lookup",
     "unknown",
 }
 
@@ -55,6 +58,11 @@ _KNOWN_INTENT_TYPES = {
     "class_create", "class_cancel",
     "course_enroll", "belt_test_register",
     "undo_action", "unknown",
+    # Extended intents
+    "subscription_pause", "subscription_resume",
+    "at_risk_members", "campaign_lookup", "marketing_card_lookup",
+    "campaign_create", "campaign_activate",
+    "social_post_create", "social_post_schedule",
 }
 
 
@@ -1001,6 +1009,17 @@ class AiAssistantService(models.AbstractModel):
             # Special intents
             "undo_action": self._handle_undo_action,
             "unknown": self._handle_unknown,
+
+            # Extended intents
+            "subscription_pause": self._handle_subscription_pause,
+            "subscription_resume": self._handle_subscription_resume,
+            "at_risk_members": self._handle_at_risk_members,
+            "campaign_lookup": self._handle_campaign_lookup,
+            "marketing_card_lookup": self._handle_marketing_card_lookup,
+            "campaign_create": self._handle_campaign_create,
+            "campaign_activate": self._handle_campaign_activate,
+            "social_post_create": self._handle_social_post_create,
+            "social_post_schedule": self._handle_social_post_schedule,
         }
 
         handler = handlers.get(intent_type, self._handle_unknown)
@@ -1808,6 +1827,243 @@ class AiAssistantService(models.AbstractModel):
             "success": False,
             "error": "I'm not sure what action you want. Could you please rephrase?",
             "data": None,
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Extended Intent Handlers
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _handle_at_risk_members(self, intent_data, resolved_data, action_log):
+        """Return active members who haven't attended in N days."""
+        from datetime import datetime, timedelta
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        days = int(params.get("days", 14))
+        cutoff = datetime.now() - timedelta(days=days)
+
+        members = self.env["dojo.member"].search([("status", "=", "active")])
+        at_risk = []
+        for m in members:
+            last = self.env["dojo.attendance"].search(
+                [("member_id", "=", m.id)], order="check_in desc", limit=1
+            )
+            if not last or last.check_in < cutoff:
+                days_ago = (datetime.now() - last.check_in).days if last else None
+                at_risk.append({
+                    "name": m.name,
+                    "days_since_visit": days_ago if days_ago is not None else "never",
+                })
+
+        if not at_risk:
+            return {"success": True, "message": f"No members missing for more than {days} days.", "data": []}
+
+        lines = [f"• {r['name']} — {r['days_since_visit']} days ago" for r in at_risk]
+        return {
+            "success": True,
+            "message": f"{len(at_risk)} members haven't been in for {days}+ days:\n" + "\n".join(lines),
+            "data": at_risk,
+        }
+
+    @api.model
+    def _handle_campaign_lookup(self, intent_data, resolved_data, action_log):
+        """Return recent campaign stats."""
+        Campaign = self.env.get("dojo.marketing.campaign")
+        if not Campaign:
+            return {"success": False, "error": "Marketing module is not installed."}
+
+        campaigns = Campaign.search([], order="last_sent_date desc", limit=5)
+        if not campaigns:
+            return {"success": True, "message": "No campaigns found.", "data": []}
+
+        lines = []
+        for c in campaigns:
+            lines.append(f"• {c.name}: {c.sent_count} sent, last on {c.last_sent_date or 'never'}")
+        return {
+            "success": True,
+            "message": "Recent campaigns:\n" + "\n".join(lines),
+            "data": [{"name": c.name, "sent_count": c.sent_count} for c in campaigns],
+        }
+
+    @api.model
+    def _handle_marketing_card_lookup(self, intent_data, resolved_data, action_log):
+        """Return marketing cards published to the kiosk."""
+        Card = self.env.get("dojo.marketing.card")
+        if not Card:
+            return {"success": False, "error": "Marketing module is not installed."}
+
+        cards = Card.search([("publish_kiosk", "=", True)])
+        if not cards:
+            return {"success": True, "message": "No marketing cards are currently on the kiosk.", "data": []}
+
+        lines = [f"• {c.name} ({c.card_type})" for c in cards]
+        return {
+            "success": True,
+            "message": f"{len(cards)} card(s) on the kiosk:\n" + "\n".join(lines),
+            "data": [{"name": c.name, "type": c.card_type} for c in cards],
+        }
+
+    @api.model
+    def _handle_subscription_pause(self, intent_data, resolved_data, action_log):
+        """Pause a member's active subscription."""
+        member_id = resolved_data.get("member_id")
+        if not member_id:
+            return {"success": False, "error": "Could not identify the member."}
+
+        sub = self.env["dojo.subscription"].search(
+            [("member_id", "=", member_id), ("state", "=", "active")], limit=1
+        )
+        if not sub:
+            return {"success": False, "error": "No active subscription found for this member."}
+
+        self._save_undo_snapshot(action_log, "dojo.subscription", sub.id, {"state": sub.state})
+        sub.write({"state": "paused"})
+        member = self.env["dojo.member"].browse(member_id)
+        return {
+            "success": True,
+            "message": f"Paused {member.name}'s subscription ({sub.plan_id.name if sub.plan_id else 'subscription'}).",
+            "data": {"subscription_id": sub.id},
+        }
+
+    @api.model
+    def _handle_subscription_resume(self, intent_data, resolved_data, action_log):
+        """Resume a member's paused subscription."""
+        member_id = resolved_data.get("member_id")
+        if not member_id:
+            return {"success": False, "error": "Could not identify the member."}
+
+        sub = self.env["dojo.subscription"].search(
+            [("member_id", "=", member_id), ("state", "=", "paused")], limit=1
+        )
+        if not sub:
+            return {"success": False, "error": "No paused subscription found for this member."}
+
+        self._save_undo_snapshot(action_log, "dojo.subscription", sub.id, {"state": sub.state})
+        sub.write({"state": "active"})
+        member = self.env["dojo.member"].browse(member_id)
+        return {
+            "success": True,
+            "message": f"Resumed {member.name}'s subscription.",
+            "data": {"subscription_id": sub.id},
+        }
+
+    @api.model
+    def _handle_campaign_create(self, intent_data, resolved_data, action_log):
+        """Create a new marketing campaign in draft state."""
+        Campaign = self.env.get("dojo.marketing.campaign")
+        if not Campaign:
+            return {"success": False, "error": "Marketing module is not installed."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        name = params.get("campaign_name", "New Campaign")
+        send_email = params.get("send_email", True)
+        send_sms = params.get("send_sms", False)
+
+        campaign = Campaign.create({
+            "name": name,
+            "send_email": send_email,
+            "send_sms": send_sms,
+            "state": "draft",
+        })
+        self._save_undo_snapshot(action_log, "dojo.marketing.campaign", campaign.id, None)
+        return {
+            "success": True,
+            "message": f"Created campaign '{name}' in draft state. Activate it when ready to send.",
+            "data": {"campaign_id": campaign.id, "name": name},
+        }
+
+    @api.model
+    def _handle_campaign_activate(self, intent_data, resolved_data, action_log):
+        """Activate a draft marketing campaign."""
+        Campaign = self.env.get("dojo.marketing.campaign")
+        if not Campaign:
+            return {"success": False, "error": "Marketing module is not installed."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        name = params.get("campaign_name", "")
+        campaign_id = resolved_data.get("campaign_id")
+
+        if campaign_id:
+            campaign = Campaign.browse(campaign_id)
+        elif name:
+            campaign = Campaign.search([("name", "ilike", name), ("state", "=", "draft")], limit=1)
+        else:
+            campaign = Campaign.search([("state", "=", "draft")], order="id desc", limit=1)
+
+        if not campaign:
+            return {"success": False, "error": "No draft campaign found to activate."}
+
+        campaign.action_activate()
+        return {
+            "success": True,
+            "message": f"Campaign '{campaign.name}' is now active and will send on the next scheduled run.",
+            "data": {"campaign_id": campaign.id},
+        }
+
+    @api.model
+    def _handle_social_post_create(self, intent_data, resolved_data, action_log):
+        """Create and immediately publish a social post."""
+        Post = self.env.get("dojo.social.post")
+        if not Post:
+            return {"success": False, "error": "Social media module is not installed."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        message = params.get("message", "")
+        account_id = resolved_data.get("social_account_id")
+
+        if not message:
+            return {"success": False, "error": "No post message provided."}
+
+        account = self.env["dojo.social.account"].browse(account_id) if account_id else \
+            self.env["dojo.social.account"].search([("status", "=", "connected")], limit=1)
+
+        if not account:
+            return {"success": False, "error": "No connected social account found."}
+
+        post = Post.create({"message": message, "account_id": account.id})
+        try:
+            post.action_post_now()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+        return {
+            "success": True,
+            "message": f"Posted to {account.name}: '{message[:60]}...'",
+            "data": {"post_id": post.id},
+        }
+
+    @api.model
+    def _handle_social_post_schedule(self, intent_data, resolved_data, action_log):
+        """Create a scheduled social post."""
+        Post = self.env.get("dojo.social.post")
+        if not Post:
+            return {"success": False, "error": "Social media module is not installed."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        message = params.get("message", "")
+        scheduled_date = params.get("scheduled_date")
+        account_id = resolved_data.get("social_account_id")
+
+        if not message:
+            return {"success": False, "error": "No post message provided."}
+        if not scheduled_date:
+            return {"success": False, "error": "No scheduled date provided."}
+
+        account = self.env["dojo.social.account"].browse(account_id) if account_id else \
+            self.env["dojo.social.account"].search([("status", "=", "connected")], limit=1)
+
+        if not account:
+            return {"success": False, "error": "No connected social account found."}
+
+        post = Post.create({
+            "message": message,
+            "account_id": account.id,
+            "scheduled_date": scheduled_date,
+            "state": "scheduled",
+        })
+        return {
+            "success": True,
+            "message": f"Scheduled post to {account.name} for {scheduled_date}: '{message[:60]}'",
+            "data": {"post_id": post.id},
         }
 
     # ═══════════════════════════════════════════════════════════════════════════

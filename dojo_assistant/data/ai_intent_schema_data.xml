@@ -606,4 +606,217 @@ Sign Mike up for his yellow stripe belt test</field>
         <field name="active">True</field>
     </record>
 
+    <!-- ── Extended Intents ──────────────────────────────────────────────── -->
+
+    <record id="intent_at_risk_members" model="dojo.ai.intent.schema">
+        <field name="intent_type">at_risk_members</field>
+        <field name="name">At-Risk Members</field>
+        <field name="description">Find active members who have not attended in a given number of days</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "days": {"type": "integer", "description": "Number of days of inactivity threshold (default 14)"}
+    },
+    "required": []
+}</field>
+        <field name="example_phrases">Who hasn't been in for 2 weeks?
+Show me at-risk members
+Which members are inactive?
+Who hasn't come in lately?</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_campaign_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">campaign_lookup</field>
+        <field name="name">Campaign Stats Lookup</field>
+        <field name="description">Look up recent marketing campaign statistics including how many people were reached</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "campaign_name": {"type": "string", "description": "Name of a specific campaign to look up, optional"}
+    },
+    "required": []
+}</field>
+        <field name="example_phrases">How many people did we reach last campaign?
+Show me campaign stats
+How many emails went out this week?
+What's the status of our campaigns?</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_marketing_card_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">marketing_card_lookup</field>
+        <field name="name">Marketing Card Lookup</field>
+        <field name="description">List marketing cards currently published on the kiosk</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {},
+    "required": []
+}</field>
+        <field name="example_phrases">What marketing cards are on the kiosk?
+Show me active marketing cards
+What's being shown on the kiosk right now?</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_subscription_pause" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_pause</field>
+        <field name="name">Pause Subscription</field>
+        <field name="description">Pause a member's active subscription</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="example_phrases">Pause Alex's membership
+Put Sarah's subscription on hold
+Suspend John's membership temporarily</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Pause {member_name}'s active subscription?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_subscription_resume" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_resume</field>
+        <field name="name">Resume Subscription</field>
+        <field name="description">Resume a member's paused subscription</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="example_phrases">Resume Alex's membership
+Reactivate Sarah's subscription
+Unpause John's membership</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Resume {member_name}'s paused subscription?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_campaign_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">campaign_create</field>
+        <field name="name">Create Campaign</field>
+        <field name="description">Create a new marketing campaign targeting members</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "campaign_name": {"type": "string", "description": "Name of the campaign"},
+        "send_email": {"type": "boolean", "description": "Whether to send emails (default true)"},
+        "send_sms": {"type": "boolean", "description": "Whether to send SMS (default false)"}
+    },
+    "required": ["campaign_name"]
+}</field>
+        <field name="example_phrases">Create a campaign for all active members
+Set up a summer camp email blast
+Create a new SMS campaign called Back to School</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Create a new campaign called '{campaign_name}'?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_campaign_activate" model="dojo.ai.intent.schema">
+        <field name="intent_type">campaign_activate</field>
+        <field name="name">Activate Campaign</field>
+        <field name="description">Activate a draft marketing campaign so it will send on the next scheduled run</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "campaign_name": {"type": "string", "description": "Name of the campaign to activate"}
+    },
+    "required": []
+}</field>
+        <field name="example_phrases">Send the summer camp campaign now
+Activate the welcome campaign
+Launch our back to school campaign</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Activate campaign '{campaign_name}' and queue it for sending?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_social_post_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">social_post_create</field>
+        <field name="name">Create Social Post</field>
+        <field name="description">Publish a post immediately to a connected Facebook or Instagram account</field>
+        <field name="category">social</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "message": {"type": "string", "description": "The post message text"},
+        "platform": {"type": "string", "enum": ["facebook", "instagram"], "description": "Platform to post to"}
+    },
+    "required": ["message"]
+}</field>
+        <field name="example_phrases">Post our summer announcement on Facebook
+Publish a post about belt testing
+Share our new schedule on social media</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Post '{message}' to social media now?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_social_post_schedule" model="dojo.ai.intent.schema">
+        <field name="intent_type">social_post_schedule</field>
+        <field name="name">Schedule Social Post</field>
+        <field name="description">Schedule a social media post to be published at a future date and time</field>
+        <field name="category">social</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "message": {"type": "string", "description": "The post message text"},
+        "scheduled_date": {"type": "string", "format": "date-time", "description": "When to publish (ISO 8601)"},
+        "platform": {"type": "string", "enum": ["facebook", "instagram"], "description": "Platform to post to"}
+    },
+    "required": ["message", "scheduled_date"]
+}</field>
+        <field name="example_phrases">Schedule a post for next Monday about belt testing
+Queue a Facebook post for Friday about summer camp
+Schedule our promotion post for Saturday morning</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Schedule post '{message}' for {scheduled_date}?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
 </odoo>
