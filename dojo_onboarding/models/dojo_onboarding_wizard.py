@@ -154,12 +154,14 @@ class DojoOnboardingWizard(models.TransientModel):
     plan_billing_period = fields.Selection(
         related='plan_id.billing_period', readonly=True, string='Billing Period',
     )
-    plan_sessions_per_period = fields.Integer(
-        related='plan_id.sessions_per_period', readonly=True, string='Sessions / Period',
+    plan_credits_per_period = fields.Integer(
+        compute='_compute_plan_credits_per_period', string='Credits / Billing Cycle',
     )
-    plan_unlimited_sessions = fields.Boolean(
-        related='plan_id.unlimited_sessions', readonly=True,
-    )
+
+    @api.depends('plan_id')
+    def _compute_plan_credits_per_period(self):
+        for rec in self:
+            rec.plan_credits_per_period = getattr(rec.plan_id, 'credits_per_period', 0) or 0
     plan_description = fields.Text(
         related='plan_id.description', readonly=True, string='Plan Notes',
     )
@@ -400,10 +402,17 @@ class DojoOnboardingWizard(models.TransientModel):
         # ── Subscription (required) — must be created BEFORE session/template
         # enrollments so the subscription constraint can validate new enrolments.
         # ─────────────────────────────────────────────────────────────────────
+        existing_hh_path = not self.create_new_household and bool(self.household_id)
+        sub = None
         if self.plan_id:
             sub_start = self.subscription_start_date or fields.Date.today()
-            sub_state = 'pending' if self.defer_payment else 'active'
-            self.env['dojo.member.subscription'].create({
+            if existing_hh_path:
+                # Existing household: always create as pending and invoice the guardian.
+                # Subscription activates automatically when the invoice is paid.
+                sub_state = 'pending'
+            else:
+                sub_state = 'pending' if self.defer_payment else 'active'
+            sub = self.env['dojo.member.subscription'].create({
                 'member_id': member.id,
                 'plan_id': self.plan_id.id,
                 'start_date': sub_start,
@@ -411,8 +420,12 @@ class DojoOnboardingWizard(models.TransientModel):
                 'state': sub_state,
                 'company_id': self.env.company.id,
             })
-        # Transition membership state — stay as lead when payment is deferred
-        if not self.defer_payment:
+            if existing_hh_path:
+                # Generate an invoice for the household guardian immediately.
+                sub.action_generate_invoice()
+        # Transition membership state — immediately for new-household paths only.
+        # For existing households the payment hook activates the member when paid.
+        if not existing_hh_path and not self.defer_payment:
             member.action_set_active()
 
         # ── Program enrollment — access is now controlled by subscription ─────

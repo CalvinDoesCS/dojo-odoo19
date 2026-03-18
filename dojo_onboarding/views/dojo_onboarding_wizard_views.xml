@@ -251,21 +251,27 @@
                                options="{'currency_field': 'plan_currency_id'}"
                                readonly="1"/>
                         <field name="plan_billing_period" readonly="1"/>
-                        <field name="plan_sessions_per_period" readonly="1"
-                               invisible="plan_unlimited_sessions"/>
-                        <field name="plan_unlimited_sessions" invisible="1"/>
-                        <div class="text-muted small" invisible="not plan_unlimited_sessions" colspan="2">
-                            Unlimited sessions included per billing period.
+                        <field name="plan_credits_per_period" readonly="1"
+                               invisible="plan_credits_per_period == 0"
+                               string="Credits / Billing Cycle"/>
+                        <div class="text-muted small" invisible="plan_credits_per_period != 0" colspan="2">
+                            <b>Credits / Billing Cycle:</b> Unlimited
                         </div>
                         <field name="plan_description" readonly="1" widget="text"
                                invisible="not plan_description"/>
                     </group>
                     <div class="alert alert-info py-2 px-3"
-                         invisible="not plan_id"
+                         invisible="not plan_id or not create_new_household"
                          colspan="2" role="alert">
                         <i class="fa fa-credit-card me-2" title="Payment"/>
                         Payment is collected on the next step.
                         You can enter a card to charge immediately, or choose <b>Send Invoice</b> to email the member an invoice — credits are only issued once payment is received.
+                    </div>
+                    <div class="alert alert-info py-2 px-3"
+                         invisible="not plan_id or create_new_household"
+                         colspan="2" role="alert">
+                        <i class="fa fa-envelope me-2" title="Invoice"/>
+                        An invoice will be sent to the household guardian to pay. The subscription activates automatically once payment is received.
                     </div>
                 </group>
 
