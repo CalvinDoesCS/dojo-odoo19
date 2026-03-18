@@ -2,7 +2,7 @@
 <odoo>
 
     <record id="action_dojo_class_templates" model="ir.actions.act_window">
-        <field name="name">Class Templates</field>
+        <field name="name">Courses</field>
         <field name="res_model">dojo.class.template</field>
         <field name="view_mode">list,form</field>
     </record>
@@ -32,7 +32,7 @@
     />
     <menuitem id="menu_dojo_programs" name="Programs" parent="menu_dojo_classes_root" action="action_dojo_programs" sequence="5"/>
     <menuitem id="menu_dojo_class_sessions" name="Sessions" parent="menu_dojo_classes_root" action="action_dojo_class_sessions" sequence="10"/>
-    <menuitem id="menu_dojo_class_templates" name="Templates" parent="menu_dojo_classes_root" action="action_dojo_class_templates" sequence="20"/>
+    <menuitem id="menu_dojo_class_templates" name="Courses" parent="menu_dojo_classes_root" action="action_dojo_class_templates" sequence="20"/>
     <menuitem id="menu_dojo_class_enrollments" name="Enrollments" parent="menu_dojo_classes_root" action="action_dojo_class_enrollments" sequence="30"/>
     <menuitem id="menu_dojo_classes_configuration" name="Configuration" parent="menu_dojo_classes_root" sequence="100"/>
     <menuitem id="menu_dojo_martial_art_styles" name="Martial Art Styles" parent="menu_dojo_classes_configuration" action="dojo_base.action_dojo_martial_art_styles" sequence="10"/>
@@ -45,7 +45,7 @@
             <list>
                 <field name="name"/>
                 <field name="code"/>
-                <field name="template_count" string="Templates"/>
+                <field name="template_count" string="Courses"/>
                 <field name="active"/>
             </list>
         </field>
@@ -64,7 +64,7 @@
                                 icon="fa-list">
                             <div class="o_stat_info">
                                 <span class="o_stat_value"><field name="template_count"/></span>
-                                <span class="o_stat_text">Templates</span>
+                                <span class="o_stat_text">Courses</span>
                             </div>
                         </button>
                     </div>
@@ -83,7 +83,7 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Class Templates" name="templates">
+                        <page string="Courses" name="templates">
                             <field name="template_ids">
                                 <list>
                                     <field name="name"/>

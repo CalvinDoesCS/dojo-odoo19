@@ -1651,7 +1651,7 @@ class CreateSessionModal extends Component {
                     </t>
                     <t t-else="">
                         <div class="k-field">
-                            <label class="k-field__label">Class Template</label>
+                            <label class="k-field__label">Course</label>
                             <select class="k-field__input" t-on-change="onTemplateChange">
                                 <option value="">— Select a template —</option>
                                 <t t-foreach="state.templates" t-as="tmpl" t-key="tmpl.id">

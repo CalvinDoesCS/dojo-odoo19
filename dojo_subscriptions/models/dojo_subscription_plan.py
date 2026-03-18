@@ -53,7 +53,7 @@ class DojoSubscriptionPlan(models.Model):
         help=(
             "Program-Based: member may attend any class that belongs to the selected program "
             "(subject to weekly session cap).\n"
-            "Course-Based: member may only attend the specific class templates listed below "
+            "Course-Based: member may only attend the specific courses listed below "
             "(subject to weekly and period caps)."
         ),
     )
@@ -75,7 +75,7 @@ class DojoSubscriptionPlan(models.Model):
         'template_id',
         string='Allowed Courses',
         help=(
-            'Course-Based plans only. Which class templates members may enrol in. '
+            'Course-Based plans only. Which courses members may enrol in. '
             'Leave empty to allow any class (session-cap rules still apply).'
         ),
     )

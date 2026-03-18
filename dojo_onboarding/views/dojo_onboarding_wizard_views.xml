@@ -177,7 +177,7 @@
                                string="Classes *"
                                domain="[('program_id', '=', program_id)]"
                                placeholder="Add to class rosters for this program…"
-                               help="Add this member to recurring class template rosters. The next step lets you choose which days to auto-enrol."/>
+                               help="Add this member to recurring course rosters. The next step lets you choose which days to auto-enrol."/>
                     </group>
                     <group colspan="2" invisible="not template_ids">
                         <field name="session_ids" widget="many2many_tags"

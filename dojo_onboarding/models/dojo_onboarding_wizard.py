@@ -88,7 +88,7 @@ class DojoOnboardingWizard(models.TransientModel):
     template_ids = fields.Many2many(
         'dojo.class.template',
         string='Add to Class Rosters',
-        help='Add this member to recurring class template rosters so they are auto-enrolled in future sessions.',
+        help='Add this member to recurring course rosters so they are auto-enrolled in future sessions.',
     )
     session_ids = fields.Many2many(
         'dojo.class.session',
