@@ -63,7 +63,7 @@
                 </button>
             </t>
 
-            <!-- ── Skip option ─────────────────────────────────────────── -->
+            <!-- ── Send Invoice option ──────────────────────────────────── -->
             <div class="mt-3 pt-3 border-top" t-if="state.status !== 'done'">
                 <div class="form-check">
                     <input
@@ -74,15 +74,15 @@
                         t-on-change="onSkipChange"
                     />
                     <label class="form-check-label fw-medium" for="skip-stripe-payment">
-                        Skip — collect payment method later
+                        Send Invoice — skip card capture for now
                     </label>
                 </div>
-                <div class="alert alert-warning py-2 px-3 mt-2 small"
+                <div class="alert alert-info py-2 px-3 mt-2 small"
                      t-if="props.record.data.skip_payment">
-                    <i class="fa fa-exclamation-triangle me-2"/>
-                    The guardian will need to add their card at
-                    <code>/my/payment_method</code> after signing into the portal.
-                    The first invoice will not be charged until a card is on file.
+                    <i class="fa fa-envelope me-2"/>
+                    An invoice will be emailed to the billing contact after onboarding.
+                    The subscription will be activated and credits issued once payment is received.
+                    The guardian can add a card later via the portal.
                 </div>
             </div>
 

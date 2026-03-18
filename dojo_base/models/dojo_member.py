@@ -23,7 +23,7 @@ class DojoMember(models.Model):
         [
             ("student", "Student"),
             ("parent", "Parent"),
-            ("both", "Student & Parent"),
+            ("both", "Standalone"),
         ],
         default="student",
         required=True,

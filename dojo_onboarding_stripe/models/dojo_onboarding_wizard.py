@@ -42,7 +42,7 @@ class DojoOnboardingWizard(models.TransientModel):
     stripe_card_display = fields.Char(readonly=True)
     stripe_customer_id = fields.Char(readonly=True)  # created in get_setup_intent
     payment_captured = fields.Boolean(default=False)
-    skip_payment = fields.Boolean(string='Skip — collect payment method later', default=False)
+    skip_payment = fields.Boolean(string='Send Invoice — skip card capture for now', default=False)
 
     # ── Override step order to insert 'payment' before 'portal_access' ───
     _STEP_ORDER = [
@@ -64,17 +64,23 @@ class DojoOnboardingWizard(models.TransientModel):
             if not self.payment_captured and not self.skip_payment:
                 raise UserError(_(
                     'Please save a payment method, or check '
-                    '"Skip — collect payment method later" to continue.'
+                    '"Send Invoice" to email the member an invoice instead.'
                 ))
         return super().action_next()
 
     # ── Override confirm to attach PM and charge first invoice ────────────
     def action_confirm(self):
-        """Run base confirm, then attach Stripe PM and charge first invoice."""
+        """Run base confirm, then attach Stripe PM and charge, or send a pending invoice."""
+        # Signal the base wizard to create the subscription as pending when skipping payment
+        if self.skip_payment:
+            self.defer_payment = True
+
         result = super().action_confirm()
 
         if self.stripe_payment_method_id and not self.skip_payment:
             self._attach_stripe_payment_and_charge()
+        elif self.skip_payment:
+            self._send_pending_invoice()
 
         return result
 
@@ -84,6 +90,41 @@ class DojoOnboardingWizard(models.TransientModel):
             [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
             limit=1,
         )
+
+    def _send_pending_invoice(self):
+        """Generate and email the first invoice for a pending (pay-by-invoice) subscription.
+
+        The subscription was created as 'pending' by the base wizard because
+        defer_payment=True. No credits are issued here — they fire via the
+        write() hook when an admin activates the subscription after payment.
+        """
+        self.ensure_one()
+        member = self.created_member_id
+        if not member:
+            return
+        subscription = self.env['dojo.member.subscription'].sudo().search(
+            [('member_id', '=', member.id), ('state', '=', 'pending')],
+            limit=1,
+            order='create_date desc',
+        )
+        if not subscription:
+            _logger.warning(
+                'dojo_onboarding_stripe: no pending subscription found for member %s — '
+                'invoice not sent.', member.id,
+            )
+            return
+        try:
+            subscription.action_generate_invoice()
+            _logger.info(
+                'dojo_onboarding_stripe: invoice generated and emailed for '
+                'pending subscription %s (member %s).',
+                subscription.id, member.id,
+            )
+        except Exception as exc:
+            _logger.error(
+                'dojo_onboarding_stripe: failed to generate invoice for '
+                'pending subscription %s: %s', subscription.id, exc,
+            )
 
     def _attach_stripe_payment_and_charge(self):
         """

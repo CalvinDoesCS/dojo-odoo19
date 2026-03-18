@@ -11,7 +11,7 @@
     </record>
 
     <record id="group_dojo_parent_student" model="res.groups">
-        <field name="name">Dojo Parent/Student</field>
+        <field name="name">Dojang Standalone</field>
         <field name="implied_ids" eval="[(4, ref('base.group_portal'))]"/>
     </record>
 

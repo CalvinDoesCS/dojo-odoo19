@@ -8,7 +8,7 @@ class ResUsers(models.Model):
         [
             ("admin", "Dojang Admin"),
             ("instructor", "Instructor"),
-            ("parent_student", "Student/Parent"),
+            ("parent_student", "Standalone"),
             ("other", "Other"),
         ],
         compute="_compute_dojo_role",

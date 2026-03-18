@@ -85,7 +85,7 @@
                                 <span class="dojo-chip dojo-chip--accent">Parent</span>
                             </t>
                             <t t-elif="member.role == 'both'">
-                                <span class="dojo-chip dojo-chip--success">Student &amp; Parent</span>
+                                <span class="dojo-chip dojo-chip--success">Standalone</span>
                             </t>
                             <t t-else="">
                                 <span class="dojo-chip dojo-chip--neutral">Student</span>

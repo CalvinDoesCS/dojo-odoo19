@@ -172,6 +172,30 @@ class DojoMemberSubscriptionCreditExtend(models.Model):
 
     # ── State-change hook: issue credits on activation ────────────────────
 
+    def _issue_activation_credits(self):
+        """Issue first-period credits if the subscription is active and has no transactions yet."""
+        for rec in self:
+            if rec.state != "active":
+                continue
+            credits_per_period = getattr(rec.plan_id, "credits_per_period", 0)
+            if not credits_per_period:
+                continue
+            if rec.transaction_ids:
+                continue
+            try:
+                rec._issue_period_credits()
+            except Exception:
+                _logger.exception(
+                    "Failed to issue activation credits for subscription %s", rec.id
+                )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Issue initial period credits when a subscription is created already active."""
+        records = super().create(vals_list)
+        records._issue_activation_credits()
+        return records
+
     def write(self, vals):
         """Issue initial period credits when a subscription becomes active."""
         # Identify records that are transitioning → 'active'
@@ -181,26 +205,15 @@ class DojoMemberSubscriptionCreditExtend(models.Model):
             else self.browse()
         )
         result = super().write(vals)
-        for rec in activating:
-            plan = rec.plan_id
-            credits_per_period = getattr(plan, "credits_per_period", 0)
-            if not credits_per_period:
-                continue
-            # Only issue if no transactions exist yet (avoid double-granting)
-            if rec.transaction_ids:
-                continue
-            try:
-                rec._issue_period_credits()
-            except Exception:
-                _logger.exception(
-                    "Failed to issue activation credits for subscription %s", rec.id
-                )
+        activating._issue_activation_credits()
         return result
 
     def action_generate_invoice(self):
-        """Issue period credits after the invoice is created."""
+        """Issue period credits after the invoice is created — only for active subscriptions."""
         result = super().action_generate_invoice()
         for rec in self:
+            if rec.state != 'active':
+                continue
             try:
                 rec._issue_period_credits()
             except Exception:
@@ -210,9 +223,11 @@ class DojoMemberSubscriptionCreditExtend(models.Model):
         return result
 
     def _generate_household_invoice(self, subscriptions, today):
-        """Issue period credits for every subscription in the household batch."""
+        """Issue period credits for every active subscription in the household batch."""
         result = super()._generate_household_invoice(subscriptions, today)
         for sub in subscriptions:
+            if sub.state != 'active':
+                continue
             try:
                 sub._issue_period_credits()
             except Exception:

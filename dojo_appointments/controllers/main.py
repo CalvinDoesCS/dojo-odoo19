@@ -102,9 +102,9 @@ class DojoAppointmentController(http.Controller):
                 }
             )
         else:
-            # Update mobile if not yet set
-            if mobile and not partner.mobile:
-                partner.write({"mobile": mobile})
+            # Update phone if not yet set
+            if mobile and not partner.phone:
+                partner.write({"phone": mobile})
 
         # --- Find or create crm.lead ---
         trial_booked_stage = (

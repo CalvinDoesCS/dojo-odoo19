@@ -261,17 +261,11 @@
                                invisible="not plan_description"/>
                     </group>
                     <div class="alert alert-info py-2 px-3"
-                         invisible="not plan_id or not create_new_household"
+                         invisible="not plan_id"
                          colspan="2" role="alert">
                         <i class="fa fa-credit-card me-2" title="Payment"/>
-                        A payment method will be collected on the next step.
-                        Your card will be invoiced for the enrollment fee and the recurring subscription fee.
-                    </div>
-                    <div class="alert alert-success py-2 px-3"
-                         invisible="not plan_id or create_new_household"
-                         colspan="2" role="alert">
-                        <i class="fa fa-check-circle me-2" title="Payment on file"/>
-                        This household already has a payment method on file. No additional payment setup is needed.
+                        Payment is collected on the next step.
+                        You can enter a card to charge immediately, or choose <b>Send Invoice</b> to email the member an invoice — credits are only issued once payment is received.
                     </div>
                 </group>
 

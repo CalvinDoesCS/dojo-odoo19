@@ -1269,7 +1269,7 @@ class DojoKioskService(models.AbstractModel):
 
             try:
                 if send_sms:
-                    phone = partner.mobile or partner.phone
+                    phone = getattr(partner, 'mobile', None) or partner.phone
                     if phone:
                         self.env["sms.sms"].create({
                             "number": phone,

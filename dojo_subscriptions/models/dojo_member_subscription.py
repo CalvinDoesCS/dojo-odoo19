@@ -41,6 +41,7 @@ class DojoMemberSubscription(models.Model):
     state = fields.Selection(
         [
             ("draft", "Draft"),
+            ("pending", "Pending Payment"),
             ("active", "Active"),
             ("paused", "Paused"),
             ("cancelled", "Cancelled"),
@@ -536,7 +537,7 @@ class DojoMemberSubscription(models.Model):
                         'deactivated_date': today,
                     })
 
-            elif new_state == 'active' and old_state in ('expired', 'paused', 'cancelled', 'draft'):
+            elif new_state == 'active' and old_state in ('expired', 'paused', 'cancelled', 'draft', 'pending'):
                 # Reactivate the enrollment(s) belonging to this subscription
                 enrollments = Enrollment.search([
                     ('subscription_id', '=', rec.id),

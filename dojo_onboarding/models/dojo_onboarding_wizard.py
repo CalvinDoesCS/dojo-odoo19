@@ -31,7 +31,7 @@ class DojoOnboardingWizard(models.TransientModel):
         selection=[
             ('student', 'Student'),
             ('parent', 'Parent'),
-            ('both', 'Parent & Student'),
+            ('both', 'Standalone'),
         ],
         default='student',
         required=True,
@@ -53,7 +53,7 @@ class DojoOnboardingWizard(models.TransientModel):
     new_guardian_role = fields.Selection(
         selection=[
             ('parent', 'Parent'),
-            ('both', 'Parent & Student'),
+            ('both', 'Standalone'),
         ],
         default='parent',
         string='Guardian Role',
@@ -162,6 +162,13 @@ class DojoOnboardingWizard(models.TransientModel):
     )
     plan_description = fields.Text(
         related='plan_id.description', readonly=True, string='Plan Notes',
+    )
+    defer_payment = fields.Boolean(
+        'Pay Later',
+        default=False,
+        help='Create the subscription as Pending Payment instead of Active. '
+             'No invoice or credits are issued until the admin activates the subscription '
+             'after receiving payment.',
     )
 
     # ── Step 5: Portal Access ────────────────────────────────────────────────
@@ -395,16 +402,18 @@ class DojoOnboardingWizard(models.TransientModel):
         # ─────────────────────────────────────────────────────────────────────
         if self.plan_id:
             sub_start = self.subscription_start_date or fields.Date.today()
+            sub_state = 'pending' if self.defer_payment else 'active'
             self.env['dojo.member.subscription'].create({
                 'member_id': member.id,
                 'plan_id': self.plan_id.id,
                 'start_date': sub_start,
                 'next_billing_date': sub_start,  # first invoice covers sub_start → sub_start+period
-                'state': 'active',
+                'state': sub_state,
                 'company_id': self.env.company.id,
             })
-        # Transition membership state to active
-        member.action_set_active()
+        # Transition membership state — stay as lead when payment is deferred
+        if not self.defer_payment:
+            member.action_set_active()
 
         # ── Program enrollment — access is now controlled by subscription ─────
         # No action needed here; the subscription plan links member to program.
@@ -557,7 +566,7 @@ class DojoOnboardingWizard(models.TransientModel):
     def _send_welcome_sms(self, member):
         """Send a welcome SMS to the member's mobile/phone via sms.sms (Twilio)."""
         partner = member.partner_id
-        number = partner.mobile or partner.phone
+        number = getattr(partner, 'mobile', None) or partner.phone
         if not number:
             return
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')

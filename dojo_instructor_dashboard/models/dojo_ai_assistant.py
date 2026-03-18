@@ -280,6 +280,6 @@ class DojoAiAssistant(models.AbstractModel):
             "member_name": member.name,
             "guardian_name": guardian_partner.name or "",
             "guardian_email": guardian_partner.email or "",
-            "guardian_phone": guardian_partner.phone or guardian_partner.mobile or "",
+            "guardian_phone": guardian_partner.phone or getattr(guardian_partner, 'mobile', None) or "",
         })
         return action

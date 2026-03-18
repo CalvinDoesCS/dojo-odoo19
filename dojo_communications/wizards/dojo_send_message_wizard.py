@@ -84,11 +84,12 @@ class DojoSendMessageWizard(models.TransientModel):
                     sent_emails += 1
 
                 # ---- SMS ----
-                if self.send_sms and partner.mobile:
+                _sms_number = getattr(partner, 'mobile', None) or partner.phone
+                if self.send_sms and _sms_number:
                     body_plain = html2plaintext(self.message_body)
                     self.env["sms.sms"].create(
                         {
-                            "number": partner.mobile,
+                            "number": _sms_number,
                             "body": body_plain,
                             "partner_id": partner.id,
                         }

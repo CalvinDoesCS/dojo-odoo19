@@ -223,7 +223,7 @@
                                     <label class="form-check-label fw-semibold" for="parent_also_trains">
                                         I also train at this Dojang
                                     </label>
-                                    <div class="form-text">Check this if you participate as a student too — your account will be marked as Student &amp; Parent.</div>
+                                    <div class="form-text">Check this if you participate as a student too — your account will be marked as Standalone.</div>
                                 </div>
                             </div>
                         </div>
