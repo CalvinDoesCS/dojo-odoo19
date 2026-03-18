@@ -59,9 +59,9 @@
 
             </xpath>
 
-            <!-- Dojo Class tab — append to the notebook -->
+            <!-- Dojang Class tab — append to the notebook -->
             <xpath expr="//notebook" position="inside">
-                <page string="Dojo Class" name="dojo_class" invisible="not x_session_id">
+                <page string="Dojang Class" name="dojo_class" invisible="not x_session_id">
                     <group>
                         <group string="Session">
                             <field name="x_session_id" readonly="1"/>

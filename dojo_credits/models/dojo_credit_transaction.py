@@ -31,7 +31,7 @@ CANCEL_REFUND_HOURS = 24  # hours before session start to qualify for a refund
 
 class DojoCreditTransaction(models.Model):
     _name = "dojo.credit.transaction"
-    _description = "Dojo Credit Transaction"
+    _description = "Dojang Credit Transaction"
     _order = "date desc, id desc"
     _rec_name = "reference"
 

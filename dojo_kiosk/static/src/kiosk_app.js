@@ -634,7 +634,7 @@ class MemberProfileCard extends Component {
                                 <label class="k-field__label">Subject</label>
                                 <input class="k-field__input" type="text"
                                     t-model="state.msgSubject"
-                                    placeholder="Message from your Dojo"/>
+                                    placeholder="Message from your Dojang"/>
                             </div>
                             <div class="k-field" style="margin-bottom:8px;">
                                 <label class="k-field__label">Message</label>
@@ -813,7 +813,7 @@ class MemberProfileCard extends Component {
             promoteError: "",
             // Manage tab — guardians & messaging
             checkedGuardianIds: [],
-            msgSubject: "Message from your Dojo",
+            msgSubject: "Message from your Dojang",
             msgBody: "",
             msgSendSms: true,
             msgSendEmail: true,
@@ -958,7 +958,7 @@ class MemberProfileCard extends Component {
             const result = await jsonPost("/kiosk/instructor/send_message", {
                 member_id: this.props.member.member_id,
                 guardian_member_ids: this.state.checkedGuardianIds,
-                subject: this.state.msgSubject || "Message from your Dojo",
+                subject: this.state.msgSubject || "Message from your Dojang",
                 message: this.state.msgBody,
                 send_sms: this.state.msgSendSms,
                 send_email: this.state.msgSendEmail,
@@ -2186,7 +2186,7 @@ class KioskApp extends Component {
             <!-- ── Header (single, conditional modifier class) ── -->
             <div t-attf-class="k-header #{state.instructorMode ? 'k-header--instructor' : ''}">
                 <t t-if="state.showTitle">
-                    <span class="k-header__logo">🥋 Dojo</span>
+                    <span class="k-header__logo">🥋 Dojang</span>
                 </t>
 
                 <!-- Student mode: search bar -->

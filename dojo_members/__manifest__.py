@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Members",
+    "name": "Dojang Members",
     "summary": "Members and household management",
     "version": "19.0.1.0.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": ["dojo_base"],
     "data": [
         "security/ir.model.access.csv",

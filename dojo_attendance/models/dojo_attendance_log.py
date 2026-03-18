@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class DojoAttendanceLog(models.Model):
     _name = "dojo.attendance.log"
-    _description = "Dojo Attendance Log"
+    _description = "Dojang Attendance Log"
     _order = "checkin_datetime desc"
     _rec_name = "name"
 

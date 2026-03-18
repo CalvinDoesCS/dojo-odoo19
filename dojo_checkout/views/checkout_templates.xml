@@ -24,7 +24,7 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      STEP 0 — Plan Gallery
 ════════════════════════════════════════════════════════════════════════════ -->
-<template id="checkout_gallery" name="Join Our Dojo">
+<template id="checkout_gallery" name="Join Our Dojang">
     <t t-call="website.layout">
         <div class="dojo-checkout-page container py-5">
             <div class="text-center mb-5">
@@ -221,7 +221,7 @@
                                     <input class="form-check-input" type="checkbox"
                                            id="parent_also_trains" name="parent_also_trains" value="on"/>
                                     <label class="form-check-label fw-semibold" for="parent_also_trains">
-                                        I also train at this dojo
+                                        I also train at this Dojang
                                     </label>
                                     <div class="form-text">Check this if you participate as a student too — your account will be marked as Student &amp; Parent.</div>
                                 </div>
@@ -521,7 +521,7 @@
             </t>
 
             <div class="dojo-complete-icon mb-4" style="font-size:4rem;">🥋</div>
-            <h1 class="fw-bold">Welcome to the dojo!</h1>
+            <h1 class="fw-bold">Welcome to the Dojang!</h1>
             <p class="lead text-muted mt-2 mb-4">
                 Your membership is active. Check your email for your invoice and portal login link.
             </p>

@@ -70,7 +70,7 @@ class DojoWaiverConfig(models.Model):
     """
 
     _name = "dojo.waiver.config"
-    _description = "Dojo Waiver Configuration"
+    _description = "Dojang Waiver Configuration"
 
     name = fields.Char(
         string="Waiver Title",

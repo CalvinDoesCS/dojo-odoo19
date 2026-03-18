@@ -32,7 +32,7 @@ class ProjectTaskDojo(models.Model):
 
     dojo_session_id = fields.Many2one(
         "dojo.class.session",
-        string="Dojo Session",
+        string="Dojang Session",
         ondelete="set null",
         copy=False,
         index=True,

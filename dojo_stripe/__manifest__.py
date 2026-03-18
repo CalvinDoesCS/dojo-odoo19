@@ -1,5 +1,5 @@
 {
-    "name": "Dojo Stripe",
+    "name": "Dojang Stripe",
     "summary": "Stripe Billing (member subscriptions) + Stripe Issuing (employee cards)",
     "description": """
 Provides two distinct Stripe object types:

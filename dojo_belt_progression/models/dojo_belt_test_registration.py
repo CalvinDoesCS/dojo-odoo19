@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoBeltTestRegistration(models.Model):
     _name = "dojo.belt.test.registration"
-    _description = "Dojo Belt Test Registration"
+    _description = "Dojang Belt Test Registration"
 
     test_id = fields.Many2one(
         "dojo.belt.test", required=True, ondelete="cascade", index=True

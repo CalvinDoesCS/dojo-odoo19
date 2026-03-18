@@ -23,7 +23,7 @@ _MAX_PIN_ENTRIES = 500  # evict oldest entry when this size is reached
 
 class DojoKioskService(models.AbstractModel):
     _name = "dojo.kiosk.service"
-    _description = "Dojo Kiosk Service"
+    _description = "Dojang Kiosk Service"
 
     # -------------------------------------------------------------------------
     # Token + bootstrap

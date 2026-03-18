@@ -5,7 +5,7 @@
                 send booking confirmation email + SMS
     -->
     <record id="automation_trial_booked_email" model="base.automation">
-        <field name="name">Dojo CRM: Trial Booked — Send Confirmation</field>
+        <field name="name">Dojang CRM: Trial Booked — Send Confirmation</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
         <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
@@ -26,7 +26,7 @@ for rec in records:
         session_info = ''
         if rec.trial_session_id:
             session_info = f' on {rec.trial_session_id.start_datetime}'
-        body = f"Your trial class at {rec.company_id.name or 'the dojo'} is confirmed{session_info}. See you there!"
+        body = f"Your trial class at {rec.company_id.name or 'the Dojang'} is confirmed{session_info}. See you there!"
         env['sms.sms'].create({
             'number': mobile,
             'body': body,
@@ -42,7 +42,7 @@ for rec in records:
                 send post-trial offer email; set offer_sent_date
     -->
     <record id="automation_trial_attended_offer" model="base.automation">
-        <field name="name">Dojo CRM: Trial Attended — Send Offer</field>
+        <field name="name">Dojang CRM: Trial Attended — Send Offer</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
         <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_attended'))]"/>
@@ -69,7 +69,7 @@ for rec in records:
                 send full membership plan details + CTA email
     -->
     <record id="automation_offer_made_details" model="base.automation">
-        <field name="name">Dojo CRM: Offer Made — Send Plan Details</field>
+        <field name="name">Dojang CRM: Offer Made — Send Plan Details</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
         <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_offer_made'))]"/>

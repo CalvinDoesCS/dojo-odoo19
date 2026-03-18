@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoHousehold(models.Model):
     _name = "dojo.household"
-    _description = "Dojo Household"
+    _description = "Dojang Household"
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(required=True, tracking=True)

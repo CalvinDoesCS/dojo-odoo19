@@ -26,7 +26,7 @@ class DojoSendMessageWizard(models.TransientModel):
         help="Messages will be sent to the primary guardian of each household, "
              "or directly to the member if no household is set.",
     )
-    subject = fields.Char(string="Subject", default="Message from Dojo")
+    subject = fields.Char(string="Subject", default="Message from Dojang")
     message_body = fields.Html(string="Message Body", required=True)
     send_email = fields.Boolean(string="Send Email", default=True)
     send_sms = fields.Boolean(string="Send SMS", default=True)

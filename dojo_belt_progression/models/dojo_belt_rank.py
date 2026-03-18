@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoBeltRank(models.Model):
     _name = "dojo.belt.rank"
-    _description = "Dojo Belt Rank"
+    _description = "Dojang Belt Rank"
     _order = "sequence, name"
 
     name = fields.Char(required=True, string="Rank Name")

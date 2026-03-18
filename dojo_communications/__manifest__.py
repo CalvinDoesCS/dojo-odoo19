@@ -1,8 +1,8 @@
 {
-    "name": "Dojo Communications",
+    "name": "Dojang Communications",
     "version": "19.0.1.0.0",
     "summary": "Automated SMS/email for check-in parent alerts, session reminders, and instructor messaging",
-    "author": "Dojo",
+    "author": "Dojang",
     "category": "Martial Arts",
     "license": "LGPL-3",
     "depends": [

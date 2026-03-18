@@ -1,8 +1,8 @@
 {
-    "name": "Dojo CRM — Lead to Member Pipeline",
+    "name": "Dojang CRM — Lead to Member Pipeline",
     "version": "19.0.1.0.0",
     "summary": "CRM stages, automations, and convert-to-member flow for the trial → subscription pipeline",
-    "author": "Dojo",
+    "author": "Dojang",
     "category": "Martial Arts",
     "license": "LGPL-3",
     "depends": [

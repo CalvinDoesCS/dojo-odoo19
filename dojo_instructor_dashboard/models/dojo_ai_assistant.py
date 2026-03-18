@@ -50,7 +50,7 @@ Keep all answers concise and friendly.
 
 class DojoAiAssistant(models.AbstractModel):
     _name = "dojo.ai.assistant"
-    _description = "Dojo AI Assistant"
+    _description = "Dojang AI Assistant"
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public API

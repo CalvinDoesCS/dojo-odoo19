@@ -5,7 +5,7 @@
          Model: dojo.attendance.log
          ================================================================ -->
     <record id="mail_template_checkin_email" model="mail.template">
-        <field name="name">Dojo: Student Check-In Notification (Email)</field>
+        <field name="name">Dojang: Student Check-In Notification (Email)</field>
         <field name="model_id" ref="dojo_attendance.model_dojo_attendance_log"/>
         <field name="subject">✅ {{ object.member_id.name }} just checked in</field>
         <field name="body_html"><![CDATA[
@@ -41,7 +41,7 @@
          Check-in SMS template  (body_html is rendered then stripped to plain text)
          ================================================================ -->
     <record id="mail_template_checkin_sms" model="mail.template">
-        <field name="name">Dojo: Student Check-In Notification (SMS)</field>
+        <field name="name">Dojang: Student Check-In Notification (SMS)</field>
         <field name="model_id" ref="dojo_attendance.model_dojo_attendance_log"/>
         <field name="subject">Check-In SMS</field>
         <field name="body_html"><![CDATA[{{ object.member_id.name }} checked in to {{ object.session_id.name }} at {{ object.checkin_datetime | time }}. - {{ object.company_id.name }}]]></field>

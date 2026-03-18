@@ -21,7 +21,7 @@
                     <i class="fa fa-tachometer"/>
                 </div>
                 <div>
-                    <div class="o_di_header_title">Dojo Dashboard</div>
+                    <div class="o_di_header_title">Dojang Dashboard</div>
                     <div class="o_di_header_date" t-esc="todayLabel"/>
                 </div>
             </div>

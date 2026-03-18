@@ -5,7 +5,7 @@
          Model: dojo.class.session
          ================================================================ -->
     <record id="mail_template_reminder_email" model="mail.template">
-        <field name="name">Dojo: Upcoming Session Reminder (Email)</field>
+        <field name="name">Dojang: Upcoming Session Reminder (Email)</field>
         <field name="model_id" ref="dojo_classes.model_dojo_class_session"/>
         <field name="subject">Reminder: {{ object.name }} is tomorrow</field>
         <field name="body_html"><![CDATA[
@@ -32,7 +32,7 @@
     <p>We look forward to seeing you!</p>
     <p style="color: #7f8c8d; font-size: 12px;">
         This is an automated reminder from {{ object.company_id.name }}.
-        To unsubscribe from reminders, contact the dojo directly.
+        To unsubscribe from reminders, contact the Dojang directly.
     </p>
 </div>
         ]]></field>
@@ -43,7 +43,7 @@
          Session Reminder SMS template
          ================================================================ -->
     <record id="mail_template_reminder_sms" model="mail.template">
-        <field name="name">Dojo: Upcoming Session Reminder (SMS)</field>
+        <field name="name">Dojang: Upcoming Session Reminder (SMS)</field>
         <field name="model_id" ref="dojo_classes.model_dojo_class_session"/>
         <field name="subject">Reminder SMS</field>
         <field name="body_html"><![CDATA[Reminder: {{ object.name }} is tomorrow at {{ object.start_datetime | time }}. See you there! - {{ object.company_id.name }}]]></field>

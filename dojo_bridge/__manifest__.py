@@ -1,5 +1,5 @@
 {
-    "name": "Dojo Bridge",
+    "name": "Dojang Bridge",
     "summary": "Headless API bridge: Control Plane (NestJS) ↔ Odoo Business Plane",
     "description": """
 Exposes a versioned, stateless REST API secured by HS256 JWTs issued by the
@@ -10,7 +10,7 @@ All routes use auth=none. Odoo session auth is never involved.
 The JWT issued by NestJS (after Firebase verification) is the sole gate.
 """,
     "version": "19.0.2.0.0",
-    "author": "Dojo Platform",
+    "author": "Dojang Platform",
     "category": "Hidden",
     "depends": [
         "dojo_base",

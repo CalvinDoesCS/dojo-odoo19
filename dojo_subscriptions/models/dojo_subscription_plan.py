@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 class DojoSubscriptionPlan(models.Model):
     _name = "dojo.subscription.plan"
-    _description = "Dojo Subscription Plan"
+    _description = "Dojang Subscription Plan"
 
     name = fields.Char(required=True)
     code = fields.Char()

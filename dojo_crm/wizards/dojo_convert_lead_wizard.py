@@ -17,7 +17,7 @@ class DojoConvertLeadWizard(models.TransientModel):
     """
 
     _name = "dojo.convert.lead.wizard"
-    _description = "Convert CRM Lead to Dojo Member"
+    _description = "Convert CRM Lead to Dojang Member"
 
     # ------------------------------------------------------------------
     # Source

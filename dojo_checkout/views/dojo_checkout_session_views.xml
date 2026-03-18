@@ -100,7 +100,7 @@
 
     <!-- ── Cron ─────────────────────────────────────────────────────── -->
     <record id="ir_cron_gc_checkout_sessions" model="ir.cron">
-        <field name="name">Dojo: Garbage-collect abandoned checkout sessions</field>
+        <field name="name">Dojang: Garbage-collect abandoned checkout sessions</field>
         <field name="model_id" ref="model_dojo_checkout_session"/>
         <field name="state">code</field>
         <field name="code">model._cron_gc_abandoned_sessions()</field>

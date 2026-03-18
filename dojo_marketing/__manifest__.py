@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Marketing Cards",
+    "name": "Dojang Marketing Cards",
     "summary": "Marketing cards with QR codes — published to kiosk carousel and member portal",
     "version": "19.0.1.0.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": [
         "dojo_kiosk",
         "dojo_members",

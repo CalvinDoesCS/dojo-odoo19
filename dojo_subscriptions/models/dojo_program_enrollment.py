@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 class DojoProgramEnrollment(models.Model):
     _name = "dojo.program.enrollment"
-    _description = "Dojo Program Enrollment"
+    _description = "Dojang Program Enrollment"
     _order = "is_active desc, enrolled_date desc"
 
     # ── Core fields ───────────────────────────────────────────────────────

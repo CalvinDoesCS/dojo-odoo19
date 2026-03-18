@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Subscriptions",
+    "name": "Dojang Subscriptions",
     "summary": "Membership plans and subscriptions",
     "version": "19.0.4.1.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": ["dojo_members", "account", "dojo_classes"],
     "data": [
         "security/ir.model.access.csv",

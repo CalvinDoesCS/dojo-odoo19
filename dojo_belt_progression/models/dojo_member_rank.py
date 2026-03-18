@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class DojoMemberRank(models.Model):
     _name = "dojo.member.rank"
-    _description = "Dojo Member Rank History"
+    _description = "Dojang Member Rank History"
     _order = "date_awarded desc"
 
     member_id = fields.Many2one(

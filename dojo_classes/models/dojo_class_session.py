@@ -18,7 +18,7 @@ def _action_open_attendance_wizard(session):
 
 class DojoClassSession(models.Model):
     _name = "dojo.class.session"
-    _description = "Dojo Class Session"
+    _description = "Dojang Class Session"
     _order = "start_datetime desc"
 
     name = fields.Char(compute="_compute_name", store=True)

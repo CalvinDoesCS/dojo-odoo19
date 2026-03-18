@@ -9,7 +9,7 @@ _logger = logging.getLogger(__name__)
 
 class DojoMember(models.Model):
     _name = "dojo.member"
-    _description = "Dojo Member"
+    _description = "Dojang Member"
     _inherits = {"res.partner": "partner_id"}
     _inherit = ["mail.thread", "mail.activity.mixin"]
 

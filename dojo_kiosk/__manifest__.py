@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Kiosk",
-    "summary": "Tablet check-in kiosk for dojo members and instructors",
+    "name": "Dojang Kiosk",
+    "summary": "Tablet check-in kiosk for Dojang members and instructors",
     "version": "19.0.1.0.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": [
         "dojo_attendance",
         "dojo_members",

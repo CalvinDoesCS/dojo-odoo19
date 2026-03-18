@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class DojoProgram(models.Model):
     _name = "dojo.program"
-    _description = "Dojo Program / Curriculum"
+    _description = "Dojang Program / Curriculum"
     _order = "sequence, name"
 
     name = fields.Char(required=True)

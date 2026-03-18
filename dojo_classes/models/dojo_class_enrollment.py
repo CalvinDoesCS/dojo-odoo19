@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 class DojoClassEnrollment(models.Model):
     _name = "dojo.class.enrollment"
-    _description = "Dojo Class Enrollment"
+    _description = "Dojang Class Enrollment"
 
     session_id = fields.Many2one(
         "dojo.class.session", required=True, ondelete="cascade", index=True
@@ -84,7 +84,7 @@ class DojoClassEnrollment(models.Model):
             if registered_count >= session.capacity:
                 raise ValidationError(_(
                     'Session "%s" is full (%d/%d seats taken). '
-                    'Please contact the dojo to be added to the waitlist.',
+                    'Please contact the Dojang to be added to the waitlist.',
                     session.name,
                     registered_count,
                     session.capacity,

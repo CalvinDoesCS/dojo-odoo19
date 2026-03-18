@@ -2,7 +2,7 @@
 <odoo>
     <!-- Every 6h: mark no-shows 48h after Trial Booked -->
     <record id="ir_cron_crm_no_show" model="ir.cron">
-        <field name="name">Dojo CRM: Mark No-Shows (48h after Trial Booked)</field>
+        <field name="name">Dojang CRM: Mark No-Shows (48h after Trial Booked)</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="state">code</field>
         <field name="code">model._cron_mark_no_shows()</field>
@@ -13,7 +13,7 @@
 
     <!-- Hourly: send 24h reminder email + SMS to leads with upcoming trial sessions -->
     <record id="ir_cron_crm_trial_reminders" model="ir.cron">
-        <field name="name">Dojo CRM: Send Trial Reminders (24h before session)</field>
+        <field name="name">Dojang CRM: Send Trial Reminders (24h before session)</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="state">code</field>
         <field name="code">model._cron_send_trial_reminders()</field>
@@ -24,7 +24,7 @@
 
     <!-- Daily: send offer expiry nudge at 72h; auto-lose at 7 days -->
     <record id="ir_cron_crm_offer_expiry" model="ir.cron">
-        <field name="name">Dojo CRM: Offer Expiry — 72h Nudge + 7d Auto-Lost</field>
+        <field name="name">Dojang CRM: Offer Expiry — 72h Nudge + 7d Auto-Lost</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="state">code</field>
         <field name="code">model._cron_offer_expiry()</field>
@@ -35,7 +35,7 @@
 
     <!-- Daily: 5-day no-show second follow-up -->
     <record id="ir_cron_crm_no_show_followup" model="ir.cron">
-        <field name="name">Dojo CRM: No-Show 2nd Follow-Up (5 days)</field>
+        <field name="name">Dojang CRM: No-Show 2nd Follow-Up (5 days)</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="state">code</field>
         <field name="code">model._cron_no_show_followup()</field>

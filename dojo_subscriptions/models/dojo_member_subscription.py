@@ -8,7 +8,7 @@ _logger = logging.getLogger(__name__)
 
 class DojoMemberSubscription(models.Model):
     _name = "dojo.member.subscription"
-    _description = "Dojo Member Subscription"
+    _description = "Dojang Member Subscription"
     _rec_name = "name"
 
     name = fields.Char(

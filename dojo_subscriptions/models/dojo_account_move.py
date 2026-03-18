@@ -6,7 +6,7 @@ class AccountMove(models.Model):
 
     subscription_id = fields.Many2one(
         "dojo.member.subscription",
-        string="Dojo Subscription",
+        string="Dojang Subscription",
         index=True,
         ondelete="set null",
         help="Dojo membership subscription that generated this invoice.",
@@ -16,6 +16,6 @@ class AccountMove(models.Model):
         "dojo_invoice_sub_rel",
         "invoice_id",
         "subscription_id",
-        string="Dojo Subscriptions",
+        string="Dojang Subscriptions",
         help="All subscriptions included in this consolidated household invoice.",
     )
