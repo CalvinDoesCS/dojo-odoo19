@@ -60,6 +60,8 @@ class DojoAiIntentSchema(models.Model):
             ("attendance", "Attendance"),
             ("subscription", "Subscription/Contract"),
             ("communication", "Communication"),
+            ("marketing", "Marketing"),
+            ("social", "Social Media"),
             ("system", "System"),
         ],
         string="Category",
