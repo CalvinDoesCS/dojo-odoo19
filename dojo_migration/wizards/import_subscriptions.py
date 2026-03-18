@@ -13,6 +13,8 @@ Expected CSV columns (case-insensitive after strip):
   next_billing_date — YYYY-MM-DD or MM/DD/YYYY
   program_name      — links plan to dojo.program (auto-creates program if missing)
   billing_reference — SparkMembership subscription ID
+  duration          — fixed plan length in months (0 = ongoing, default 0); only
+                      applied when a new plan is auto-created
 
 Dedup: skips if a subscription already exists for (member, plan_name, start_date).
 Also creates dojo.program.enrollment when state='active'.
@@ -35,17 +37,17 @@ TEMPLATE_ROWS = [
     [
         "member_email", "plan_name", "billing_period", "price", "initial_fee",
         "start_date", "state", "end_date", "next_billing_date",
-        "program_name", "billing_reference",
+        "program_name", "billing_reference", "duration",
     ],
     [
         "john.doe@example.com", "BJJ Adult Monthly", "monthly", "120.00", "50.00",
         "2024-01-01", "active", "", "2026-04-01",
-        "Brazilian Jiu-Jitsu", "SPARK-SUB-001",
+        "Brazilian Jiu-Jitsu", "SPARK-SUB-001", "0",
     ],
     [
         "sam.doe@example.com", "BJJ Kids Monthly", "monthly", "80.00", "0.00",
         "2024-01-01", "active", "", "2026-04-01",
-        "Brazilian Jiu-Jitsu", "SPARK-SUB-002",
+        "Brazilian Jiu-Jitsu", "SPARK-SUB-002", "0",
     ],
 ]
 
@@ -164,6 +166,14 @@ class DojoMigrationImportSubscriptions(models.TransientModel):
                         if not program:
                             program = Program.create({"name": program_name})
 
+                    # Parse duration (0 = ongoing, i.e. no fixed end date)
+                    try:
+                        duration = int((row.get("duration") or "0").strip())
+                        if duration < 0:
+                            duration = 0
+                    except (ValueError, TypeError):
+                        duration = 0
+
                     plan_vals = {
                         "name": plan_name,
                         "billing_period": billing_period,
@@ -172,6 +182,7 @@ class DojoMigrationImportSubscriptions(models.TransientModel):
                         "company_id": company.id,
                         "currency_id": company.currency_id.id,
                         "plan_type": "program",
+                        "duration": duration,
                     }
                     if program:
                         plan_vals["program_id"] = program.id

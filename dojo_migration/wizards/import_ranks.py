@@ -7,10 +7,13 @@ Expected CSV columns (case-insensitive after strip):
   program_name      — links rank to dojo.program; auto-creates program if missing
   date_awarded*     — YYYY-MM-DD or MM/DD/YYYY (required)
   awarded_by_name   — matches dojo.instructor.profile by name (optional)
+  stripe_count      — number of stripes earned at this rank (integer, default 0,
+                      optional; if column is absent all rows default to 0 and a
+                      warning is added to the import log)
 
 Dedup: skips if dojo.member.rank exists for (member, rank, date_awarded).
-After all rows are inserted the wizard triggers a recompute of current_rank_id
-on every affected member.
+After all rows are inserted the wizard triggers a recompute of current_rank and
+current_stripe_count on every affected member.
 """
 import base64
 import csv
@@ -27,10 +30,10 @@ _logger = logging.getLogger(__name__)
 REQUIRED_COLS = {"member_email", "rank_name", "date_awarded"}
 
 TEMPLATE_ROWS = [
-    ["member_email", "rank_name", "program_name", "date_awarded", "awarded_by_name"],
-    ["john.doe@example.com", "White Belt", "Brazilian Jiu-Jitsu", "2020-01-15", "Sensei Mike"],
-    ["john.doe@example.com", "Blue Belt", "Brazilian Jiu-Jitsu", "2022-06-10", "Sensei Mike"],
-    ["sam.doe@example.com", "White Belt", "Brazilian Jiu-Jitsu", "2021-03-20", ""],
+    ["member_email", "rank_name", "program_name", "date_awarded", "awarded_by_name", "stripe_count"],
+    ["john.doe@example.com", "White Belt", "Brazilian Jiu-Jitsu", "2020-01-15", "Sensei Mike", "0"],
+    ["john.doe@example.com", "Blue Belt", "Brazilian Jiu-Jitsu", "2022-06-10", "Sensei Mike", "2"],
+    ["sam.doe@example.com", "White Belt", "Brazilian Jiu-Jitsu", "2021-03-20", "", "0"],
 ]
 
 
@@ -99,6 +102,23 @@ class DojoMigrationImportRanks(models.TransientModel):
         log_lines = []
         success = skip = error = 0
         affected_members = set()
+
+        has_stripe_col = "stripe_count" in header
+        if not has_stripe_col:
+            _logger.warning(
+                "import_ranks: 'stripe_count' column not found in CSV — "
+                "defaulting to 0 for all rows."
+            )
+            log_lines.append((0, 0, {
+                "row_number": 0,
+                "status": "skip",
+                "message": (
+                    "WARNING: 'stripe_count' column not found in CSV. "
+                    "All rank history rows will be imported with stripe_count=0. "
+                    "To import stripe data, add a 'stripe_count' column to your CSV."
+                ),
+                "raw_data": "{}",
+            }))
 
         Member = self.env["dojo.member"]
         Rank = self.env["dojo.belt.rank"]
@@ -171,10 +191,21 @@ class DojoMigrationImportRanks(models.TransientModel):
                     skip += 1
                     continue
 
+                # Parse stripe_count (optional column, default 0)
+                stripe_count = 0
+                if has_stripe_col:
+                    try:
+                        stripe_count = int((row.get("stripe_count") or "0").strip())
+                        if stripe_count < 0:
+                            stripe_count = 0
+                    except (ValueError, TypeError):
+                        stripe_count = 0
+
                 rank_vals = {
                     "member_id": member.id,
                     "rank_id": rank.id,
                     "date_awarded": date_awarded,
+                    "stripe_count": stripe_count,
                 }
                 if program_id:
                     rank_vals["program_id"] = program_id
@@ -197,10 +228,11 @@ class DojoMigrationImportRanks(models.TransientModel):
                 }))
                 error += 1
 
-        # Trigger recompute of current_rank_id on affected members
+        # Trigger recompute of current_rank and current_stripe_count on affected members
         if affected_members:
             members_to_update = Member.browse(list(affected_members))
-            members_to_update._compute_current_rank_id()
+            members_to_update._compute_current_rank()
+            members_to_update._compute_current_stripe_count()
 
         state = "done" if error == 0 else ("partial" if success + skip > 0 else "failed")
         log = self.env["dojo.migration.log"].create({

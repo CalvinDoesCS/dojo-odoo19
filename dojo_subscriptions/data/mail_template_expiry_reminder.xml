@@ -4,7 +4,7 @@
     <record id="mail_template_expiry_reminder_email" model="mail.template">
         <field name="name">Dojang: Membership Expiry Reminder (Email)</field>
         <field name="model_id" ref="model_dojo_member_subscription"/>
-        <field name="subject">Your <t t-out="object.plan_id.name"/> membership expires soon</field>
+        <field name="subject">Your {{ object.plan_id.name }} membership expires soon</field>
         <field name="body_html"><![CDATA[
 <p>Hi <t t-out="object.member_id.name"/>,</p>
 
@@ -25,17 +25,6 @@ before the expiry date.</p>
 
 <p>Thank you,<br/>
 <t t-out="object.company_id.name or 'The Dojang Team'"/></p>
-        ]]></field>
-        <field name="auto_delete">True</field>
-    </record>
-
-    <!-- SMS reminder sent at 30 and 7 days before membership end_date -->
-    <record id="mail_template_expiry_reminder_sms" model="mail.template">
-        <field name="name">Dojang: Membership Expiry Reminder (SMS)</field>
-        <field name="model_id" ref="model_dojo_member_subscription"/>
-        <field name="subject">Membership Expiry Reminder</field>
-        <field name="body_html"><![CDATA[
-Hi <t t-out="object.member_id.name"/>, your <t t-out="object.plan_id.name"/> membership at <t t-out="object.company_id.name or 'the Dojang'"/> expires on <t t-out="object.end_date"/>. Please contact us to renew and keep training!
         ]]></field>
         <field name="auto_delete">True</field>
     </record>

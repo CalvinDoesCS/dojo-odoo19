@@ -1,7 +1,7 @@
 {
     "name": "Dojang Subscriptions",
     "summary": "Membership plans and subscriptions",
-    "version": "19.0.4.1.0",
+    "version": "19.0.4.2.0",
     "category": "Services",
     "license": "LGPL-3",
     "author": "Dojang",
@@ -12,6 +12,7 @@
         "data/membership_product.xml",
         "data/mail_template_dunning.xml",
         "data/mail_template_expiry_reminder.xml",
+        "data/mail_template_expiry_reminder_sms.xml",
         "data/ir_cron.xml",
         "views/dojo_subscription_views.xml",
         "views/dojo_program_enrollment_views.xml",
