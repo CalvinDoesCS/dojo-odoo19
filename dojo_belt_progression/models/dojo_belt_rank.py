@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoBeltRank(models.Model):
     _name = "dojo.belt.rank"
-    _description = "Dojo Belt Rank"
+    _description = "Dojang Belt Rank"
     _order = "sequence, name"
 
     name = fields.Char(required=True, string="Rank Name")
@@ -42,6 +42,13 @@ class DojoBeltRank(models.Model):
     # Reverse links
     member_rank_ids = fields.One2many(
         "dojo.member.rank", "rank_id", string="Awarded To"
+    )
+
+    # ── Stripes ──────────────────────────────────────────────────────────
+    max_stripes = fields.Integer(
+        string="Max Stripes",
+        default=4,
+        help="Maximum number of stripes a member can earn on this belt before testing for the next rank. Set to 0 to disable stripe tracking.",
     )
 
     # ── Dan Level ─────────────────────────────────────────────────────────

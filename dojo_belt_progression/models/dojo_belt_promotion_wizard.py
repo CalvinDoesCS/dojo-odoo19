@@ -23,6 +23,16 @@ class DojoBeltPromotionWizardLine(models.TransientModel):
         required=True,
     )
     do_promote = fields.Boolean(string="Promote", default=True)
+    current_stripe_count = fields.Integer(
+        string="Current Stripes",
+        compute="_compute_current_stripe_count",
+    )
+
+    def _compute_current_stripe_count(self):
+        for line in self:
+            line.current_stripe_count = (
+                getattr(line.member_id, "current_stripe_count", 0) or 0
+            )
 
 
 class DojoBeltPromotionWizard(models.TransientModel):

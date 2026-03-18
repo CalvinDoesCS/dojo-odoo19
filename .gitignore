@@ -8,3 +8,6 @@ config/odoo.conf
 CLAUDE.md
 node_modules/*
 .playwright-mcp/**
+commands.md
+dojo_schema.sql
+dojo_schema.md

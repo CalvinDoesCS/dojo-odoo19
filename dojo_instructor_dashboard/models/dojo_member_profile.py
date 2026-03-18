@@ -81,6 +81,7 @@ class DojoMemberProfile(models.Model):
                 "name": r.name or "",
                 "color": r.color or "#9aa0a6",
                 "sequence": r.sequence or 0,
+                "max_stripes": getattr(r, "max_stripes", 0) or 0,
             }
         if hasattr(member, "rank_history_ids"):
             for rh in member.rank_history_ids.sorted("date_awarded", reverse=True)[:5]:
@@ -89,6 +90,7 @@ class DojoMemberProfile(models.Model):
                     "date_awarded": str(rh.date_awarded) if rh.date_awarded else "",
                     "awarded_by": rh.awarded_by.name if getattr(rh, "awarded_by", None) else "—",
                     "program": rh.program_id.name if getattr(rh, "program_id", None) and rh.program_id else "—",
+                    "stripe_count": getattr(rh, "stripe_count", 0) or 0,
                 })
         if hasattr(member, "attendance_since_last_rank"):
             attendance_since_last_rank = member.attendance_since_last_rank or 0
@@ -105,6 +107,7 @@ class DojoMemberProfile(models.Model):
         data["attendance_since_last_rank"] = attendance_since_last_rank
         data["rank_threshold"] = rank_threshold
         data["test_invite_pending"] = test_invite_pending
+        data["current_stripes"] = getattr(member, "current_stripe_count", 0) or 0
 
         # ── Total attendance count ─────────────────────────────────────────
         total_attendance = 0

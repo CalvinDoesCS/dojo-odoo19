@@ -758,7 +758,7 @@
                                     <option value="parent"
                                             t-att-selected="state.editOverlay.form.role === 'parent'">Parent</option>
                                     <option value="both"
-                                            t-att-selected="state.editOverlay.form.role === 'both'">Parent &amp; Student</option>
+                                            t-att-selected="state.editOverlay.form.role === 'both'">Standalone</option>
                                 </select>
                             </div>
                         </div>

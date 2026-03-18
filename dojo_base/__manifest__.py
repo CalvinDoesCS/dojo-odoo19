@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Base",
-    "summary": "Core dojo models and security",
+    "name": "Dojang Base",
+    "summary": "Core Dojang models and security",
     "version": "19.0.1.0.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": ["base", "mail", "portal", "hr"],
     "data": [
         "security/dojo_security.xml",

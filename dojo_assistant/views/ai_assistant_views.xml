@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        AI Assistant Admin Views
+        
+        Provides admin interface for:
+        - AI Action Log (monitoring/audit)
+        - AI Intent Schema (configuration)
+        - AI Undo Snapshots (debugging)
+    -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- AI Action Log Views                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="view_dojo_ai_action_log_tree" model="ir.ui.view">
+        <field name="name">dojo.ai.action.log.tree</field>
+        <field name="model">dojo.ai.action.log</field>
+        <field name="arch" type="xml">
+            <list string="AI Action Logs" decoration-danger="execution_status == 'error'" decoration-warning="confirmation_status == 'rejected'" decoration-muted="undone">
+                <field name="timestamp"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="input_text" optional="show"/>
+                <field name="intent_type"/>
+                <field name="confidence" widget="progressbar"/>
+                <field name="role"/>
+                <field name="confirmation_status" widget="badge" 
+                    decoration-info="confirmation_status == 'pending'"
+                    decoration-success="confirmation_status in ('confirmed', 'auto')"
+                    decoration-danger="confirmation_status == 'rejected'"/>
+                <field name="execution_status" widget="badge"
+                    decoration-success="execution_status == 'success'"
+                    decoration-danger="execution_status == 'error'"/>
+                <field name="execution_time_ms" optional="hide"/>
+                <field name="is_undoable" optional="hide"/>
+                <field name="undone" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_ai_action_log_form" model="ir.ui.view">
+        <field name="name">dojo.ai.action.log.form</field>
+        <field name="model">dojo.ai.action.log</field>
+        <field name="arch" type="xml">
+            <form string="AI Action Log">
+                <header>
+                    <field name="confirmation_status" widget="statusbar" statusbar_visible="pending,confirmed,rejected"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_undo_snapshots" type="object" class="oe_stat_button" icon="fa-history"
+                            invisible="not is_undoable">
+                            <field name="is_undoable" widget="statinfo" string="Undo Data"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Undone" bg_color="text-bg-secondary" invisible="not undone"/>
+                    <group>
+                        <group string="Request">
+                            <field name="session_key"/>
+                            <field name="timestamp"/>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="role"/>
+                            <field name="input_type"/>
+                            <field name="input_text"/>
+                            <field name="audio_attachment_id" invisible="input_type != 'voice'"/>
+                        </group>
+                        <group string="Intent">
+                            <field name="intent_type"/>
+                            <field name="confidence" widget="progressbar"/>
+                            <field name="parsed_intent"/>
+                            <field name="resolved_data"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Confirmation">
+                            <field name="confirmation_prompt"/>
+                            <field name="confirmation_status"/>
+                            <field name="confirmed_by" widget="many2one_avatar_user"/>
+                            <field name="confirmed_at"/>
+                        </group>
+                        <group string="Execution">
+                            <field name="execution_status"/>
+                            <field name="execution_result"/>
+                            <field name="error_message"/>
+                            <field name="execution_time_ms"/>
+                        </group>
+                    </group>
+                    <group string="Undo" invisible="not is_undoable">
+                        <field name="is_undoable"/>
+                        <field name="undone"/>
+                        <field name="undone_at" invisible="not undone"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dojo_ai_action_log_search" model="ir.ui.view">
+        <field name="name">dojo.ai.action.log.search</field>
+        <field name="model">dojo.ai.action.log</field>
+        <field name="arch" type="xml">
+            <search string="AI Action Logs">
+                <field name="input_text"/>
+                <field name="intent_type"/>
+                <field name="user_id"/>
+                <field name="session_key"/>
+                <filter name="timestamp" string="Date" date="timestamp"/>
+                <separator/>
+                <filter name="pending" string="Pending" domain="[('confirmation_status', '=', 'pending')]"/>
+                <filter name="confirmed" string="Confirmed" domain="[('confirmation_status', '=', 'confirmed')]"/>
+                <filter name="rejected" string="Rejected" domain="[('confirmation_status', '=', 'rejected')]"/>
+                <separator/>
+                <filter name="success" string="Successful" domain="[('execution_status', '=', 'success')]"/>
+                <filter name="error" string="Errors" domain="[('execution_status', '=', 'error')]"/>
+                <separator/>
+                <filter name="undoable" string="Undoable" domain="[('is_undoable', '=', True)]"/>
+                <filter name="undone" string="Undone" domain="[('undone', '=', True)]"/>
+                <separator/>
+                <filter name="my_actions" string="My Actions" domain="[('user_id', '=', uid)]"/>
+                <group>
+                    <filter name="group_by_intent" string="Intent" context="{'group_by': 'intent_type'}"/>
+                    <filter name="group_by_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_by_status" string="Status" context="{'group_by': 'confirmation_status'}"/>
+                    <filter name="group_by_date" string="Date" context="{'group_by': 'timestamp:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dojo_ai_action_log" model="ir.actions.act_window">
+        <field name="name">AI Action Log</field>
+        <field name="res_model">dojo.ai.action.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_dojo_ai_action_log_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No AI actions recorded yet
+            </p>
+            <p>
+                AI action logs appear here when users interact with the voice assistant.
+            </p>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- AI Intent Schema Views                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="view_dojo_ai_intent_schema_tree" model="ir.ui.view">
+        <field name="name">dojo.ai.intent.schema.tree</field>
+        <field name="model">dojo.ai.intent.schema</field>
+        <field name="arch" type="xml">
+            <list string="AI Intent Schemas" editable="bottom" decoration-muted="not active">
+                <field name="active" column_invisible="True"/>
+                <field name="intent_type"/>
+                <field name="name"/>
+                <field name="category" optional="show"/>
+                <field name="allowed_roles"/>
+                <field name="requires_confirmation" widget="boolean_toggle"/>
+                <field name="is_undoable" widget="boolean_toggle"/>
+                <field name="supports_bulk" widget="boolean_toggle" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_ai_intent_schema_form" model="ir.ui.view">
+        <field name="name">dojo.ai.intent.schema.form</field>
+        <field name="model">dojo.ai.intent.schema</field>
+        <field name="arch" type="xml">
+            <form string="AI Intent Schema">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="Intent Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Identification">
+                            <field name="intent_type"/>
+                            <field name="category"/>
+                            <field name="description"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Permissions">
+                            <field name="allowed_roles" placeholder="kiosk,instructor,admin"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Behavior">
+                            <field name="requires_confirmation"/>
+                            <field name="is_undoable"/>
+                            <field name="supports_bulk"/>
+                        </group>
+                        <group string="Confirmation">
+                            <field name="confirmation_template" placeholder="Confirm {action} for {member_name}?" invisible="not requires_confirmation"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Parameters Schema" name="parameters">
+                            <field name="parameters_schema" widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                        <page string="Example Phrases" name="example_phrases">
+                            <field name="example_phrases" placeholder="One example phrase per line..."
+                                   help="Natural language phrases that should trigger this intent. Used to guide the AI model."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dojo_ai_intent_schema_search" model="ir.ui.view">
+        <field name="name">dojo.ai.intent.schema.search</field>
+        <field name="model">dojo.ai.intent.schema</field>
+        <field name="arch" type="xml">
+            <search string="AI Intent Schemas">
+                <field name="name"/>
+                <field name="intent_type"/>
+                <field name="category"/>
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="requires_confirmation" string="Requires Confirmation" domain="[('requires_confirmation', '=', True)]"/>
+                <filter name="undoable" string="Undoable" domain="[('is_undoable', '=', True)]"/>
+                <group>
+                    <filter name="group_by_category" string="Category" context="{'group_by': 'category'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dojo_ai_intent_schema" model="ir.actions.act_window">
+        <field name="name">AI Intent Schemas</field>
+        <field name="res_model">dojo.ai.intent.schema</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_dojo_ai_intent_schema_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define AI intent schemas
+            </p>
+            <p>
+                Intent schemas define what actions the AI assistant can perform,
+                their parameters, and required permissions.
+            </p>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- AI Undo Snapshot Views                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="view_dojo_ai_undo_snapshot_tree" model="ir.ui.view">
+        <field name="name">dojo.ai.undo.snapshot.tree</field>
+        <field name="model">dojo.ai.undo.snapshot</field>
+        <field name="arch" type="xml">
+            <list string="AI Undo Snapshots" decoration-muted="undo_executed">
+                <field name="create_date"/>
+                <field name="action_log_id"/>
+                <field name="model_name"/>
+                <field name="record_id"/>
+                <field name="operation"/>
+                <field name="undo_expires_at"/>
+                <field name="undo_executed"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dojo_ai_undo_snapshot_form" model="ir.ui.view">
+        <field name="name">dojo.ai.undo.snapshot.form</field>
+        <field name="model">dojo.ai.undo.snapshot</field>
+        <field name="arch" type="xml">
+            <form string="AI Undo Snapshot">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="action_log_id"/>
+                            <field name="model_name"/>
+                            <field name="record_id"/>
+                            <field name="operation"/>
+                        </group>
+                        <group>
+                            <field name="undo_expires_at"/>
+                            <field name="undo_executed"/>
+                            <field name="undo_executed_at" invisible="not undo_executed"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Snapshot Data" name="data">
+                            <field name="snapshot_data"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_dojo_ai_undo_snapshot" model="ir.actions.act_window">
+        <field name="name">AI Undo Snapshots</field>
+        <field name="res_model">dojo.ai.undo.snapshot</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No undo snapshots
+            </p>
+            <p>
+                Undo snapshots store the state before undoable AI actions,
+                allowing users to reverse changes.
+            </p>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Menu Items                                                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Add to Settings menu (parent: base.menu_administration) -->
+    <menuitem id="menu_ai_assistant_root"
+        name="AI Assistant"
+        parent="base.menu_administration"
+        sequence="99"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem id="menu_ai_action_log"
+        name="Action Log"
+        parent="menu_ai_assistant_root"
+        action="action_dojo_ai_action_log"
+        sequence="10"/>
+
+    <menuitem id="menu_ai_intent_schema"
+        name="Intent Schemas"
+        parent="menu_ai_assistant_root"
+        action="action_dojo_ai_intent_schema"
+        sequence="20"/>
+
+    <menuitem id="menu_ai_undo_snapshots"
+        name="Undo Snapshots"
+        parent="menu_ai_assistant_root"
+        action="action_dojo_ai_undo_snapshot"
+        sequence="30"/>
+
+</odoo>

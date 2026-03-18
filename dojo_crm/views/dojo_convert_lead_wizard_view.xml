@@ -14,7 +14,7 @@
         <field name="name">dojo.convert.lead.wizard.form</field>
         <field name="model">dojo.convert.lead.wizard</field>
         <field name="arch" type="xml">
-            <form string="Convert Lead to Dojo Member">
+            <form string="Convert Lead to Dojang Member">
                 <sheet>
                     <group string="Lead">
                         <field name="lead_id" readonly="1"/>

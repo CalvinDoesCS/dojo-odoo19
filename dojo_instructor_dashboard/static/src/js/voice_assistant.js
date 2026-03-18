@@ -53,6 +53,8 @@ export class DojoVoiceAssistant extends Component {
             actionBody: "",
             actionEmail: true,
             actionSms: true,
+            // Two-phase confirmation flow
+            pendingConfirm: null,  // {session_key, prompt, intent_type}
         });
 
         this._mediaRecorder = null;
@@ -222,7 +224,7 @@ export class DojoVoiceAssistant extends Component {
 
     _handleAiResult(result) {
         const text = result.response || "";
-        this._pushMsg("assistant", text);
+        if (text) this._pushMsg("assistant", text);
 
         // Speak response if TTS is enabled
         if (this.state.ttsEnabled && text && "speechSynthesis" in window) {
@@ -232,7 +234,20 @@ export class DojoVoiceAssistant extends Component {
             window.speechSynthesis.speak(utter);
         }
 
-        // Handle contact_parent action
+        // ── Two-phase confirmation (enroll, belt, etc.) ──────────────────────
+        if (result.state === "pending_confirmation" && result.session_key && result.confirmation_prompt) {
+            this.state.pendingConfirm = {
+                session_key: result.session_key,
+                prompt: result.confirmation_prompt,
+                intent_type: result.intent && result.intent.intent_type,
+            };
+            if (!text) {
+                this._pushMsg("assistant", result.confirmation_prompt);
+            }
+            return;
+        }
+
+        // Handle contact_parent action (legacy)
         const action = result.action;
         if (action && action.type === "contact_parent" && !action.error) {
             this.state.pendingAction  = action;
@@ -255,6 +270,50 @@ export class DojoVoiceAssistant extends Component {
     cancelAction() {
         this.state.pendingAction = null;
         this._pushMsg("assistant", "Message cancelled. Let me know if you need anything else.");
+    }
+
+    // ── Two-phase confirmation (enroll / belt / etc.) ─────────────────────────
+
+    async confirmIntent() {
+        const pending = this.state.pendingConfirm;
+        if (!pending) return;
+        this.state.pendingConfirm = null;
+        this.state.processing = true;
+        try {
+            const result = await rpc("/dojo/ai/confirm", {
+                session_key: pending.session_key,
+                confirmed: true,
+            });
+            if (result.success) {
+                const msg = result.result && result.result.message
+                    ? "✅ " + result.result.message
+                    : "✅ Done!";
+                this._pushMsg("assistant", msg);
+                if (result.undo_available) {
+                    this._pushMsg("assistant", "You can say \"undo\" to reverse this action.");
+                }
+            } else {
+                this._pushMsg("assistant", "⚠️ " + (result.error || "Action failed."));
+            }
+        } catch (err) {
+            this._pushMsg("assistant", "⚠️ Network error during confirmation.");
+        } finally {
+            this.state.processing = false;
+            this._scrollToBottom();
+        }
+    }
+
+    async cancelIntent() {
+        const pending = this.state.pendingConfirm;
+        if (!pending) return;
+        this.state.pendingConfirm = null;
+        try {
+            await rpc("/dojo/ai/confirm", {
+                session_key: pending.session_key,
+                confirmed: false,
+            });
+        } catch (_) {}
+        this._pushMsg("assistant", "Action cancelled. Let me know if you need anything else.");
     }
 
     async confirmAction() {

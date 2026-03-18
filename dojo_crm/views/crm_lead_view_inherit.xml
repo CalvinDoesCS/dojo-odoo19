@@ -31,9 +31,9 @@
                 />
             </xpath>
 
-            <!-- Add dojo tab to the form -->
+            <!-- Add Dojang tab to the form -->
             <xpath expr="//notebook" position="inside">
-                <page string="Dojo Trial" name="dojo_trial">
+                <page string="Dojang Trial" name="dojo_trial">
                     <group>
                         <group string="Trial Details">
                             <field name="trial_session_id"/>

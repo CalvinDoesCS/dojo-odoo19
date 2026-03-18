@@ -34,7 +34,7 @@ class DojoAutoEnrollPreference(models.Model):
     )
     template_id = fields.Many2one(
         "dojo.class.template",
-        string="Class Template",
+        string="Course",
         required=True,
         index=True,
         ondelete="cascade",
@@ -92,7 +92,7 @@ class DojoAutoEnrollPreference(models.Model):
     # ── Unique constraint ──────────────────────────────────────────────────
     _dojo_auto_enroll_unique = models.Constraint(
         "unique(member_id, template_id)",
-        "A member can only have one auto-enroll preference per class template.",
+        "A member can only have one auto-enroll preference per course.",
     )
 
     # ── ORM hooks ─────────────────────────────────────────────────────────

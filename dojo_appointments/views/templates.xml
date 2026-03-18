@@ -3,7 +3,7 @@
     <!-- ================================================================
          Public Trial Booking Page
          ================================================================ -->
-    <template id="booking_page" name="Dojo: Book a Free Trial Class">
+    <template id="booking_page" name="Dojang: Book a Free Trial Class">
         <t t-call="website.layout">
             <div class="container py-5" style="max-width: 680px;">
                 <h1 class="mb-2">Book a Free Trial Class</h1>

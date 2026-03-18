@@ -26,7 +26,7 @@ class DojoSendMessageWizard(models.TransientModel):
         help="Messages will be sent to the primary guardian of each household, "
              "or directly to the member if no household is set.",
     )
-    subject = fields.Char(string="Subject", default="Message from Dojo")
+    subject = fields.Char(string="Subject", default="Message from Dojang")
     message_body = fields.Html(string="Message Body", required=True)
     send_email = fields.Boolean(string="Send Email", default=True)
     send_sms = fields.Boolean(string="Send SMS", default=True)
@@ -84,11 +84,12 @@ class DojoSendMessageWizard(models.TransientModel):
                     sent_emails += 1
 
                 # ---- SMS ----
-                if self.send_sms and partner.mobile:
+                _sms_number = getattr(partner, 'mobile', None) or partner.phone
+                if self.send_sms and _sms_number:
                     body_plain = html2plaintext(self.message_body)
                     self.env["sms.sms"].create(
                         {
-                            "number": partner.mobile,
+                            "number": _sms_number,
                             "body": body_plain,
                             "partner_id": partner.id,
                         }

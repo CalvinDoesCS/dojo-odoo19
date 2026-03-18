@@ -37,11 +37,24 @@ class DojoMember(models.Model):
         ),
     )
 
+    current_stripe_count = fields.Integer(
+        string="Current Stripes",
+        compute="_compute_current_stripe_count",
+        store=True,
+        help="Number of stripes on the member's current belt rank.",
+    )
+
     @api.depends("rank_history_ids.date_awarded", "rank_history_ids.rank_id")
     def _compute_current_rank(self):
         for member in self:
             latest = member.rank_history_ids.sorted("date_awarded", reverse=True)[:1]
             member.current_rank_id = latest.rank_id if latest else False
+
+    @api.depends("rank_history_ids.date_awarded", "rank_history_ids.stripe_count")
+    def _compute_current_stripe_count(self):
+        for member in self:
+            latest = member.rank_history_ids.sorted("date_awarded", reverse=True)[:1]
+            member.current_stripe_count = latest.stripe_count if latest else 0
 
     @api.depends(
         "attendance_log_ids.status",

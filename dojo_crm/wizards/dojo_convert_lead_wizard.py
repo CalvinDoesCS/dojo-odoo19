@@ -17,7 +17,7 @@ class DojoConvertLeadWizard(models.TransientModel):
     """
 
     _name = "dojo.convert.lead.wizard"
-    _description = "Convert CRM Lead to Dojo Member"
+    _description = "Convert CRM Lead to Dojang Member"
 
     # ------------------------------------------------------------------
     # Source
@@ -42,7 +42,7 @@ class DojoConvertLeadWizard(models.TransientModel):
     mobile = fields.Char(string="Mobile")
     date_of_birth = fields.Date(string="Date of Birth")
     role = fields.Selection(
-        [("student", "Student"), ("parent", "Parent / Guardian"), ("both", "Both")],
+        [("student", "Student"), ("parent", "Parent / Guardian"), ("both", "Standalone")],
         string="Role",
         default="student",
         required=True,
@@ -102,7 +102,7 @@ class DojoConvertLeadWizard(models.TransientModel):
                 res["last_name"] = name_parts[1] if len(name_parts) > 1 else ""
                 res["email"] = partner.email or lead.email_from or ""
                 res["phone"] = partner.phone or lead.phone or ""
-                res["mobile"] = partner.mobile or lead.mobile or ""
+                res["mobile"] = getattr(partner, 'mobile', None) or lead.mobile or ""
             else:
                 name_parts = (lead.contact_name or lead.partner_name or "").split(" ", 1)
                 res["first_name"] = name_parts[0]

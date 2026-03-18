@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <record id="mail_template_dunning_notice" model="mail.template">
-        <field name="name">Dojo: Billing Failure Notice</field>
+        <field name="name">Dojang: Billing Failure Notice</field>
         <field name="model_id" ref="model_dojo_member_subscription"/>
-        <field name="subject">Action required: payment issue with your dojo membership</field>
+        <field name="subject">Action required: payment issue with your Dojang membership</field>
         <field name="body_html"><![CDATA[
 <p>Hi <t t-out="object.member_id.name"/>,</p>
 
@@ -23,7 +23,7 @@ interruption to your membership.</p>
 <p>If payment is not received within 30 days, your membership may be suspended.</p>
 
 <p>Thank you,<br/>
-<t t-out="object.company_id.name or 'The Dojo Team'"/></p>
+<t t-out="object.company_id.name or 'The Dojang Team'"/></p>
         ]]></field>
         <field name="auto_delete">True</field>
     </record>

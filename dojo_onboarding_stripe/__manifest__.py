@@ -1,5 +1,5 @@
 {
-    'name': 'Dojo Onboarding — Stripe Payment',
+    'name': 'Dojang Onboarding — Stripe Payment',
     'version': '19.0.1.0.0',
     'summary': 'Collects a Stripe payment method during member onboarding',
     'description': "Bridge between dojo_onboarding and dojo_stripe. "

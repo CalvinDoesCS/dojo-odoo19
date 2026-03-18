@@ -22,9 +22,9 @@ class CrmLead(models.Model):
 
     dojo_member_id = fields.Many2one(
         "dojo.member",
-        string="Dojo Member",
+        string="Dojang Member",
         ondelete="set null",
-        help="Populated when this lead is converted to a dojo member.",
+        help="Populated when this lead is converted to a Dojang member.",
     )
     trial_session_id = fields.Many2one(
         "dojo.class.session",
@@ -173,7 +173,7 @@ class CrmLead(models.Model):
                         body = _(
                             "We missed you! Reschedule your free trial at "
                             "%(company)s — reply or call us to pick a new date.",
-                            company=lead.company_id.name or "our dojo",
+                            company=lead.company_id.name or "our Dojang",
                         )
                         self.env["sms.sms"].create(
                             {
@@ -234,7 +234,7 @@ class CrmLead(models.Model):
                     body = _(
                         "Reminder: your free trial at %(company)s is tomorrow — "
                         "%(session)s at %(start)s. See you there!",
-                        company=lead.company_id.name or "the dojo",
+                        company=lead.company_id.name or "the Dojang",
                         session=session.name,
                         start=session.start_datetime,
                     )
@@ -300,7 +300,7 @@ class CrmLead(models.Model):
                     body = _(
                         "Heads up — your special membership offer from %(company)s "
                         "expires in 24 hours. Reply or call us to lock it in!",
-                        company=lead.company_id.name or "the dojo",
+                        company=lead.company_id.name or "the Dojang",
                     )
                     self.env["sms.sms"].create(
                         {
@@ -388,7 +388,7 @@ class CrmLead(models.Model):
                     body = _(
                         "Hey! We'd still love to have you try a class at %(company)s. "
                         "Reply or call us to book a new trial — no pressure!",
-                        company=lead.company_id.name or "the dojo",
+                        company=lead.company_id.name or "the Dojang",
                     )
                     self.env["sms.sms"].create(
                         {

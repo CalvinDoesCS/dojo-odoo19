@@ -19,4 +19,24 @@
         <field name="interval_type">days</field>
         <field name="active">True</field>
     </record>
+
+    <record id="ir_cron_dojo_expire_ended_subscriptions" model="ir.cron">
+        <field name="name">Dojo: Expire Ended Subscriptions</field>
+        <field name="model_id" ref="model_dojo_member_subscription"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_expire_ended_subscriptions()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="ir_cron_dojo_send_expiry_reminders" model="ir.cron">
+        <field name="name">Dojo: Send Membership Expiry Reminders</field>
+        <field name="model_id" ref="model_dojo_member_subscription"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_send_expiry_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
 </odoo>

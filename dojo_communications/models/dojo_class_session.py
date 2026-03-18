@@ -73,7 +73,8 @@ class DojoClassSession(models.Model):
                         )
 
                     # SMS
-                    if sms_template and guardian_partner.mobile:
+                    _guardian_sms = getattr(guardian_partner, 'mobile', None) or guardian_partner.phone
+                    if sms_template and _guardian_sms:
                         body = sms_template._render_field(
                             "body_html", [session.id], compute_lang=True
                         )[session.id]
@@ -84,7 +85,7 @@ class DojoClassSession(models.Model):
                         )
                         self.env["sms.sms"].create(
                             {
-                                "number": guardian_partner.mobile,
+                                "number": _guardian_sms,
                                 "body": body_plain,
                                 "partner_id": guardian_partner.id,
                             }

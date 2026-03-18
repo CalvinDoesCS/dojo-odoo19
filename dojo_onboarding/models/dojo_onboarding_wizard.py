@@ -31,7 +31,7 @@ class DojoOnboardingWizard(models.TransientModel):
         selection=[
             ('student', 'Student'),
             ('parent', 'Parent'),
-            ('both', 'Parent & Student'),
+            ('both', 'Standalone'),
         ],
         default='student',
         required=True,
@@ -53,7 +53,7 @@ class DojoOnboardingWizard(models.TransientModel):
     new_guardian_role = fields.Selection(
         selection=[
             ('parent', 'Parent'),
-            ('both', 'Parent & Student'),
+            ('both', 'Standalone'),
         ],
         default='parent',
         string='Guardian Role',
@@ -88,7 +88,7 @@ class DojoOnboardingWizard(models.TransientModel):
     template_ids = fields.Many2many(
         'dojo.class.template',
         string='Add to Class Rosters',
-        help='Add this member to recurring class template rosters so they are auto-enrolled in future sessions.',
+        help='Add this member to recurring course rosters so they are auto-enrolled in future sessions.',
     )
     session_ids = fields.Many2many(
         'dojo.class.session',
@@ -154,14 +154,23 @@ class DojoOnboardingWizard(models.TransientModel):
     plan_billing_period = fields.Selection(
         related='plan_id.billing_period', readonly=True, string='Billing Period',
     )
-    plan_sessions_per_period = fields.Integer(
-        related='plan_id.sessions_per_period', readonly=True, string='Sessions / Period',
+    plan_credits_per_period = fields.Integer(
+        compute='_compute_plan_credits_per_period', string='Credits / Billing Cycle',
     )
-    plan_unlimited_sessions = fields.Boolean(
-        related='plan_id.unlimited_sessions', readonly=True,
-    )
+
+    @api.depends('plan_id')
+    def _compute_plan_credits_per_period(self):
+        for rec in self:
+            rec.plan_credits_per_period = getattr(rec.plan_id, 'credits_per_period', 0) or 0
     plan_description = fields.Text(
         related='plan_id.description', readonly=True, string='Plan Notes',
+    )
+    defer_payment = fields.Boolean(
+        'Pay Later',
+        default=False,
+        help='Create the subscription as Pending Payment instead of Active. '
+             'No invoice or credits are issued until the admin activates the subscription '
+             'after receiving payment.',
     )
 
     # ── Step 5: Portal Access ────────────────────────────────────────────────
@@ -393,18 +402,31 @@ class DojoOnboardingWizard(models.TransientModel):
         # ── Subscription (required) — must be created BEFORE session/template
         # enrollments so the subscription constraint can validate new enrolments.
         # ─────────────────────────────────────────────────────────────────────
+        existing_hh_path = not self.create_new_household and bool(self.household_id)
+        sub = None
         if self.plan_id:
             sub_start = self.subscription_start_date or fields.Date.today()
-            self.env['dojo.member.subscription'].create({
+            if existing_hh_path:
+                # Existing household: always create as pending and invoice the guardian.
+                # Subscription activates automatically when the invoice is paid.
+                sub_state = 'pending'
+            else:
+                sub_state = 'pending' if self.defer_payment else 'active'
+            sub = self.env['dojo.member.subscription'].create({
                 'member_id': member.id,
                 'plan_id': self.plan_id.id,
                 'start_date': sub_start,
                 'next_billing_date': sub_start,  # first invoice covers sub_start → sub_start+period
-                'state': 'active',
+                'state': sub_state,
                 'company_id': self.env.company.id,
             })
-        # Transition membership state to active
-        member.action_set_active()
+            if existing_hh_path:
+                # Generate an invoice for the household guardian immediately.
+                sub.action_generate_invoice()
+        # Transition membership state — immediately for new-household paths only.
+        # For existing households the payment hook activates the member when paid.
+        if not existing_hh_path and not self.defer_payment:
+            member.action_set_active()
 
         # ── Program enrollment — access is now controlled by subscription ─────
         # No action needed here; the subscription plan links member to program.
@@ -557,7 +579,7 @@ class DojoOnboardingWizard(models.TransientModel):
     def _send_welcome_sms(self, member):
         """Send a welcome SMS to the member's mobile/phone via sms.sms (Twilio)."""
         partner = member.partner_id
-        number = partner.mobile or partner.phone
+        number = getattr(partner, 'mobile', None) or partner.phone
         if not number:
             return
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')

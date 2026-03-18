@@ -281,7 +281,7 @@ class MemberProfile extends Component {
 
     roleLabel(role) {
         return (
-            { student: "Student", parent: "Parent", both: "Parent & Student" }[role]
+            { student: "Student", parent: "Parent", both: "Standalone" }[role]
             || role
         );
     }

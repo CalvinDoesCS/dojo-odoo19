@@ -1,7 +1,7 @@
 {
-    'name': 'Dojo Member Portal',
+    'name': 'Dojang Member Portal',
     'version': '19.0.3.0.0',
-    'summary': 'Self-service portal for dojo parents and students',
+    'summary': 'Self-service portal for Dojang parents and students',
     'description': """
         Extends the Odoo website portal (/my) with dojo-specific pages:
         - My Schedule: browse upcoming open class sessions

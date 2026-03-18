@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Attendance",
+    "name": "Dojang Attendance",
     "summary": "Session attendance logging",
     "version": "19.0.1.0.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": ["dojo_classes"],
     "data": [
         "security/ir.model.access.csv",

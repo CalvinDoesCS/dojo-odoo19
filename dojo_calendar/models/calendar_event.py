@@ -14,10 +14,10 @@ class CalendarEvent(models.Model):
 
     x_session_id = fields.Many2one(
         "dojo.class.session",
-        string="Dojo Session",
+        string="Dojang Session",
         ondelete="set null",
         index=True,
-        help="The dojo class session this calendar event represents.",
+        help="The Dojang class session this calendar event represents.",
     )
 
     x_capacity = fields.Integer(

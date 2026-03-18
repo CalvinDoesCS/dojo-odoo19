@@ -2,13 +2,14 @@ import logging
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+from odoo.tools import html2plaintext
 
 _logger = logging.getLogger(__name__)
 
 
 class DojoMemberSubscription(models.Model):
     _name = "dojo.member.subscription"
-    _description = "Dojo Member Subscription"
+    _description = "Dojang Member Subscription"
     _rec_name = "name"
 
     name = fields.Char(
@@ -41,6 +42,7 @@ class DojoMemberSubscription(models.Model):
     state = fields.Selection(
         [
             ("draft", "Draft"),
+            ("pending", "Pending Payment"),
             ("active", "Active"),
             ("paused", "Paused"),
             ("cancelled", "Cancelled"),
@@ -104,6 +106,11 @@ class DojoMemberSubscription(models.Model):
                 rec.grace_period_end = rec.last_billing_failure_date + relativedelta(days=30)
             else:
                 rec.grace_period_end = False
+
+    @api.onchange('plan_id', 'start_date')
+    def _onchange_plan_end_date(self):
+        if self.plan_id and self.plan_id.duration and self.start_date:
+            self.end_date = self.start_date + relativedelta(months=self.plan_id.duration)
 
     # ── Helpers ───────────────────────────────────────────────────────────
     def _billing_partner(self):
@@ -297,6 +304,35 @@ class DojoMemberSubscription(models.Model):
             },
         }
 
+    # ── State transition actions ──────────────────────────────────────────
+    def action_set_active(self):
+        """Manually activate the subscription."""
+        for rec in self:
+            rec.write({'state': 'active'})
+            rec.member_id.sudo().write({'membership_state': 'active'})
+
+    def action_set_pending(self):
+        """Set the subscription to pending payment."""
+        for rec in self:
+            rec.write({'state': 'pending'})
+
+    def action_set_paused(self):
+        """Pause the subscription."""
+        for rec in self:
+            rec.write({'state': 'paused'})
+            rec.member_id.sudo().write({'membership_state': 'paused'})
+
+    def action_set_cancelled(self):
+        """Cancel the subscription."""
+        for rec in self:
+            rec.write({'state': 'cancelled'})
+            rec.member_id.sudo().write({'membership_state': 'cancelled'})
+
+    def action_set_draft(self):
+        """Reset the subscription to draft."""
+        for rec in self:
+            rec.write({'state': 'draft'})
+
     # ── Daily cron ────────────────────────────────────────────────────────
     @api.model
     def _cron_generate_invoices(self):
@@ -481,6 +517,17 @@ class DojoMemberSubscription(models.Model):
     # ── Program Enrollment auto-management ───────────────────────────────
     @api.model_create_multi
     def create(self, vals_list):
+        today = fields.Date.today()
+        for vals in vals_list:
+            if vals.get('end_date'):
+                continue
+            plan_id = vals.get('plan_id')
+            if not plan_id:
+                continue
+            plan = self.env['dojo.subscription.plan'].browse(plan_id)
+            if plan.duration and plan.duration > 0:
+                start = fields.Date.to_date(vals.get('start_date') or today)
+                vals['end_date'] = start + relativedelta(months=plan.duration)
         records = super().create(vals_list)
         Enrollment = self.env['dojo.program.enrollment'].sudo()
         today = fields.Date.today()
@@ -536,7 +583,7 @@ class DojoMemberSubscription(models.Model):
                         'deactivated_date': today,
                     })
 
-            elif new_state == 'active' and old_state in ('expired', 'paused', 'cancelled', 'draft'):
+            elif new_state == 'active' and old_state in ('expired', 'paused', 'cancelled', 'draft', 'pending'):
                 # Reactivate the enrollment(s) belonging to this subscription
                 enrollments = Enrollment.search([
                     ('subscription_id', '=', rec.id),
@@ -566,3 +613,81 @@ class DojoMemberSubscription(models.Model):
                         })
 
         return result
+
+    # ── Expiry management ─────────────────────────────────────────────────
+    @api.model
+    def _cron_expire_ended_subscriptions(self):
+        """Daily cron — expire active/paused subscriptions whose end_date has passed."""
+        today = fields.Date.today()
+        ended = self.search([
+            ('state', 'in', ('active', 'paused')),
+            ('end_date', '!=', False),
+            ('end_date', '<', today),
+        ])
+        for sub in ended:
+            sub.state = 'expired'
+            sub.member_id.sudo().write({'membership_state': 'cancelled'})
+            _logger.info(
+                'Dojo subscriptions: subscription %s expired (end_date=%s).',
+                sub.id, sub.end_date,
+            )
+
+    @api.model
+    def _cron_send_expiry_reminders(self):
+        """Daily cron — send email + SMS reminders at 30 and 7 days before end_date."""
+        today = fields.Date.today()
+        thresholds = [
+            today + relativedelta(days=30),
+            today + relativedelta(days=7),
+        ]
+        email_template = self.env.ref(
+            'dojo_subscriptions.mail_template_expiry_reminder_email',
+            raise_if_not_found=False,
+        )
+        sms_template = self.env.ref(
+            'dojo_subscriptions.mail_template_expiry_reminder_sms',
+            raise_if_not_found=False,
+        )
+        for threshold in thresholds:
+            due = self.search([
+                ('state', '=', 'active'),
+                ('end_date', '=', threshold),
+            ])
+            for sub in due:
+                billing_partner = sub._billing_partner()
+                if not billing_partner:
+                    continue
+                try:
+                    if email_template and billing_partner.email:
+                        email_template.send_mail(
+                            sub.id,
+                            force_send=True,
+                            raise_exception=False,
+                            email_values={
+                                'email_to': billing_partner.email,
+                                'partner_ids': [(4, billing_partner.id)],
+                            },
+                        )
+                    mobile = getattr(billing_partner, 'mobile', None) or billing_partner.phone
+                    if sms_template and mobile:
+                        body = sms_template._render_field(
+                            'body_html', [sub.id], compute_lang=True
+                        )[sub.id]
+                        body_plain = (
+                            html2plaintext(body)
+                            if body
+                            else (
+                                f"Reminder: your {sub.plan_id.name} membership expires on "
+                                f"{sub.end_date}. Contact us to renew."
+                            )
+                        )
+                        self.env['sms.sms'].create({
+                            'number': mobile,
+                            'body': body_plain,
+                            'partner_id': billing_partner.id,
+                        }).send()
+                except Exception:
+                    _logger.warning(
+                        'Dojo expiry reminder: failed to notify subscription %s.',
+                        sub.id, exc_info=True,
+                    )

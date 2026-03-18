@@ -4,7 +4,7 @@
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
          PORTAL HOME – inject dojo tiles into /my
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <template id="portal_my_home_dojo" name="Portal My Home: Dojo entries"
+    <template id="portal_my_home_dojo" name="Portal My Home: Dojang entries"
               inherit_id="portal.portal_my_home" customize_show="False" priority="30">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <!-- Resolve member role once for conditional tile visibility -->
@@ -13,13 +13,13 @@
 
             <!-- Dojo Portal tile — rendered directly to avoid d-none count-gating -->
             <div class="o_portal_index_card col-md-6 order-2">
-                <a href="/my/dojo" title="Dojo Portal" class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none bg-100">
+                <a href="/my/dojo" title="Dojang Portal" class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none bg-100">
                     <div class="o_portal_icon d-block align-self-start">
                         <img src="/dojo_members_portal/static/src/img/dojo_icon.svg"/>
                     </div>
                     <div>
                         <div class="mt-0 mb-1 fs-5 fw-normal lh-1">
-                            <span>Dojo Portal</span>
+                            <span>Dojang Portal</span>
                         </div>
                         <div class="opacity-75">Schedule, enrollments and attendance</div>
                     </div>
@@ -50,7 +50,7 @@
                         <div class="mt-0 mb-1 fs-5 fw-normal lh-1">
                             <span>My Household</span>
                         </div>
-                        <div class="opacity-75">View your dojo household members</div>
+                        <div class="opacity-75">View your Dojang household members</div>
                     </div>
                 </a>
             </div>
@@ -59,7 +59,7 @@
 
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━         DOJO HOME  /my/dojo
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <template id="portal_dojo_home" name="Dojo Portal">
+    <template id="portal_dojo_home" name="Dojang Portal">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="False"/>
 
@@ -85,7 +85,7 @@
                                 <span class="dojo-chip dojo-chip--accent">Parent</span>
                             </t>
                             <t t-elif="member.role == 'both'">
-                                <span class="dojo-chip dojo-chip--success">Student &amp; Parent</span>
+                                <span class="dojo-chip dojo-chip--success">Standalone</span>
                             </t>
                             <t t-else="">
                                 <span class="dojo-chip dojo-chip--neutral">Student</span>
@@ -94,6 +94,13 @@
                                 <span class="dojo-chip dojo-chip--ghost"
                                       t-attf-style="border-color:#{current_rank.color};color:#{current_rank.color};"
                                       t-out="current_rank.name"/>
+                            </t>
+                            <t t-if="current_rank and max_stripes and max_stripes > 0">
+                                <span class="dojo-belt-stripes d-inline-flex align-items-center gap-1 ms-1" title="Belt stripes">
+                                    <t t-foreach="range(max_stripes)" t-as="i">
+                                        <span t-attf-style="display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #{current_rank.color or '#888'};background:#{current_rank.color if i &lt; current_stripes else 'transparent'};"/>
+                                    </t>
+                                </span>
                             </t>
                         </div>
                         <!-- Household + member number -->
@@ -396,9 +403,9 @@
 
                     <div class="alert alert-info mt-2" role="alert">
                         <i class="fa fa-info-circle"/> To update household information or emergency contacts,
-                        please contact the dojo admin.
+                        please contact the Dojang admin.
                     </div>
-                    <a href="/my/dojo" class="btn btn-secondary btn-sm">Back to Dojo Home</a>
+                    <a href="/my/dojo" class="btn btn-secondary btn-sm">Back to Dojang Home</a>
                 </div>
             </t>
         </t>
@@ -407,13 +414,13 @@
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
          FALLBACK – user has no dojo.member record
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <template id="portal_no_member" name="No Dojo Member">
+    <template id="portal_no_member" name="No Dojang Member">
         <t t-call="portal.portal_layout">
             <div class="alert alert-warning mt-4" role="alert">
                 <h4 class="alert-heading">No Member Profile Found</h4>
                 <p>
-                    Your account is not linked to a dojo member profile yet.
-                    Please contact the dojo admin to get this set up.
+                    Your account is not linked to a Dojang member profile yet.
+                    Please contact the Dojang admin to get this set up.
                 </p>
                 <a href="/my" class="btn btn-primary">Back to My Account</a>
             </div>

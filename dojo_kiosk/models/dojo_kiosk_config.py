@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 
 class DojoKioskConfig(models.Model):
     _name = "dojo.kiosk.config"
-    _description = "Dojo Kiosk Configuration"
+    _description = "Dojang Kiosk Configuration"
     _order = "name"
 
     name = fields.Char(string="Kiosk Name", required=True)
@@ -51,9 +51,9 @@ class DojoKioskConfig(models.Model):
         help="Determines the check-in interface shown to students.",
     )
     show_title = fields.Boolean(
-        string="Show Dojo Title",
+        string="Show Dojang Title",
         default=True,
-        help="Show the 'Dojo' title in the kiosk header.",
+        help="Show the 'Dojang' title in the kiosk header.",
     )
     announcement_ids = fields.One2many(
         "dojo.kiosk.announcement",

@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 class DojoSubscriptionPlan(models.Model):
     _name = "dojo.subscription.plan"
-    _description = "Dojo Subscription Plan"
+    _description = "Dojang Subscription Plan"
 
     name = fields.Char(required=True)
     code = fields.Char()
@@ -31,6 +31,11 @@ class DojoSubscriptionPlan(models.Model):
         default="monthly",
         required=True,
     )
+    duration = fields.Integer(
+        string='Duration (Months)',
+        default=0,
+        help='Fixed membership length in months. 0 = ongoing (no fixed end date).',
+    )
     sessions_per_period = fields.Integer(default=0)
     unlimited_sessions = fields.Boolean(default=True)
     description = fields.Text()
@@ -53,7 +58,7 @@ class DojoSubscriptionPlan(models.Model):
         help=(
             "Program-Based: member may attend any class that belongs to the selected program "
             "(subject to weekly session cap).\n"
-            "Course-Based: member may only attend the specific class templates listed below "
+            "Course-Based: member may only attend the specific courses listed below "
             "(subject to weekly and period caps)."
         ),
     )
@@ -75,7 +80,7 @@ class DojoSubscriptionPlan(models.Model):
         'template_id',
         string='Allowed Courses',
         help=(
-            'Course-Based plans only. Which class templates members may enrol in. '
+            'Course-Based plans only. Which courses members may enrol in. '
             'Leave empty to allow any class (session-cap rules still apply).'
         ),
     )

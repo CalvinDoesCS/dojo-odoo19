@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class DojoInstructorProfile(models.Model):
     _name = "dojo.instructor.profile"
-    _description = "Dojo Instructor Profile"
+    _description = "Dojang Instructor Profile"
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
     name = fields.Char(required=True, tracking=True)

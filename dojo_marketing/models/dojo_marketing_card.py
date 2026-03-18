@@ -22,7 +22,7 @@ _PERSONAL_TYPES = {"badge"}
 
 class DojoMarketingCard(models.Model):
     _name = "dojo.marketing.card"
-    _description = "Dojo Marketing Card"
+    _description = "Dojang Marketing Card"
     _order = "sequence, id"
 
     name = fields.Char(required=True, string="Card Title")

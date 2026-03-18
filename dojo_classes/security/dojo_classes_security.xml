@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="rule_dojo_class_template_instructor_company" model="ir.rule">
-        <field name="name">Class Template Instructor Company</field>
+        <field name="name">Course Instructor Company</field>
         <field name="model_id" ref="model_dojo_class_template"/>
         <field name="groups" eval="[(4, ref('dojo_base.group_dojo_instructor'))]"/>
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
@@ -22,7 +22,7 @@
     </record>
 
     <record id="rule_dojo_class_template_parent_company" model="ir.rule">
-        <field name="name">Class Template Parent Company</field>
+        <field name="name">Course Parent Company</field>
         <field name="model_id" ref="model_dojo_class_template"/>
         <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>

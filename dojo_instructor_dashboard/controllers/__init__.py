@@ -1,1 +1,1 @@
-from . import ai_assistant
+# AI controller moved to dojo_assistant module

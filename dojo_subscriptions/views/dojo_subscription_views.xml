@@ -50,6 +50,7 @@
                 <field name="price"/>
                 <field name="initial_fee"/>
                 <field name="billing_period"/>
+                <field name="duration" string="Duration (mo)"/>
                 <field name="active"/>
             </list>
         </field>
@@ -72,6 +73,9 @@
                         <field name="initial_fee"/>
                         <field name="currency_id"/>
                         <field name="billing_period"/>
+                        <field name="duration"
+                               string="Duration (Months)"
+                               help="Fixed membership length in months. 0 = ongoing (no fixed end date)."/>
                         <field name="active"/>
                     </group>
                     <group string="Session Restrictions"
@@ -110,6 +114,7 @@
                 <field name="plan_type"/>
                 <field name="program_id"/>
                 <field name="start_date"/>
+                <field name="end_date"/>
                 <field name="next_billing_date"/>
                 <field name="state"/>
                 <field name="billing_failure_count" string="Failures" optional="show"
@@ -125,15 +130,38 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_set_active"
+                            type="object"
+                            string="Set Active"
+                            class="btn-success"
+                            invisible="state == 'active'"
+                            confirm="Activate this subscription? Credits will be issued immediately."/>
+                    <button name="action_set_pending"
+                            type="object"
+                            string="Set Pending"
+                            invisible="state in ('pending', 'cancelled', 'expired')"/>
+                    <button name="action_set_paused"
+                            type="object"
+                            string="Pause"
+                            invisible="state != 'active'"/>
+                    <button name="action_set_cancelled"
+                            type="object"
+                            string="Cancel"
+                            invisible="state in ('cancelled', 'expired')"
+                            confirm="Cancel this subscription? This cannot be easily undone."/>
+                    <button name="action_set_draft"
+                            type="object"
+                            string="Reset to Draft"
+                            invisible="state not in ('pending', 'cancelled')"/>
                     <button name="action_generate_invoice"
                             type="object"
                             string="Generate Invoice"
                             class="btn-primary"
-                            invisible="state != 'active'"
+                            invisible="state not in ('active', 'pending')"
                             groups="account.group_account_invoice"
                             confirm="This will create and post an invoice for the current billing cycle and advance the next billing date. Continue?"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,active,paused,cancelled"/>
+                           statusbar_visible="draft,pending,active,paused,cancelled"/>
                 </header>
                 <sheet>
                     <div name="button_box" class="oe_button_box">

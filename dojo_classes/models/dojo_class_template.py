@@ -6,7 +6,7 @@ from odoo.exceptions import ValidationError
 
 class DojoClassTemplate(models.Model):
     _name = "dojo.class.template"
-    _description = "Dojo Class Template"
+    _description = "Course"
 
     name = fields.Char(required=True)
     code = fields.Char()

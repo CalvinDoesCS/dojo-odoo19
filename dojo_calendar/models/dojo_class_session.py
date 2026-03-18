@@ -28,7 +28,7 @@ class DojoClassSession(models.Model):
         name = (
             self.name
             or (self.template_id.name if self.template_id else False)
-            or "Dojo Class"
+            or "Dojang Class"
         )
         partner_ids = []
         if self.instructor_profile_id and self.instructor_profile_id.partner_id:

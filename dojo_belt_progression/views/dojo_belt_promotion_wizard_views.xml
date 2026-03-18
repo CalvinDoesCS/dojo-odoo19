@@ -17,6 +17,7 @@
                                 <field name="do_promote" string="Promote"/>
                                 <field name="member_id" readonly="1"/>
                                 <field name="current_rank_id" readonly="1"/>
+                                <field name="current_stripe_count" readonly="1" string="Current Stripes"/>
                                 <field name="target_rank_id"/>
                             </list>
                         </field>

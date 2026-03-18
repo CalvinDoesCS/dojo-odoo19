@@ -5,7 +5,7 @@
  * Mounts to #kiosk-root on /kiosk/<token>
  */
 /* global owl */
-const { Component, useState, onMounted, onWillUnmount, mount, xml } = owl;
+const { Component, useState, onMounted, onWillUnmount, mount, xml, useRef } = owl;
 
 // ─── Config identity (per-tablet token from URL) ─────────────────────────────
 const KIOSK_TOKEN = window.KIOSK_TOKEN || null;
@@ -634,7 +634,7 @@ class MemberProfileCard extends Component {
                                 <label class="k-field__label">Subject</label>
                                 <input class="k-field__input" type="text"
                                     t-model="state.msgSubject"
-                                    placeholder="Message from your Dojo"/>
+                                    placeholder="Message from your Dojang"/>
                             </div>
                             <div class="k-field" style="margin-bottom:8px;">
                                 <label class="k-field__label">Message</label>
@@ -751,45 +751,6 @@ class MemberProfileCard extends Component {
                     </div>
                 </t>
 
-                <!-- ── Voice AI floating button (instructor mode) ── -->
-                <t t-if="props.instructorMode">
-                    <button t-attf-class="k-voice-btn #{state.voiceState === 'recording' ? 'k-voice-btn--recording' : ''} #{state.voiceState === 'processing' || state.voiceState === 'executing' ? 'k-voice-btn--processing' : ''}"
-                        t-on-click="onVoiceClick"
-                        title="Voice Command — tap to record, tap again to send">
-                        <t t-if="state.voiceState === 'recording'">⏹</t>
-                        <t t-elif="state.voiceState === 'processing' or state.voiceState === 'executing'">⌛</t>
-                        <t t-else="">🎤</t>
-                    </button>
-                    <t t-if="state.voiceState !== 'idle'">
-                        <div t-attf-class="k-voice-result #{state.voiceState === 'confirm' ? 'k-voice-result--confirm' : ''}"
-                            t-on-click="() => (state.voiceState !== 'confirm' &amp;&amp; state.voiceState !== 'executing') ? this.dismissVoice() : null">
-                            <t t-if="state.voiceTranscript">
-                                <div class="k-voice-result__transcript">"<t t-esc="state.voiceTranscript"/>"</div>
-                            </t>
-                            <t t-if="state.voiceState === 'processing' or state.voiceState === 'executing'">
-                                <div class="k-voice-result__response">
-                                    <t t-if="state.voiceState === 'executing'">Executing…</t>
-                                    <t t-else="">Processing…</t>
-                                </div>
-                            </t>
-                            <t t-if="state.voiceResponse and state.voiceState !== 'processing' and state.voiceState !== 'executing'">
-                                <div class="k-voice-result__response" t-esc="state.voiceResponse"/>
-                            </t>
-                            <t t-if="state.voiceActionText and state.voiceState === 'done'">
-                                <div class="k-voice-result__action" t-esc="state.voiceActionText"/>
-                            </t>
-                            <!-- Confirmation buttons (shown only for non-info actions) -->
-                            <t t-if="state.voiceState === 'confirm'">
-                                <div class="k-voice-result__confirm-row">
-                                    <button class="k-btn k-btn--secondary k-voice-result__cancel-btn"
-                                        t-on-click.stop="dismissVoice">Cancel</button>
-                                    <button class="k-btn k-btn--primary k-voice-result__confirm-btn"
-                                        t-on-click.stop="confirmVoiceAction">✓ Confirm</button>
-                                </div>
-                            </t>
-                        </div>
-                    </t>
-                </t>
 
             </div>
         </div>
@@ -813,7 +774,7 @@ class MemberProfileCard extends Component {
             promoteError: "",
             // Manage tab — guardians & messaging
             checkedGuardianIds: [],
-            msgSubject: "Message from your Dojo",
+            msgSubject: "Message from your Dojang",
             msgBody: "",
             msgSendSms: true,
             msgSendEmail: true,
@@ -826,21 +787,6 @@ class MemberProfileCard extends Component {
             sessionsLoading: false,
             sessionsLoadError: "",
             sessionRemoveMsg: "",
-            // Voice AI
-            voiceState: "idle",  // idle | recording | processing | confirm | executing | done | error
-            voiceTranscript: "",
-            voiceResponse: "",
-            voiceActionText: "",
-            voicePendingAction: null,  // { action, params } awaiting confirmation
-        });
-        onWillUnmount(() => {
-            clearTimeout(this._voiceDismissTimer);
-            if (this._voiceRecorder && this._voiceRecorder.state === "recording") {
-                this._voiceRecorder.stop();
-            }
-            if (this._voiceStream) {
-                this._voiceStream.getTracks().forEach(t => t.stop());
-            }
         });
     }
 
@@ -958,7 +904,7 @@ class MemberProfileCard extends Component {
             const result = await jsonPost("/kiosk/instructor/send_message", {
                 member_id: this.props.member.member_id,
                 guardian_member_ids: this.state.checkedGuardianIds,
-                subject: this.state.msgSubject || "Message from your Dojo",
+                subject: this.state.msgSubject || "Message from your Dojang",
                 message: this.state.msgBody,
                 send_sms: this.state.msgSendSms,
                 send_email: this.state.msgSendEmail,
@@ -1040,121 +986,6 @@ class MemberProfileCard extends Component {
         this.state.sessionRemoveMsg = "Removed from session.";
     }
 
-    // ── Voice AI ──────────────────────────────────────────────────
-
-    onVoiceClick() {
-        if (this.state.voiceState === "idle") this.startVoice();
-        else if (this.state.voiceState === "recording") this.stopVoice();
-        else this.dismissVoice();
-    }
-
-    async startVoice() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this._voiceStream = stream;
-            this._voiceChunks = [];
-            this._voiceRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-            this._voiceRecorder.ondataavailable = ev => {
-                if (ev.data && ev.data.size > 0) this._voiceChunks.push(ev.data);
-            };
-            this._voiceRecorder.onstop = () => this._onVoiceStop();
-            this._voiceRecorder.start();
-            this.state.voiceState = "recording";
-            this.state.voiceTranscript = "";
-            this.state.voiceResponse = "";
-            this.state.voiceActionText = "";
-        } catch {
-            this.state.voiceState = "error";
-            this.state.voiceResponse = "Microphone access denied. Please allow mic in browser settings.";
-        }
-    }
-
-    stopVoice() {
-        if (this._voiceRecorder && this._voiceRecorder.state === "recording") {
-            this._voiceRecorder.stop();
-        }
-        if (this._voiceStream) this._voiceStream.getTracks().forEach(t => t.stop());
-    }
-
-    async _onVoiceStop() {
-        this.state.voiceState = "processing";
-        try {
-            const blob = new Blob(this._voiceChunks, { type: "audio/webm" });
-            const ab = await blob.arrayBuffer();
-            const bytes = new Uint8Array(ab);
-            let binary = "";
-            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-            const b64 = btoa(binary);
-            const result = await jsonPost("/kiosk/instructor/voice_command", {
-                member_id: this.props.member.member_id,
-                session_id: this.props.sessionId,
-                audio_data_b64: b64,
-                dry_run: true,
-            });
-            if (result && result.success) {
-                this.state.voiceTranscript = result.transcribed_text || "";
-                this.state.voiceResponse = result.response_text || "";
-                // For info-only responses execute immediately (no side effects);
-                // for all mutating actions, require explicit confirmation first.
-                if (!result.action || result.action === "info") {
-                    this.state.voiceActionText = "";
-                    this.state.voiceState = "done";
-                    clearTimeout(this._voiceDismissTimer);
-                    this._voiceDismissTimer = setTimeout(() => this.dismissVoice(), 8000);
-                } else {
-                    this.state.voicePendingAction = { action: result.action, params: result.params || {} };
-                    this.state.voiceState = "confirm";
-                }
-            } else {
-                this.state.voiceState = "error";
-                this.state.voiceResponse = (result && result.error) || "Voice command failed.";
-            }
-        } catch {
-            this.state.voiceState = "error";
-            this.state.voiceResponse = "Network error processing voice command.";
-        }
-    }
-
-    async confirmVoiceAction() {
-        if (!this.state.voicePendingAction) return;
-        const { action, params } = this.state.voicePendingAction;
-        this.state.voicePendingAction = null;
-        this.state.voiceState = "executing";
-        try {
-            const result = await jsonPost("/kiosk/instructor/voice_command/execute", {
-                member_id: this.props.member.member_id,
-                session_id: this.props.sessionId,
-                action,
-                params,
-            });
-            if (result && result.success) {
-                this.state.voiceActionText = result.action_taken
-                    ? `✓ Action: ${result.action_taken.replace(/_/g, " ")}`
-                    : "";
-                this.state.voiceState = "done";
-                if (result.action_taken && this.props.onRefreshProfile) {
-                    await this.props.onRefreshProfile(this.props.member);
-                }
-                clearTimeout(this._voiceDismissTimer);
-                this._voiceDismissTimer = setTimeout(() => this.dismissVoice(), 6000);
-            } else {
-                this.state.voiceState = "error";
-                this.state.voiceResponse = (result && result.error) || "Action failed.";
-            }
-        } catch {
-            this.state.voiceState = "error";
-            this.state.voiceResponse = "Network error executing action.";
-        }
-    }
-
-    dismissVoice() {
-        clearTimeout(this._voiceDismissTimer);
-        this.state.voiceState = "idle";
-        this.state.voiceTranscript = "";
-        this.state.voiceResponse = "";
-        this.state.voiceActionText = "";
-        this.state.voicePendingAction = null;
-    }
 }
 
 // ─── HomeContent ──────────────────────────────────────────────────────────────
@@ -1651,7 +1482,7 @@ class CreateSessionModal extends Component {
                     </t>
                     <t t-else="">
                         <div class="k-field">
-                            <label class="k-field__label">Class Template</label>
+                            <label class="k-field__label">Course</label>
                             <select class="k-field__input" t-on-change="onTemplateChange">
                                 <option value="">— Select a template —</option>
                                 <t t-foreach="state.templates" t-as="tmpl" t-key="tmpl.id">
@@ -2157,6 +1988,236 @@ class KioskSettingsModal extends Component {
     static props = ["onClose", "fontSize", "theme", "idleMinutes", "showTitle", "onFontSize", "onTheme", "onIdleMinutes", "onShowTitle"];
 }
 
+// ─── KioskVoiceAssistant ──────────────────────────────────────────────────────
+/**
+ * Floating AI voice assistant panel for the kiosk.
+ * Uses /kiosk/ai/text and /kiosk/ai/voice (token-validated, role=kiosk).
+ * No Odoo module imports — uses the same plain-fetch jsonPost utility.
+ */
+
+class KioskVoiceAssistant extends Component {
+    static template = xml`
+        <div class="k-ai-widget">
+            <!-- Floating toggle button -->
+            <button t-attf-class="k-ai-btn #{state.open ? 'k-ai-btn--active' : ''}"
+                    t-on-click="toggle"
+                    title="AI Assistant">
+                🤖
+            </button>
+
+            <!-- Chat panel -->
+            <t t-if="state.open">
+                <div class="k-ai-panel">
+                    <div class="k-ai-panel__header">
+                        <span class="k-ai-panel__title">
+                            <t t-if="props.instructorMode">🤖 Instructor AI</t>
+                            <t t-else="">🤖 AI Assistant</t>
+                        </span>
+                        <button class="k-ai-panel__close" t-on-click="close">✕</button>
+                    </div>
+
+                    <div class="k-ai-panel__messages" t-ref="msgList">
+                        <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                            <div t-attf-class="k-ai-msg k-ai-msg--#{msg.role}">
+                                <div class="k-ai-msg__text" t-esc="msg.text"/>
+                                <div class="k-ai-msg__time" t-esc="msg.time"/>
+                            </div>
+                        </t>
+                        <t t-if="state.processing">
+                            <div class="k-ai-msg k-ai-msg--assistant k-ai-msg--typing">
+                                <span class="k-ai-typing-dot"/>
+                                <span class="k-ai-typing-dot"/>
+                                <span class="k-ai-typing-dot"/>
+                            </div>
+                        </t>
+                        <div t-ref="msgEnd"/>
+                    </div>
+
+                    <div class="k-ai-panel__footer">
+                        <input class="k-ai-input"
+                            type="text"
+                            placeholder="Ask something…"
+                            t-att-value="state.input"
+                            t-on-input="onInputChange"
+                            t-on-keydown="onInputKeydown"
+                            t-att-disabled="state.processing or undefined"/>
+                        <button t-attf-class="k-ai-mic #{state.recording ? 'k-ai-mic--active' : ''}"
+                            t-on-click="toggleRecording"
+                            title="Voice input">
+                            🎙️
+                        </button>
+                        <button class="k-ai-send"
+                            t-on-click="send"
+                            t-att-disabled="!state.input.trim() or state.processing or undefined">
+                            ➤
+                        </button>
+                    </div>
+                </div>
+            </t>
+        </div>
+    `;
+
+    static props = ["instructorMode"];
+
+    setup() {
+        this.state = useState({
+            open: false,
+            messages: [],
+            input: "",
+            recording: false,
+            processing: false,
+        });
+        this._msgListRef = useRef("msgList");
+        this._msgEndRef  = useRef("msgEnd");
+        this._mediaRecorder = null;
+        this._audioChunks   = [];
+        this._stream        = null;
+        this._recordTimeout = null;
+        this._lastRole = null;
+    }
+
+    get _role() {
+        return this.props.instructorMode ? "instructor" : "kiosk";
+    }
+
+    toggle() {
+        this.state.open = !this.state.open;
+        // Reset conversation when switching between roles
+        if (this.state.open && (this.state.messages.length === 0 || this._lastRole !== this._role)) {
+            this.state.messages = [];
+            this._lastRole = this._role;
+            const greeting = this.props.instructorMode
+                ? "👋 Instructor mode. I can help you manage attendance, check rosters, look up members, and more."
+                : "👋 Hi! I can help you look up members, check sessions, or answer questions about the dojo. What would you like to know?";
+            this._push("assistant", greeting);
+        }
+        if (this.state.open) setTimeout(() => this._scrollBottom(), 60);
+    }
+
+    close() { this.state.open = false; }
+
+    onInputChange(ev) { this.state.input = ev.target.value; }
+
+    onInputKeydown(ev) {
+        if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); this.send(); }
+    }
+
+    async send() {
+        const text = (this.state.input || "").trim();
+        if (!text || this.state.processing) return;
+        this.state.input = "";
+        await this._submitText(text);
+    }
+
+    async _submitText(text) {
+        this._push("user", text);
+        this.state.processing = true;
+        this._scrollBottom();
+        try {
+            const result = await jsonPost("/kiosk/ai/text", { text, role: this._role });
+            if (result.success !== false) {
+                this._push("assistant", result.response || "Done.");
+            } else {
+                this._push("assistant", "⚠️ " + (result.error || "Unknown error."));
+            }
+        } catch {
+            this._push("assistant", "⚠️ Network error — please try again.");
+        } finally {
+            this.state.processing = false;
+            this._scrollBottom();
+        }
+    }
+
+    async toggleRecording() {
+        if (this.state.recording) {
+            this._stopRecording();
+        } else {
+            await this._startRecording();
+        }
+    }
+
+    async _startRecording() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this._push("assistant", "⚠️ Microphone not available in this browser.");
+            return;
+        }
+        try {
+            this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+            this._push("assistant", "⚠️ Microphone access denied. Please allow it in your browser.");
+            return;
+        }
+
+        this._audioChunks = [];
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus" : "audio/webm";
+        this._mediaRecorder = new MediaRecorder(this._stream, { mimeType });
+        this._mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) this._audioChunks.push(e.data);
+        };
+        this._mediaRecorder.onstop = () => this._processRecording();
+        this._mediaRecorder.start(250);
+        this.state.recording = true;
+        this._recordTimeout = setTimeout(() => {
+            if (this.state.recording) this._stopRecording();
+        }, 60000);
+    }
+
+    _stopRecording() {
+        if (this._recordTimeout) { clearTimeout(this._recordTimeout); this._recordTimeout = null; }
+        if (this._mediaRecorder && this._mediaRecorder.state !== "inactive") {
+            this._mediaRecorder.stop();
+        }
+        if (this._stream) { this._stream.getTracks().forEach(t => t.stop()); this._stream = null; }
+        this.state.recording = false;
+    }
+
+    async _processRecording() {
+        if (!this._audioChunks.length) return;
+        const blob = new Blob(this._audioChunks, { type: "audio/webm" });
+        this._audioChunks = [];
+
+        this._push("user", "🎙️ [voice message]");
+        this.state.processing = true;
+        this._scrollBottom();
+
+        const formData = new FormData();
+        formData.append("audio", blob, "recording.webm");
+        if (KIOSK_TOKEN) formData.append("token", KIOSK_TOKEN);
+        formData.append("role", this._role);
+
+        try {
+            const resp = await fetch("/kiosk/ai/voice", { method: "POST", body: formData });
+            const result = await resp.json();
+            if (result.success !== false) {
+                const msgs = this.state.messages;
+                const last = [...msgs].reverse().find(m => m.role === "user");
+                if (last && last.text === "🎙️ [voice message]" && result.transcribed) {
+                    last.text = "🎙️ " + result.transcribed;
+                }
+                this._push("assistant", result.response || "Done.");
+            } else {
+                this._push("assistant", "⚠️ " + (result.error || "Voice processing failed."));
+            }
+        } catch {
+            this._push("assistant", "⚠️ Could not process voice recording.");
+        } finally {
+            this.state.processing = false;
+            this._scrollBottom();
+        }
+    }
+
+    _push(role, text) {
+        const time = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+        this.state.messages.push({ role, text, time });
+    }
+
+    _scrollBottom() {
+        const el = this._msgEndRef.el;
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
+}
+
 // ─── KioskApp (root) ─────────────────────────────────────────────────────────
 
 class KioskApp extends Component {
@@ -2186,7 +2247,7 @@ class KioskApp extends Component {
             <!-- ── Header (single, conditional modifier class) ── -->
             <div t-attf-class="k-header #{state.instructorMode ? 'k-header--instructor' : ''}">
                 <t t-if="state.showTitle">
-                    <span class="k-header__logo">🥋 Dojo</span>
+                    <span class="k-header__logo">🥋 Dojang</span>
                 </t>
 
                 <!-- Student mode: search bar -->
@@ -2390,6 +2451,11 @@ class KioskApp extends Component {
                     onShowTitle="(v) => this.onShowTitle(v)"/>
             </t>
 
+            <!-- ── AI Voice Assistant ── -->
+            <t t-if="!state.idle">
+                <KioskVoiceAssistant instructorMode="state.instructorMode"/>
+            </t>
+
         </div>
     `;
 
@@ -2409,6 +2475,7 @@ class KioskApp extends Component {
         SessionEditModal,
         KioskSettingsModal,
         CreateSessionModal,
+        KioskVoiceAssistant,
     };
 
     setup() {

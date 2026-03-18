@@ -1,5 +1,5 @@
 {
-    'name': 'Dojo Sign & Waivers',
+    'name': 'Dojang Sign & Waivers',
     'version': '19.0.2.0.0',
     'summary': 'Inline waiver signing during member onboarding (Community-compatible)',
     'description': """

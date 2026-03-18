@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoGuardianLink(models.Model):
     _name = "dojo.guardian.link"
-    _description = "Dojo Guardian Link"
+    _description = "Dojang Guardian Link"
 
     household_id = fields.Many2one("dojo.household", required=True, index=True, ondelete="cascade")
     guardian_member_id = fields.Many2one(

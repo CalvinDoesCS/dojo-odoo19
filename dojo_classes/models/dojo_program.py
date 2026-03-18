@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class DojoProgram(models.Model):
     _name = "dojo.program"
-    _description = "Dojo Program / Curriculum"
+    _description = "Dojang Program / Curriculum"
     _order = "sequence, name"
 
     name = fields.Char(required=True)
@@ -23,7 +23,7 @@ class DojoProgram(models.Model):
 
     # ── Related records ───────────────────────────────────────────────────
     template_ids = fields.One2many(
-        "dojo.class.template", "program_id", string="Class Templates"
+        "dojo.class.template", "program_id", string="Courses"
     )
     template_count = fields.Integer(
         compute="_compute_template_count", store=True
@@ -40,7 +40,7 @@ class DojoProgram(models.Model):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
-            "name": "Class Templates",
+            "name": "Courses",
             "res_model": "dojo.class.template",
             "view_mode": "list,form",
             "domain": [("program_id", "=", self.id)],

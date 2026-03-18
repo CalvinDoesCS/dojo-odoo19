@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="ir_cron_check_belt_eligibility" model="ir.cron">
-        <field name="name">Dojo: Check Belt Test Eligibility</field>
+        <field name="name">Dojang: Check Belt Test Eligibility</field>
         <field name="model_id" ref="dojo_base.model_dojo_member"/>
         <field name="state">code</field>
         <field name="code">model._cron_check_belt_eligibility()</field>

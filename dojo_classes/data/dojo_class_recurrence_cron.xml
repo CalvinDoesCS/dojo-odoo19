@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="ir_cron_dojo_class_recurrence" model="ir.cron">
-        <field name="name">Dojo: Generate Recurring Class Sessions</field>
+        <field name="name">Dojang: Generate Recurring Class Sessions</field>
         <field name="model_id" ref="dojo_classes.model_dojo_class_template"/>
         <field name="state">code</field>
         <field name="code">model._cron_generate_recurring_sessions()</field>

@@ -1,9 +1,9 @@
 {
-    "name": "Dojo Calendar",
+    "name": "Dojang Calendar",
     "version": "19.0.1.0.0",
-    "summary": "Class Calendar — sync dojo sessions to calendar.event with roster & attendance controls",
-    "author": "Dojo",
-    "category": "Dojo",
+    "summary": "Class Calendar — sync Dojang sessions to calendar.event with roster & attendance controls",
+    "author": "Dojang",
+    "category": "Dojang",
     "depends": ["dojo_classes", "dojo_attendance", "calendar"],
     "data": [
         "security/ir.model.access.csv",

@@ -10,6 +10,16 @@
 			"label": "Check Odoo logs",
 			"type": "shell",
 			"command": "docker logs odoo-web-1 2>&1 | tail -20"
+		},
+		{
+			"label": "Upgrade all modules (odoo19)",
+			"type": "shell",
+			"command": "cd /home/calvin/Documents/Work/odoo && docker compose run --rm web odoo -d odoo19 -u all --stop-after-init"
+		},
+		{
+			"label": "Upgrade dojo_onboarding (odoo19)",
+			"type": "shell",
+			"command": "cd /home/calvin/Documents/Work/odoo && docker compose run --rm web odoo -d odoo19 -u dojo_onboarding --stop-after-init"
 		}
 	]
 }

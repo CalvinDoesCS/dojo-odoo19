@@ -58,7 +58,7 @@ class DojoMarketingCampaign(models.Model):
     # Role filters (only used when target_all=False)
     filter_role_student = fields.Boolean(string="Students", default=True)
     filter_role_parent = fields.Boolean(string="Parents", default=True)
-    filter_role_both = fields.Boolean(string="Both (Student + Parent)", default=True)
+    filter_role_both = fields.Boolean(string="Standalone", default=True)
 
     # ── Schedule ─────────────────────────────────────────────────────
     schedule_type = fields.Selection(
@@ -221,10 +221,11 @@ class DojoMarketingCampaign(models.Model):
                     mail.send()
                     sent_emails += 1
 
-                if self.send_sms and self.body_sms and partner.mobile:
+                _sms_number = getattr(partner, 'mobile', None) or partner.phone
+                if self.send_sms and self.body_sms and _sms_number:
                     self.env["sms.sms"].sudo().create(
                         {
-                            "number": partner.mobile,
+                            "number": _sms_number,
                             "body": self.body_sms,
                             "partner_id": partner.id,
                         }

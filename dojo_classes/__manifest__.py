@@ -1,10 +1,10 @@
 {
-    "name": "Dojo Classes",
-    "summary": "Class templates, sessions, and enrollment",
+    "name": "Dojang Classes",
+    "summary": "Courses, sessions, and enrollment",
     "version": "19.0.1.2.0",
     "category": "Services",
     "license": "LGPL-3",
-    "author": "Dojo",
+    "author": "Dojang",
     "depends": ["dojo_members"],
     "data": [
         "security/ir.model.access.csv",

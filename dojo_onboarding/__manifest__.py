@@ -1,5 +1,5 @@
 {
-    'name': 'Dojo Onboarding',
+    'name': 'Dojang Onboarding',
     'version': '19.0.1.0.0',
     'summary': 'Step-by-step member onboarding wizard for admins and instructors',
     'description': """

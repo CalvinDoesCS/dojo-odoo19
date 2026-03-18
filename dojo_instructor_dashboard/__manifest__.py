@@ -1,17 +1,18 @@
 {
-    'name': 'Dojo Instructor Dashboard',
-    'version': '19.0.1.1.0',
+    'name': 'Dojang Instructor Dashboard',
+    'version': '19.0.1.2.0',
     'summary': 'Instructor and admin backend dashboard with quick attendance, student roster, todos, and calendar',
     'description': """
-        Provides a dedicated backend dashboard for Dojo instructors and admins:
+        Provides a dedicated backend dashboard for Dojang instructors and admins:
         - Today's sessions with quick attendance marking
         - My Students roster (with medical flags)
         - My Todos (filtered view of project.task)
         - Class calendar scoped to the logged-in instructor
         - KPI computed fields on instructor profiles
+        - AI voice assistant (via dojo_assistant module)
     """,
-    'author': 'Dojo',
-    'category': 'Dojo',
+    'author': 'Dojang',
+    'category': 'Dojang',
     'license': 'LGPL-3',
     'application': True,
     'installable': True,
@@ -22,7 +23,7 @@
         'dojo_communications',
         'project',
         'account',
-        'elevenlabs_connector',
+        'dojo_assistant',  # AI assistant functionality
     ],
     'data': [
         'security/ir.model.access.csv',

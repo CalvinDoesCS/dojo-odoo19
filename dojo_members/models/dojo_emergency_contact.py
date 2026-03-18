@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoEmergencyContact(models.Model):
     _name = "dojo.emergency.contact"
-    _description = "Dojo Emergency Contact"
+    _description = "Dojang Emergency Contact"
 
     member_id = fields.Many2one("dojo.member", required=True, ondelete="cascade", index=True)
     name = fields.Char(required=True)

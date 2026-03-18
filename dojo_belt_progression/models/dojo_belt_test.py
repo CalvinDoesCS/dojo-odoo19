@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class DojoBeltTest(models.Model):
     _name = "dojo.belt.test"
-    _description = "Dojo Belt Test Event"
+    _description = "Dojang Belt Test Event"
     _order = "test_date desc"
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
