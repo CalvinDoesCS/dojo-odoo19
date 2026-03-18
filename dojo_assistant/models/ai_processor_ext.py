@@ -47,6 +47,9 @@ IMPORTANT RULES:
 - If you cannot determine the intent, use intent_type "unknown" with confidence 0.0
 - Resolve entity names to IDs when possible using the database context
 - For member lookups, try to match names, member numbers, or partial names
+- CRITICAL: For parameter VALUES, always use the ACTUAL values from the user's input, NEVER use template placeholders like {{member_name}}, {{target_belt}}, {{class_name}} etc.
+  Example of CORRECT parameters: {{"member_name": "Mary Smith", "target_belt": "Blue Belt"}}
+  Example of WRONG parameters: {{"member_name": "{{member_name}}", "target_belt": "{{target_belt}}"}}
 
 Response format:
 {{
@@ -79,10 +82,31 @@ You are a helpful AI assistant for a martial arts dojo. You help instructors and
 Always be helpful, concise, and accurate. Use the database context to provide real information.
 When you need to perform an action (not just answer a question), output a structured intent.
 
-For actions, include at the very end of your response:
+Valid intent_type values (use EXACTLY these strings — do not invent variants):
+  member_lookup, class_list, belt_lookup, subscription_lookup, attendance_history,
+  schedule_today, member_enroll, member_unenroll, belt_promote,
+  subscription_create, subscription_cancel, contact_parent,
+  attendance_checkin, attendance_checkout, member_create, member_update,
+  class_create, class_cancel, course_enroll, belt_test_register, undo_action
+
+CRITICAL INTENT DISAMBIGUATION — read carefully:
+  • member_enroll      = reserve a spot in ONE specific class SESSION (e.g. "enroll in today's 6pm class")
+  • course_enroll      = add to the PERMANENT ROSTER of a course template (e.g. "add to roster", "add to the course")
+  • belt_lookup        = look up what belt rank someone currently has (e.g. "what belt is John?", "show belt ranks")
+  • belt_test_register = REGISTER a member to take a belt promotion TEST (e.g. "register for a belt test", "sign up for blue belt test", "schedule a belt promotion")
+
+KEYWORD RULES:
+  - "roster", "course roster", "permanent roster", "add to the course" → ALWAYS use course_enroll
+  - "today's class", "this session", "session at 6pm", "book for class today" → use member_enroll
+  - "register for a belt test", "sign up for belt test", "schedule belt test", "belt test" + register/sign up → ALWAYS use belt_test_register (NOT belt_lookup)
+  - "what belt is", "what rank", "belt rank" without register/test action → use belt_lookup
+
+For actions, include at the very end of your response (ALWAYS use REAL values, NOT template placeholders like {{member_name}}):
 {intent_start}
-{{"intent_type": "...", "parameters": {{...}}, "confidence": 0.9}}
+{{"intent_type": "course_enroll", "parameters": {{"member_name": "Mary Smith", "class_name": "Adult Fundamentals"}}, "confidence": 0.9}}
 {intent_end}
+
+Never put {{member_name}}, {{class_name}} etc. as parameter values. Always use the actual names from the user's message.
 
 Only include the intent block for actions, not for informational questions.
 """
@@ -201,8 +225,15 @@ class AIProcessorIntentExt(models.AbstractModel):
         )
 
         try:
-            # Get AI response
-            raw_response = self.process_query(text, {"system_prompt": system_prompt})
+            # Get AI response — call provider directly so our system_prompt is used,
+            # bypassing the base process_query which ignores context["system_prompt"].
+            provider = self._get_provider()
+            if provider in ("openai", "odoo_native"):
+                raw_response = self._process_conversational_openai(text, system_prompt)
+            elif provider == "gemini":
+                raw_response = self._process_conversational_gemini(text, system_prompt)
+            else:
+                raw_response = self.process_query(text, {"system_prompt": system_prompt})
 
             # Extract intent block if present
             response_text, intent = self._extract_intent_block(raw_response)
@@ -222,6 +253,96 @@ class AIProcessorIntentExt(models.AbstractModel):
                 "intent": None,
                 "has_intent": False,
             }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Conversational (free-form text) API calls
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _process_conversational_openai(self, text, system_prompt):
+        """Call OpenAI in normal (non-JSON) mode for a conversational reply."""
+        api_key = self.env["ir.config_parameter"].sudo().get_param("openai.api_key") or \
+                  self.env["ir.config_parameter"].sudo().get_param("elevenlabs_connector.openai_api_key")
+
+        if not api_key:
+            raise UserError("OpenAI API key not configured.")
+
+        url = "https://api.openai.com/v1/chat/completions"
+
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            # No response_format — free-form text output
+        }
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json; charset=utf-8",
+        }
+
+        try:
+            json_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            response = requests.post(url, headers=headers, data=json_data, timeout=30)
+
+            if response.encoding is None or response.encoding.lower() in ("iso-8859-1", "latin-1"):
+                response.encoding = "utf-8"
+
+            response.raise_for_status()
+            result = json.loads(response.text)
+
+            if "choices" in result and len(result["choices"]) > 0:
+                return self._sanitize_text(result["choices"][0]["message"]["content"])
+            else:
+                raise UserError("Unexpected response format from OpenAI API")
+
+        except requests.exceptions.RequestException as e:
+            _logger.error("OpenAI conversational API request failed: %s", e, exc_info=True)
+            raise UserError(f"OpenAI API error: {e}")
+
+    def _process_conversational_gemini(self, text, system_prompt):
+        """Call Gemini in normal (free-form text) mode for a conversational reply."""
+        api_key = self.env["ir.config_parameter"].sudo().get_param("gemini.api_key") or \
+                  self.env["ir.config_parameter"].sudo().get_param("elevenlabs_connector.gemini_api_key")
+
+        if not api_key:
+            raise UserError("Gemini API key not configured.")
+
+        model = "gemini-1.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+        full_prompt = f"{system_prompt}\n\nUser: {text}"
+
+        payload = {
+            "contents": [{"parts": [{"text": full_prompt}]}],
+            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000},
+        }
+
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+
+        try:
+            json_data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            response = requests.post(url, headers=headers, data=json_data,
+                                     params={"key": api_key}, timeout=30)
+
+            if response.encoding is None or response.encoding.lower() in ("iso-8859-1", "latin-1"):
+                response.encoding = "utf-8"
+
+            response.raise_for_status()
+            result = json.loads(response.text)
+
+            if "candidates" in result and len(result["candidates"]) > 0:
+                content = result["candidates"][0]["content"]["parts"][0].get("text", "")
+                return self._sanitize_text(content)
+            else:
+                raise UserError("No response from Gemini API")
+
+        except requests.exceptions.RequestException as e:
+            _logger.error("Gemini conversational API request failed: %s", e, exc_info=True)
+            raise UserError(f"Gemini API error: {e}")
 
     # ─────────────────────────────────────────────────────────────────────────
     # OpenAI Intent Parsing (JSON Mode)

@@ -44,6 +44,19 @@ _AUTO_EXECUTE_INTENTS = {
     "unknown",
 }
 
+# ─── All recognised intent types (must match handler keys in _execute_intent) ─
+_KNOWN_INTENT_TYPES = {
+    "member_lookup", "class_list", "belt_lookup", "subscription_lookup",
+    "attendance_history", "schedule_today",
+    "member_enroll", "member_unenroll", "belt_promote",
+    "subscription_create", "subscription_cancel", "contact_parent",
+    "attendance_checkin", "attendance_checkout",
+    "member_create", "member_update",
+    "class_create", "class_cancel",
+    "course_enroll", "belt_test_register",
+    "undo_action", "unknown",
+}
+
 
 class AiAssistantService(models.AbstractModel):
     """
@@ -121,14 +134,89 @@ class AiAssistantService(models.AbstractModel):
             response_text = result.get("response", "")
             intent_data = result.get("intent")
 
-            # If no intent detected, try explicit intent parsing
-            if not intent_data or intent_data.get("intent_type") == "unknown":
-                intent_result = ai_proc.process_intent_query(text, role, self._build_db_context(text))
+            # Determine the raw intent type from the conversational query
+            conv_intent_type = intent_data.get("intent_type", "unknown") if intent_data else "unknown"
+
+            # Fall back to structured intent parsing if:
+            #  - no intent was detected at all
+            #  - conversational intent is "unknown"
+            #  - conversational intent is not a recognised handler key
+            #    (the AI sometimes invents variants like "member_enrollment")
+            if not intent_data or conv_intent_type not in _KNOWN_INTENT_TYPES or conv_intent_type == "unknown":
+                db_ctx = self._build_db_context(text)
+                intent_result = ai_proc.process_intent_query(text, role, db_ctx)
                 if intent_result.get("confidence", 0) >= _MIN_CONFIDENCE:
                     intent_data = intent_result
+                    _logger.info(
+                        "AI: using structured intent %s (conv was '%s')",
+                        intent_result.get("intent_type"), conv_intent_type,
+                    )
 
             # Determine intent type and check permissions
             intent_type = intent_data.get("intent_type", "unknown") if intent_data else "unknown"
+            # Final safety net: if the AI still returned an unrecognised type, reset to unknown
+            if intent_type not in _KNOWN_INTENT_TYPES:
+                _logger.warning("AI returned unrecognised intent_type '%s', treating as unknown", intent_type)
+                intent_type = "unknown"
+
+            # Keyword-based override for common AI confusion patterns
+            text_lower = text.lower()
+            if intent_type == "member_enroll" and any(
+                kw in text_lower for kw in ("roster", "course roster", "permanent roster", "add to the course", "add to course")
+            ):
+                _logger.info("Keyword override: member_enroll → course_enroll (user said 'roster')")
+                intent_type = "course_enroll"
+                if intent_data:
+                    intent_data["intent_type"] = "course_enroll"
+
+            # belt_lookup → belt_test_register when the user is asking to register/schedule a test
+            if intent_type in ("belt_lookup", "unknown") and "belt test" in text_lower and any(
+                kw in text_lower for kw in ("register", "sign up", "schedule", "add", "book", "testing for")
+            ):
+                _logger.info("Keyword override: %s → belt_test_register (user said 'belt test' + action verb)", intent_type)
+                intent_type = "belt_test_register"
+                # Ensure intent_data has the right type and try to extract belt name
+                if intent_data is None:
+                    intent_data = {"intent_type": "belt_test_register", "parameters": {}, "confidence": 0.8}
+                else:
+                    intent_data["intent_type"] = "belt_test_register"
+
+            # For belt_test_register, recover any dropped params (AI sometimes uses placeholder strings)
+            if intent_type == "belt_test_register":
+                if intent_data is None:
+                    intent_data = {"intent_type": "belt_test_register", "parameters": {}, "confidence": 0.8}
+                params = intent_data.setdefault("parameters", {})
+                # Recover belt name from user text if missing or was a placeholder
+                if not params.get("target_belt") and not params.get("belt_name") and not params.get("new_belt"):
+                    import re as _re2
+                    belt_match = _re2.search(
+                        r'\b(white|yellow|orange|green|blue|purple|brown|red|black|stripe)\s+(?:stripe\s+)?belt\b',
+                        text_lower
+                    )
+                    if belt_match:
+                        params["target_belt"] = belt_match.group(0).title()
+                        _logger.info("Recovered target_belt from user text: %s", params["target_belt"])
+                # Recover member name from user text if missing
+                if not params.get("member_name") and not params.get("member_id"):
+                    members = self.env["dojo.member"].search([], limit=200, order="name asc")
+                    for m in members:
+                        if m.name.lower() in text_lower:
+                            params["member_name"] = m.name
+                            _logger.info("Recovered member_name from user text: %s", m.name)
+                            break
+
+            # For contact_parent, ensure subject has a readable default for confirmation
+            if intent_type == "contact_parent" and intent_data is not None:
+                params = intent_data.setdefault("parameters", {})
+                if not params.get("subject"):
+                    # Build a default subject from the body or user text
+                    body = params.get("body", params.get("message", ""))
+                    if body:
+                        # Use first ~50 chars of body as subject
+                        default_subj = body[:50].rstrip().rstrip(".,!?") + ("..." if len(body) > 50 else "")
+                    else:
+                        default_subj = "Message from Dojo"
+                    params["subject"] = default_subj
 
             # Validate role permission
             if intent_type != "unknown":
@@ -149,7 +237,7 @@ class AiAssistantService(models.AbstractModel):
                 role=role,
                 intent_type=intent_type,
                 parsed_intent=intent_data,
-                confidence=intent_data.get("confidence", 0) if intent_data else 0,
+                confidence=round((intent_data.get("confidence", 0) if intent_data else 0) * 100, 1),
                 resolved_data=resolved_data,
                 confirmation_prompt=None,  # Set below if needed
                 requires_confirmation=requires_confirmation,
@@ -169,6 +257,11 @@ class AiAssistantService(models.AbstractModel):
                     is_undoable=False,
                 )
 
+                # Use formatted execution result as the response so the user
+                # sees actual data rather than the AI's conversational fallback.
+                formatted = self._format_exec_result_as_response(intent_type, exec_result)
+                final_response = formatted or response_text
+
                 return {
                     "success": True,
                     "state": "executed",
@@ -176,7 +269,7 @@ class AiAssistantService(models.AbstractModel):
                     "intent": intent_data,
                     "auto_executed": True,
                     "result": exec_result,
-                    "response": response_text,
+                    "response": final_response,
                     "confirmation_prompt": None,
                     "resolved_data": resolved_data,
                     "error": None,
@@ -184,8 +277,7 @@ class AiAssistantService(models.AbstractModel):
 
             # Build confirmation prompt
             confirmation_prompt = self._build_confirmation_prompt(intent_type, intent_data, resolved_data)
-            log.confirmation_prompt = confirmation_prompt
-            log.flush()
+            log.write({"confirmation_prompt": confirmation_prompt})
 
             return {
                 "success": True,
@@ -345,7 +437,7 @@ class AiAssistantService(models.AbstractModel):
             role=log.role,
             intent_type="undo_action",
             parsed_intent={"original_action_log_id": log.id},
-            confidence=1.0,
+            confidence=100.0,
             resolved_data={"snapshots": [s.id for s in snapshots]},
             confirmation_prompt=confirmation_prompt,
             requires_confirmation=True,
@@ -484,10 +576,12 @@ class AiAssistantService(models.AbstractModel):
             if sessions:
                 lines.append("=== Today's Sessions ===")
                 for s in sessions:
+                    dt = s["start_datetime"]
+                    time_str = dt.strftime("%H:%M") if hasattr(dt, "strftime") else str(dt)[:16]
                     lines.append(
                         "  - {} at {} ({}/{} enrolled, state:{})".format(
                             s["template_id"][1] if s["template_id"] else "—",
-                            s["start_datetime"][:16],
+                            time_str,
                             s["seats_taken"],
                             s["capacity"],
                             s["state"],
@@ -622,6 +716,14 @@ class AiAssistantService(models.AbstractModel):
             "class_cancel": lambda: "Cancel {}?".format(
                 resolved_data.get("session_name", "the session")
             ),
+            "course_enroll": lambda: "Add {} to the {} course roster?".format(
+                resolved_data.get("member_name", params.get("member_name", "member")),
+                resolved_data.get("template_name", params.get("class_name", "the course"))
+            ),
+            "belt_test_register": lambda: "Register {} for a belt test (testing for {})?".format(
+                resolved_data.get("member_name", params.get("member_name", "member")),
+                resolved_data.get("new_rank_name", params.get("target_belt", "next rank"))
+            ),
             "undo_action": lambda: "Undo the previous action?",
         }
 
@@ -645,7 +747,14 @@ class AiAssistantService(models.AbstractModel):
             return {}
 
         resolved = {}
-        params = intent_data.get("parameters", {})
+        raw_params = intent_data.get("parameters", {}) or {}
+        # Strip unfilled template placeholders like "{name}" or "{{member}}"
+        # that the AI occasionally emits instead of real values.
+        _placeholder = re.compile(r'^\{[^}]*\}$')
+        params = {
+            k: v for k, v in raw_params.items()
+            if not (isinstance(v, str) and _placeholder.match(v.strip()))
+        }
 
         # Resolve member by name or ID
         if params.get("member_name"):
@@ -674,20 +783,64 @@ class AiAssistantService(models.AbstractModel):
                 resolved["member_rank"] = member.current_rank_id.name if hasattr(member, 'current_rank_id') and member.current_rank_id else None
 
         # Resolve class/session
-        if params.get("class_name") or params.get("session_id"):
+        # Also check resolved_entities the AI may have already identified
+        ai_resolved = intent_data.get("resolved_entities", {}) or {}
+        raw_class_name = (
+            params.get("class_name")
+            or ai_resolved.get("class_name")
+        )
+        raw_session_id = params.get("session_id") or ai_resolved.get("session_id")
+
+        if raw_class_name or raw_session_id:
             session = None
-            if params.get("session_id"):
-                session = self.env["dojo.class.session"].browse(int(params["session_id"]))
-            elif params.get("class_name"):
-                # Search for today's sessions matching the class name
-                from datetime import date as _date
-                today = _date.today().isoformat()
-                sessions = self.env["dojo.class.session"].search([
-                    ("template_id.name", "ilike", params["class_name"]),
-                    ("start_datetime", ">=", today + " 00:00:00"),
-                    ("start_datetime", "<=", today + " 23:59:59"),
-                ], limit=1)
-                session = sessions[0] if sessions else None
+            from datetime import date as _date
+            today = _date.today().isoformat()
+            today_domain = [
+                ("start_datetime", ">=", today + " 00:00:00"),
+                ("start_datetime", "<=", today + " 23:59:59"),
+            ]
+
+            if raw_session_id:
+                try:
+                    session = self.env["dojo.class.session"].browse(int(raw_session_id))
+                    if not session.exists():
+                        session = None
+                except Exception:
+                    session = None
+
+            if not session and raw_class_name:
+                # 1. Try exact ilike on the full name
+                sessions = self.env["dojo.class.session"].search(
+                    [("template_id.name", "ilike", raw_class_name)] + today_domain,
+                    limit=5,
+                )
+                if sessions:
+                    session = sessions[0]
+
+            if not session and raw_class_name:
+                # 2. Word-by-word fallback: score each today-session by how many
+                #    significant words from the user query appear in its name.
+                #    Weighted by character length so longer/more-specific words
+                #    win ties (e.g. "fundamental" beats "advanced").
+                all_today = self.env["dojo.class.session"].search(today_domain, limit=50)
+                query_words = [
+                    w.lower() for w in re.split(r"\W+", raw_class_name)
+                    if len(w) > 2
+                ]
+                best_score, best_session = 0, None
+                for s in all_today:
+                    tname = (s.template_id.name or "").lower() if s.template_id else ""
+                    score = sum(len(w) for w in query_words if w in tname)
+                    if score > best_score:
+                        best_score, best_session = score, s
+                if best_score > 0:
+                    session = best_session
+                    _logger.info(
+                        "AI session fuzzy-matched '%s' → '%s' (score %d)",
+                        raw_class_name,
+                        session.template_id.name if session.template_id else session.id,
+                        best_score,
+                    )
 
             if session and session.exists():
                 resolved["session_id"] = session.id
@@ -695,14 +848,39 @@ class AiAssistantService(models.AbstractModel):
                 resolved["session_datetime"] = session.start_datetime.isoformat() if session.start_datetime else None
 
         # Resolve belt rank
-        if params.get("belt_name") or params.get("new_belt"):
-            belt_name = params.get("new_belt") or params.get("belt_name")
+        if params.get("belt_name") or params.get("new_belt") or params.get("target_belt"):
+            belt_name = params.get("target_belt") or params.get("new_belt") or params.get("belt_name")
             ranks = self.env["dojo.belt.rank"].search([
                 ("name", "ilike", belt_name)
             ], limit=1)
             if ranks:
                 resolved["new_rank_id"] = ranks[0].id
                 resolved["new_rank_name"] = ranks[0].name
+                resolved["target_belt"] = ranks[0].name  # alias used by belt_test_register confirmation template
+
+        # Resolve class template (for course_enroll — no session lookup needed)
+        intent_type_for_resolve = (intent_data.get("intent_type", "") or "").lower()
+        # For course_enroll, always resolve the template and ignore any session_id
+        if params.get("class_name") and (
+            intent_type_for_resolve == "course_enroll" or not resolved.get("session_id")
+        ):
+            templates = self.env["dojo.class.template"].search([
+                ("name", "ilike", params["class_name"])
+            ], limit=5)
+            if templates:
+                # Pick best match by char-length scoring
+                query_words = [
+                    w.lower() for w in re.split(r"\W+", params["class_name"])
+                    if len(w) > 2
+                ]
+                best_score, best_tmpl = 0, templates[0]
+                for t in templates:
+                    tname = (t.name or "").lower()
+                    score = sum(len(w) for w in query_words if w in tname)
+                    if score > best_score:
+                        best_score, best_tmpl = score, t
+                resolved["template_id"] = best_tmpl.id
+                resolved["template_name"] = best_tmpl.name
 
         # Resolve subscription plan
         if params.get("plan_name") or params.get("plan_id"):
@@ -720,6 +898,69 @@ class AiAssistantService(models.AbstractModel):
                 resolved["plan_name"] = plan.name
 
         return resolved
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Result Formatter — converts execution data into human-readable text
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _format_exec_result_as_response(self, intent_type, exec_result):
+        """Convert an intent execution result dict into a chat-friendly string."""
+        if not exec_result or not exec_result.get("success"):
+            return exec_result.get("error") if exec_result else None
+
+        data = exec_result.get("data")
+        msg = exec_result.get("message", "")
+
+        if intent_type in ("schedule_today", "class_list"):
+            if not data:
+                return "No classes scheduled for today."
+            lines = ["Here's today's schedule:"]
+            for s in data:
+                enrolled = s.get("enrolled", 0)
+                capacity = s.get("capacity", 0)
+                lines.append("  • {} at {} — {}/{} enrolled".format(
+                    s.get("name", "Class"),
+                    s.get("time", "?"),
+                    enrolled,
+                    capacity,
+                ))
+            return "\n".join(lines)
+
+        if intent_type == "member_lookup":
+            if not data:
+                return msg
+            lines = ["{} — {}".format(data.get("name", "Member"), data.get("state", "unknown"))]
+            if data.get("rank"):
+                lines.append("  Rank: {}".format(data["rank"]))
+            sub = data.get("subscription")
+            if sub:
+                lines.append("  Subscription: {} ({})".format(sub.get("plan", "?"), sub.get("status", "?")))
+            if data.get("guardian"):
+                lines.append("  Guardian: {}".format(data["guardian"]))
+            return "\n".join(lines)
+
+        if intent_type == "belt_lookup":
+            if not data:
+                return msg
+            if isinstance(data, list):
+                return "Belt ranks:\n" + "\n".join("  • {}".format(r.get("name", "")) for r in data)
+            return "Belt: {}".format(data.get("name", msg))
+
+        if intent_type == "subscription_lookup":
+            return msg
+
+        if intent_type == "attendance_history":
+            if not data:
+                return msg
+            lines = [msg]
+            for rec in data[:5]:
+                session = rec.get("session") or "Open mat"
+                lines.append("  • {} — {}".format(rec.get("date", "?"), session))
+            return "\n".join(lines)
+
+        # Default: return the message
+        return msg
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Intent Execution Router
@@ -754,6 +995,8 @@ class AiAssistantService(models.AbstractModel):
             "member_update": self._handle_member_update,
             "class_create": self._handle_class_create,
             "class_cancel": self._handle_class_cancel,
+            "course_enroll": self._handle_course_enroll,
+            "belt_test_register": self._handle_belt_test_register,
 
             # Special intents
             "undo_action": self._handle_undo_action,
@@ -831,7 +1074,7 @@ class AiAssistantService(models.AbstractModel):
 
         # Default to today
         from datetime import date, timedelta
-        target_date = params.get("date", date.today().isoformat())
+        target_date = params.get("date") or date.today().isoformat()
 
         sessions = self.env["dojo.class.session"].search([
             ("start_datetime", ">=", target_date + " 00:00:00"),
@@ -992,11 +1235,14 @@ class AiAssistantService(models.AbstractModel):
                 "error": f"{session.template_id.name} is at capacity ({session.capacity}).",
             }
 
-        # Create enrollment
-        enrollment = Enrollment.create({
+        # Create enrollment — bypass course-roster check since the instructor
+        # is explicitly authorising this enrolment via the AI assistant.
+        enrollment = Enrollment.with_context(
+            skip_course_membership_check=True
+        ).create({
             "member_id": member.id,
             "session_id": session.id,
-            "status": "enrolled",
+            "status": "registered",
         })
 
         # Create snapshot for undo
@@ -1405,6 +1651,121 @@ class AiAssistantService(models.AbstractModel):
         }
 
     @api.model
+    def _handle_course_enroll(self, intent_data, resolved_data, action_log):
+        """Add a member to a course's permanent roster (template.course_member_ids)."""
+        member_id = resolved_data.get("member_id")
+        template_id = resolved_data.get("template_id")
+
+        if not member_id:
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            return {"success": False, "error": f"Member '{params.get('member_name', '')}' not found."}
+        if not template_id:
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            return {"success": False, "error": f"Course '{params.get('class_name', '')}' not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        template = self.env["dojo.class.template"].browse(template_id)
+
+        # Check if already on the roster
+        if member in template.course_member_ids:
+            return {
+                "success": False,
+                "error": f"{member.name} is already on the {template.name} roster.",
+            }
+
+        # Add to roster
+        template.course_member_ids = [(4, member.id)]
+
+        # Create snapshot for undo (write snapshot on template)
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(
+            action_log.id, "dojo.class.template", template.id, "write",
+            snapshot_data={"course_member_ids": [(3, member.id)]}
+        )
+
+        return {
+            "success": True,
+            "message": f"Added {member.name} to the {template.name} course roster.",
+            "data": {"template_id": template.id, "member_id": member.id},
+        }
+
+    @api.model
+    def _handle_belt_test_register(self, intent_data, resolved_data, action_log):
+        """Register a member for an upcoming belt test."""
+        member_id = resolved_data.get("member_id")
+        new_rank_id = resolved_data.get("new_rank_id")
+
+        if not member_id:
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            return {"success": False, "error": f"Member '{params.get('member_name', '')}' not found."}
+        if not new_rank_id:
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            return {"success": False, "error": f"Belt rank '{params.get('target_belt', '')}' not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        rank = self.env["dojo.belt.rank"].browse(new_rank_id)
+        params = intent_data.get("parameters", {}) if intent_data else {}
+
+        # Find an upcoming scheduled belt test
+        BeltTest = self.env["dojo.belt.test"]
+        domain = [("state", "=", "scheduled")]
+
+        # Optionally filter by test_date if provided
+        test_date = params.get("test_date")
+        if test_date:
+            domain.append(("test_date", "=", test_date))
+
+        # Optionally filter by test name if provided
+        test_name = params.get("test_name")
+        if test_name:
+            domain.append(("name", "ilike", test_name))
+
+        belt_test = BeltTest.search(domain, order="test_date asc", limit=1)
+
+        if not belt_test:
+            # Create a new belt test if none is scheduled
+            from datetime import date as _date, timedelta
+            default_date = _date.today() + timedelta(days=14)
+            belt_test = BeltTest.create({
+                "name": f"Belt Test — {default_date.isoformat()}",
+                "test_date": default_date,
+                "state": "scheduled",
+            })
+            _logger.info("AI created new belt test %s for registration", belt_test.id)
+
+        # Check for duplicate registration
+        Registration = self.env["dojo.belt.test.registration"]
+        existing = Registration.search([
+            ("test_id", "=", belt_test.id),
+            ("member_id", "=", member.id),
+        ], limit=1)
+
+        if existing:
+            return {
+                "success": False,
+                "error": f"{member.name} is already registered for this belt test.",
+            }
+
+        # Create registration
+        reg = Registration.create({
+            "test_id": belt_test.id,
+            "member_id": member.id,
+            "target_rank_id": rank.id,
+            "result": "pending",
+        })
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, Registration._name, reg.id, "create")
+
+        test_date_str = belt_test.test_date.isoformat() if belt_test.test_date else "TBD"
+        return {
+            "success": True,
+            "message": f"Registered {member.name} for belt test on {test_date_str} (testing for {rank.name}).",
+            "data": {"registration_id": reg.id, "test_id": belt_test.id},
+        }
+
+    @api.model
     def _handle_undo_action(self, intent_data, resolved_data, action_log):
         """Execute an undo operation."""
         snapshot_ids = resolved_data.get("snapshots", [])
@@ -1444,8 +1805,8 @@ class AiAssistantService(models.AbstractModel):
     def _handle_unknown(self, intent_data, resolved_data, action_log):
         """Handle unknown/unrecognized intents."""
         return {
-            "success": True,
-            "message": "I'm not sure what action you want. Could you please rephrase?",
+            "success": False,
+            "error": "I'm not sure what action you want. Could you please rephrase?",
             "data": None,
         }
 

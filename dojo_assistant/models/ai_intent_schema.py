@@ -186,8 +186,14 @@ class DojoAiIntentSchema(models.Model):
         try:
             return self.confirmation_template.format(**data)
         except KeyError as e:
-            _logger.warning("Missing key in confirmation template: %s", e)
-            return self.confirmation_template
+            _logger.warning("Missing key in confirmation template: %s, data keys: %s", e, list(data.keys()))
+            # Graceful fallback: replace missing placeholders with available data or defaults
+            result = self.confirmation_template
+            import re as _re
+            for placeholder in _re.findall(r'\{(\w+)\}', self.confirmation_template):
+                value = data.get(placeholder, data.get(placeholder + '_name', placeholder))
+                result = result.replace('{' + placeholder + '}', str(value) if value else placeholder)
+            return result
 
     # ─── Lookup Methods ───────────────────────────────────────────────────────
     @api.model

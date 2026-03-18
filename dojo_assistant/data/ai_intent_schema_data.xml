@@ -23,6 +23,11 @@
         "member_id": {"type": "integer", "description": "ID of the member to look up"}
     }
 }</field>
+        <field name="example_phrases">Look up John Smith
+Find member Sarah
+What's Test8's information?
+Show me details for Mike
+Who is Jane Doe?</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -41,6 +46,10 @@
         "date": {"type": "string", "format": "date", "description": "Date to list classes for (YYYY-MM-DD)"}
     }
 }</field>
+        <field name="example_phrases">What classes are on today?
+List all classes for Friday
+Show me Monday's classes
+What sessions do we have this week?</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -54,6 +63,11 @@
         <field name="description">Get today's class schedule</field>
         <field name="category">read</field>
         <field name="parameters_schema">{}</field>
+        <field name="example_phrases">What's the schedule today?
+Show today's classes
+What classes are happening now?
+What's on the schedule?
+What do we have today?</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -72,6 +86,10 @@
         "belt_name": {"type": "string", "description": "Name of the belt rank to look up"}
     }
 }</field>
+        <field name="example_phrases">What belt is John on?
+Show me Sarah's belt rank
+What rank is Test8?
+What color belt does Mike have?</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -91,6 +109,11 @@
         "member_id": {"type": "integer", "description": "ID of the member"}
     }
 }</field>
+        <field name="example_phrases">What's John's subscription status?
+Is Sarah's membership active?
+Check Test8's plan
+Does Mike have an active subscription?
+What plan is Jane on?</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -111,6 +134,11 @@
         "limit": {"type": "integer", "description": "Max records to return", "default": 10}
     }
 }</field>
+        <field name="example_phrases">Show John's attendance history
+How often has Sarah been coming in?
+When did Test8 last attend?
+Show me Mike's recent classes
+What's Jane's attendance like?</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
@@ -138,6 +166,11 @@
 }</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Check in John
+Mark Sarah as present
+Test8 just arrived
+Sign in Mike for class
+Check in Jane Doe</field>
         <field name="confirmation_template">Check in {member_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">True</field>
@@ -159,6 +192,11 @@
 }</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Check out John
+Mark Sarah as done for today
+Test8 is leaving
+Sign out Mike
+Jane is heading home</field>
         <field name="confirmation_template">Check out {member_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">True</field>
@@ -186,6 +224,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Enroll John in today's Advanced Sparring
+Sign Sarah up for the 6pm Fundamentals session
+Add Test8 to this morning's class
+Book Mike into the Kids Karate session today
+Enroll Jane in the next available class</field>
         <field name="confirmation_template">Enroll {member_name} in {class_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">True</field>
@@ -209,6 +252,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Remove John from today's class
+Unenroll Sarah from Advanced Sparring
+Take Test8 off the session
+Cancel Mike's enrollment
+Drop Jane from this morning's class</field>
         <field name="confirmation_template">Remove {member_name} from {class_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -235,6 +283,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Promote John to blue belt
+Advance Sarah to the next rank
+Test8 earned their green stripe
+Move Mike up to purple belt
+Promote Jane to her next belt level</field>
         <field name="confirmation_template">Promote {member_name} to {new_belt}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">True</field>
@@ -262,6 +315,11 @@
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a monthly subscription for John
+Sign Sarah up for the unlimited plan
+Add Test8 to the family membership
+Set up a yearly plan for Mike
+Start a new subscription for Jane</field>
         <field name="confirmation_template">Create {plan_name} subscription for {member_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -283,6 +341,11 @@
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Cancel John's subscription
+End Sarah's membership
+Stop Test8's plan
+Terminate Mike's subscription
+Cancel Jane's membership plan</field>
         <field name="confirmation_template">Cancel subscription for {member_name}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -313,6 +376,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Message John's parent about his progress
+Email Sarah's guardian about the upcoming test
+Send a note to Test8's mom
+Contact Mike's parents about his attendance
+Let Jane's guardian know about the schedule change</field>
         <field name="confirmation_template">Send message to {member_name}'s guardian about "{subject}"?</field>
         <field name="is_undoable">False</field>
         <field name="supports_bulk">True</field>
@@ -340,6 +408,11 @@
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a new member named John Smith
+Add a new student Sarah Jones
+Register new member Test8
+Create a profile for Mike Williams
+Add a new student Jane Doe with email jane@example.com</field>
         <field name="confirmation_template">Create new member "{name}"?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -364,6 +437,11 @@
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Update John's email to john@example.com
+Change Sarah's phone number
+Update Test8's name
+Edit Mike's contact information
+Update Jane's profile details</field>
         <field name="confirmation_template">Update {member_name}'s profile?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -390,6 +468,10 @@
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a new Advanced Sparring session
+Add a class session for Kids Karate tomorrow
+Schedule a new Fundamentals class for 6pm
+Create an extra session for Adult BJJ on Friday</field>
         <field name="confirmation_template">Create new "{class_name}" session?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -410,6 +492,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Cancel today's Advanced Sparring
+Cancel the 6pm Fundamentals class
+Call off the Kids Karate session
+Cancel this morning's class
+Take the Adult BJJ session off the schedule</field>
         <field name="confirmation_template">Cancel the "{class_name}" session?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
@@ -433,6 +520,11 @@
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Undo that
+Undo the last action
+Revert what I just did
+Go back on that
+That was a mistake, undo it</field>
         <field name="confirmation_template">Undo the previous action?</field>
         <field name="is_undoable">False</field>
         <field name="supports_bulk">False</field>
@@ -448,6 +540,68 @@
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Course Roster Intents                                                -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_course_enroll" model="dojo.ai.intent.schema">
+        <field name="intent_type">course_enroll</field>
+        <field name="name">Enroll in Course Roster</field>
+        <field name="description">Add a member to a course's permanent roster, allowing them to join any session of that class. This is different from member_enroll which reserves a single session spot.</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "class_name": {"type": "string", "description": "Name of the class/course template to join the roster of"}
+    },
+    "required": ["member_name", "class_name"]
+}</field>
+        <field name="example_phrases">Add Test8 to the Advanced Sparring roster
+Add John to the Adult Fundamentals course
+Enroll Sarah in the Kids Karate course roster
+Put Mike on the course roster for Intermediate BJJ</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Add {member_name} to the {class_name} course roster?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Belt Test Intents                                                    -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_belt_test_register" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_test_register</field>
+        <field name="name">Register for Belt Test</field>
+        <field name="description">Register a member for an upcoming belt test event, specifying the target belt rank they are testing for</field>
+        <field name="category">belt</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "target_belt": {"type": "string", "description": "Belt rank they are testing for (e.g. blue belt, green stripe)"},
+        "test_date": {"type": "string", "format": "date", "description": "Date of the belt test (YYYY-MM-DD), optional — defaults to the next scheduled test"},
+        "test_name": {"type": "string", "description": "Name of the belt test event, optional"}
+    },
+    "required": ["member_name", "target_belt"]
+}</field>
+        <field name="example_phrases">Register Test8 for a blue belt test
+Schedule a belt test for John testing for green belt
+Add Sarah to the next belt test for purple belt
+Sign Mike up for his yellow stripe belt test</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Register {member_name} for a belt test (testing for {target_belt})?</field>
+        <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
         <field name="active">True</field>
     </record>

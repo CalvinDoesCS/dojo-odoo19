@@ -128,18 +128,21 @@ class DojoAiUndoSnapshot(models.Model):
             )
 
     # ─── Model Methods ────────────────────────────────────────────────────────
-    @api.model
-    def create(self, vals):
+    @api.model_create_multi
+    def create(self, vals_list):
         """Set expiration time on creation."""
-        if "undo_expires_at" not in vals:
-            expiry_minutes = int(
-                self.env["ir.config_parameter"].sudo().get_param(
-                    "dojo_assistant.undo_expiry_minutes", "60"
-                )
-            )
-            vals["undo_expires_at"] = fields.Datetime.now() + timedelta(minutes=expiry_minutes)
-
-        return super().create(vals)
+        now = fields.Datetime.now()
+        expiry_minutes = None
+        for vals in vals_list:
+            if "undo_expires_at" not in vals:
+                if expiry_minutes is None:
+                    expiry_minutes = int(
+                        self.env["ir.config_parameter"].sudo().get_param(
+                            "dojo_assistant.undo_expiry_minutes", "60"
+                        )
+                    )
+                vals["undo_expires_at"] = now + timedelta(minutes=expiry_minutes)
+        return super().create(vals_list)
 
     # ─── Snapshot Creation Helpers ────────────────────────────────────────────
     @api.model

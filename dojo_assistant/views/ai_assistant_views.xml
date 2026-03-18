@@ -201,6 +201,10 @@
                         <page string="Parameters Schema" name="parameters">
                             <field name="parameters_schema" widget="ace" options="{'mode': 'json'}"/>
                         </page>
+                        <page string="Example Phrases" name="example_phrases">
+                            <field name="example_phrases" placeholder="One example phrase per line..."
+                                   help="Natural language phrases that should trigger this intent. Used to guide the AI model."/>
+                        </page>
                     </notebook>
                 </sheet>
             </form>

@@ -71,6 +71,27 @@
                 </div>
             </t>
 
+            <!-- General Intent Confirmation Card (enroll, belt, etc.) -->
+            <t t-if="state.pendingConfirm and !state.processing">
+                <div class="dojo-va-action-card">
+                    <div class="dojo-va-action-header">
+                        <i class="fa fa-question-circle me-2"/>
+                        Confirm Action
+                    </div>
+                    <div class="dojo-va-action-field">
+                        <p t-esc="state.pendingConfirm.prompt"/>
+                    </div>
+                    <div class="dojo-va-action-btns">
+                        <button class="dojo-va-btn-cancel" t-on-click="cancelIntent">
+                            Cancel
+                        </button>
+                        <button class="dojo-va-btn-send" t-on-click="confirmIntent">
+                            <i class="fa fa-check me-1"/>Confirm
+                        </button>
+                    </div>
+                </div>
+            </t>
+
             <!-- Contact-parent Action Card -->
             <t t-if="state.pendingAction and !state.processing">
                 <div class="dojo-va-action-card">
