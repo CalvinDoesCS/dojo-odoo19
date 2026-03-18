@@ -113,12 +113,12 @@ class DojoMemberPortal(CustomerPortal):
         return all_invoices.ids
 
     def _get_belt_context(self, member):
-        """Return current_rank, next_rank, and rank_pct (0-100) for the dashboard."""
+        """Return current_rank, next_rank, rank_pct, current_stripes, and max_stripes for the dashboard."""
         if not member:
-            return {'current_rank': None, 'next_rank': None, 'rank_pct': 0}
+            return {'current_rank': None, 'next_rank': None, 'rank_pct': 0, 'current_stripes': 0, 'max_stripes': 0}
         current_rank = getattr(member, 'current_rank_id', None) or None
         if not current_rank:
-            return {'current_rank': None, 'next_rank': None, 'rank_pct': 0}
+            return {'current_rank': None, 'next_rank': None, 'rank_pct': 0, 'current_stripes': 0, 'max_stripes': 0}
         all_ranks = request.env['dojo.belt.rank'].sudo().search(
             [('company_id', '=', member.company_id.id)], order='sequence asc'
         )
@@ -130,7 +130,15 @@ class DojoMemberPortal(CustomerPortal):
         total = len(rank_ids)
         next_rank = all_ranks[idx + 1] if idx + 1 < total else None
         rank_pct = int(((idx + 1) / total) * 100) if total else 0
-        return {'current_rank': current_rank, 'next_rank': next_rank, 'rank_pct': rank_pct}
+        current_stripes = getattr(member, 'current_stripe_count', 0) or 0
+        max_stripes = getattr(current_rank, 'max_stripes', 0) or 0
+        return {
+            'current_rank': current_rank,
+            'next_rank': next_rank,
+            'rank_pct': rank_pct,
+            'current_stripes': current_stripes,
+            'max_stripes': max_stripes,
+        }
 
     # ── /my/dojo  (unified portal page) ─────────────────────────────────
     @http.route('/my/dojo', type='http', auth='user', website=True)
@@ -238,6 +246,8 @@ class DojoMemberPortal(CustomerPortal):
                     if belt.get('next_rank') else None
                 ),
                 'rank_pct': belt.get('rank_pct', 0),
+                'current_stripes': belt.get('current_stripes', 0),
+                'max_stripes': belt.get('max_stripes', 0),
             }),
             headers=[('Content-Type', 'application/json')],
         )

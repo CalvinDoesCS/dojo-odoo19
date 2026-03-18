@@ -31,6 +31,11 @@ class DojoSubscriptionPlan(models.Model):
         default="monthly",
         required=True,
     )
+    duration = fields.Integer(
+        string='Duration (Months)',
+        default=0,
+        help='Fixed membership length in months. 0 = ongoing (no fixed end date).',
+    )
     sessions_per_period = fields.Integer(default=0)
     unlimited_sessions = fields.Boolean(default=True)
     description = fields.Text()

@@ -11,6 +11,7 @@
         "security/dojo_subscriptions_security.xml",
         "data/membership_product.xml",
         "data/mail_template_dunning.xml",
+        "data/mail_template_expiry_reminder.xml",
         "data/ir_cron.xml",
         "views/dojo_program_enrollment_views.xml",
         "views/dojo_subscription_views.xml",

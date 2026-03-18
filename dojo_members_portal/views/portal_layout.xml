@@ -95,6 +95,13 @@
                                       t-attf-style="border-color:#{current_rank.color};color:#{current_rank.color};"
                                       t-out="current_rank.name"/>
                             </t>
+                            <t t-if="current_rank and max_stripes and max_stripes > 0">
+                                <span class="dojo-belt-stripes d-inline-flex align-items-center gap-1 ms-1" title="Belt stripes">
+                                    <t t-foreach="range(max_stripes)" t-as="i">
+                                        <span t-attf-style="display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #{current_rank.color or '#888'};background:#{current_rank.color if i &lt; current_stripes else 'transparent'};"/>
+                                    </t>
+                                </span>
+                            </t>
                         </div>
                         <!-- Household + member number -->
                         <div class="d-flex align-items-center gap-2 mb-3" style="color:#5f6368;font-size:.85rem;">

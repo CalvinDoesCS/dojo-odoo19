@@ -608,14 +608,18 @@ class AIProcessorIntentExt(models.AbstractModel):
                         context_parts.append(self._format_session_context(s))
 
             # ── Belt Ranks ────────────────────────────────────────────────────
-            if any(word in query_lower for word in ["belt", "rank", "promote", "promotion"]):
+            if any(word in query_lower for word in ["belt", "rank", "promote", "promotion", "stripe"]):
                 try:
                     ranks = self.env["dojo.belt.rank"].search([("active", "=", True)], order="sequence")
                     if ranks:
                         context_parts.append("\n=== Belt Ranks ===")
                         for r in ranks:
                             threshold = getattr(r, 'attendance_threshold', 0)
-                            context_parts.append(f"- {r.name} (seq: {r.sequence}, threshold: {threshold})")
+                            max_stripes = getattr(r, 'max_stripes', 0) or 0
+                            stripe_info = f", max_stripes: {max_stripes}" if max_stripes > 0 else ""
+                            context_parts.append(
+                                f"- {r.name} (seq: {r.sequence}, threshold: {threshold}{stripe_info})"
+                            )
                 except Exception:
                     pass
 
@@ -658,7 +662,13 @@ class AIProcessorIntentExt(models.AbstractModel):
         if hasattr(member, 'membership_state'):
             parts.append(f", state: {member.membership_state}")
         if hasattr(member, 'current_rank_id') and member.current_rank_id:
-            parts.append(f", rank: {member.current_rank_id.name}")
+            rank = member.current_rank_id
+            stripe_count = getattr(member, 'current_stripe_count', 0) or 0
+            max_stripes = getattr(rank, 'max_stripes', 0) or 0
+            rank_str = rank.name
+            if max_stripes > 0:
+                rank_str += f" ({stripe_count}/{max_stripes} stripes)"
+            parts.append(f", rank: {rank_str}")
         parts.append(")")
         return "".join(parts)
 

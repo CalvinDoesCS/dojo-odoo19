@@ -44,6 +44,13 @@ class DojoBeltRank(models.Model):
         "dojo.member.rank", "rank_id", string="Awarded To"
     )
 
+    # ── Stripes ──────────────────────────────────────────────────────────
+    max_stripes = fields.Integer(
+        string="Max Stripes",
+        default=4,
+        help="Maximum number of stripes a member can earn on this belt before testing for the next rank. Set to 0 to disable stripe tracking.",
+    )
+
     # ── Dan Level ─────────────────────────────────────────────────────────
     is_dan = fields.Boolean(
         string="Is Dan Level",

@@ -9,6 +9,7 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="color"/>
+                <field name="max_stripes" optional="show"/>
                 <field name="active"/>
             </list>
         </field>
@@ -32,6 +33,8 @@
                                help="0 = disabled. Sessions attended since last rank award needed to auto-create a test invite."/>
                         <field name="testing_fee_product_id"
                                placeholder="Leave blank if no fee applies"/>
+                        <field name="max_stripes"
+                               help="0 = stripes disabled for this rank. Maximum stripes a member can earn before testing for the next belt."/>
                     </group>
                     <group string="Dan Level">
                         <field name="is_dan"/>
@@ -53,6 +56,7 @@
             <list>
                 <field name="member_id"/>
                 <field name="rank_id"/>
+                <field name="stripe_count"/>
                 <field name="program_id"/>
                 <field name="date_awarded"/>
                 <field name="awarded_by"/>
@@ -69,6 +73,7 @@
                     <group>
                         <field name="member_id"/>
                         <field name="rank_id"/>
+                        <field name="stripe_count"/>
                         <field name="program_id"/>
                         <field name="date_awarded"/>
                         <field name="awarded_by"/>
@@ -214,6 +219,8 @@
                 <page string="Belt Progression">
                     <group>
                         <field name="current_rank_id" readonly="1"/>
+                        <field name="current_stripe_count" readonly="1"
+                               help="Stripes on the current belt. Edit via the rank history entries below."/>
                         <field name="attendance_since_last_rank" readonly="1"/>
                         <field name="test_invite_pending" readonly="1"/>
                     </group>
@@ -227,6 +234,7 @@
                     <field name="rank_history_ids">
                         <list>
                             <field name="rank_id"/>
+                            <field name="stripe_count"/>
                             <field name="program_id"/>
                             <field name="date_awarded"/>
                             <field name="awarded_by"/>
@@ -267,6 +275,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='current_belt_stub']" position="replace">
                 <field name="current_rank_id" optional="show" string="Belt Rank"/>
+                <field name="current_stripe_count" optional="show" string="Stripes"/>
             </xpath>
         </field>
     </record>

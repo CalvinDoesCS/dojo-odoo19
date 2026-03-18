@@ -50,6 +50,7 @@
                 <field name="price"/>
                 <field name="initial_fee"/>
                 <field name="billing_period"/>
+                <field name="duration" string="Duration (mo)"/>
                 <field name="active"/>
             </list>
         </field>
@@ -72,6 +73,9 @@
                         <field name="initial_fee"/>
                         <field name="currency_id"/>
                         <field name="billing_period"/>
+                        <field name="duration"
+                               string="Duration (Months)"
+                               help="Fixed membership length in months. 0 = ongoing (no fixed end date)."/>
                         <field name="active"/>
                     </group>
                     <group string="Session Restrictions"
@@ -110,6 +114,7 @@
                 <field name="plan_type"/>
                 <field name="program_id"/>
                 <field name="start_date"/>
+                <field name="end_date"/>
                 <field name="next_billing_date"/>
                 <field name="state"/>
                 <field name="billing_failure_count" string="Failures" optional="show"
