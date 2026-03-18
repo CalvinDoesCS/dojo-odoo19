@@ -298,6 +298,35 @@ class DojoMemberSubscription(models.Model):
             },
         }
 
+    # ── State transition actions ──────────────────────────────────────────
+    def action_set_active(self):
+        """Manually activate the subscription."""
+        for rec in self:
+            rec.write({'state': 'active'})
+            rec.member_id.sudo().write({'membership_state': 'active'})
+
+    def action_set_pending(self):
+        """Set the subscription to pending payment."""
+        for rec in self:
+            rec.write({'state': 'pending'})
+
+    def action_set_paused(self):
+        """Pause the subscription."""
+        for rec in self:
+            rec.write({'state': 'paused'})
+            rec.member_id.sudo().write({'membership_state': 'paused'})
+
+    def action_set_cancelled(self):
+        """Cancel the subscription."""
+        for rec in self:
+            rec.write({'state': 'cancelled'})
+            rec.member_id.sudo().write({'membership_state': 'cancelled'})
+
+    def action_set_draft(self):
+        """Reset the subscription to draft."""
+        for rec in self:
+            rec.write({'state': 'draft'})
+
     # ── Daily cron ────────────────────────────────────────────────────────
     @api.model
     def _cron_generate_invoices(self):
