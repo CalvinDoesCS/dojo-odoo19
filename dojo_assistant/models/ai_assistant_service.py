@@ -1,0 +1,1480 @@
+# -*- coding: utf-8 -*-
+"""
+AI Assistant Service — Central service for handling AI assistant commands.
+
+This is a reusable service model that can be used by:
+- Instructor Dashboard
+- Kiosk module
+- Other applications needing AI assistant capabilities
+
+Provides:
+- Two-phase confirmation flow (parse → confirm → execute)
+- Structured intent parsing via ai.processor extension
+- Intent handlers for CRUD operations
+- Audit logging of all actions
+- Undo capability for reversible actions
+- Bulk operation support
+"""
+
+import json
+import logging
+import re
+import time
+
+from odoo import api, fields, models
+from odoo.exceptions import UserError, AccessError
+
+_logger = logging.getLogger(__name__)
+
+# ─── Action sentinel tokens (legacy, for backward compatibility) ─────────────
+_ACTION_START = "##ACTION##"
+_ACTION_END = "##END_ACTION##"
+
+# ─── Confidence threshold ────────────────────────────────────────────────────
+_MIN_CONFIDENCE = 0.7
+
+# ─── Read-only intents that auto-execute without confirmation ────────────────
+_AUTO_EXECUTE_INTENTS = {
+    "member_lookup",
+    "class_list",
+    "belt_lookup",
+    "subscription_lookup",
+    "attendance_history",
+    "schedule_today",
+    "unknown",
+}
+
+
+class AiAssistantService(models.AbstractModel):
+    """
+    Central AI Assistant Service.
+    
+    This abstract model provides the core AI assistant functionality
+    that can be used by multiple modules (instructor dashboard, kiosk, etc.)
+    """
+    _name = "ai.assistant.service"
+    _description = "AI Assistant Service"
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Main API: Two-Phase Confirmation Flow
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def handle_command(self, text, role="instructor", input_type="text", audio_attachment_id=None, context=None):
+        """
+        Main entry point for the AI assistant.
+        
+        This is the primary method that should be called by consuming modules.
+        Aliases: parse_and_confirm (for backward compatibility)
+        
+        Args:
+            text: User's natural language input
+            role: User role (kiosk/instructor/admin)
+            input_type: 'text' or 'voice'
+            audio_attachment_id: ID of stored audio attachment (for voice)
+            context: Optional dict of additional context data
+        
+        Returns:
+            dict: {
+                "success": bool,
+                "state": "pending_confirmation" | "executed" | "error",
+                "session_key": str (for confirmation flow),
+                "intent": dict | None,
+                "confirmation_prompt": str | None,
+                "resolved_data": dict | None,
+                "auto_executed": bool,
+                "result": dict | None (if auto-executed),
+                "response": str | None (AI conversational response),
+                "error": str | None
+            }
+        """
+        return self.parse_and_confirm(text, role, input_type, audio_attachment_id)
+
+    @api.model
+    def parse_and_confirm(self, text, role="instructor", input_type="text", audio_attachment_id=None):
+        """
+        Phase 1: Parse natural language input into a structured intent.
+        
+        For read-only intents, auto-executes and returns result.
+        For mutating intents, returns confirmation prompt.
+        
+        Args:
+            text: User's natural language input
+            role: User role (kiosk/instructor/admin)
+            input_type: 'text' or 'voice'
+            audio_attachment_id: ID of stored audio attachment (for voice)
+        
+        Returns:
+            dict: Standard response format (see handle_command)
+        """
+        text = (text or "").strip()
+        if not text:
+            return self._error_response("Please type or say something.")
+
+        start_time = time.time()
+
+        try:
+            # Get conversational response with potential intent
+            ai_proc = self.env["ai.processor"]
+            result = ai_proc.process_conversational_query(text, role, self._build_db_context(text))
+
+            response_text = result.get("response", "")
+            intent_data = result.get("intent")
+
+            # If no intent detected, try explicit intent parsing
+            if not intent_data or intent_data.get("intent_type") == "unknown":
+                intent_result = ai_proc.process_intent_query(text, role, self._build_db_context(text))
+                if intent_result.get("confidence", 0) >= _MIN_CONFIDENCE:
+                    intent_data = intent_result
+
+            # Determine intent type and check permissions
+            intent_type = intent_data.get("intent_type", "unknown") if intent_data else "unknown"
+
+            # Validate role permission
+            if intent_type != "unknown":
+                schema = self.env["dojo.ai.intent.schema"].get_by_type(intent_type)
+                if schema and not schema.check_role_permission(role):
+                    return self._error_response(f"You don't have permission to execute '{intent_type}'.")
+
+            # Resolve entities (member IDs, session IDs, etc.)
+            resolved_data = self._resolve_entities(intent_data) if intent_data else {}
+
+            # Check if this intent requires confirmation
+            requires_confirmation = self._requires_confirmation(intent_type)
+
+            # Create action log entry
+            ActionLog = self.env["dojo.ai.action.log"]
+            log = ActionLog.log_parse(
+                input_text=text,
+                role=role,
+                intent_type=intent_type,
+                parsed_intent=intent_data,
+                confidence=intent_data.get("confidence", 0) if intent_data else 0,
+                resolved_data=resolved_data,
+                confirmation_prompt=None,  # Set below if needed
+                requires_confirmation=requires_confirmation,
+                input_type=input_type,
+                audio_attachment_id=audio_attachment_id,
+            )
+
+            # If read-only intent, auto-execute
+            if not requires_confirmation:
+                exec_result = self._execute_intent(intent_type, intent_data, resolved_data, log)
+                execution_time_ms = int((time.time() - start_time) * 1000)
+
+                log.log_execution(
+                    success=exec_result.get("success", False),
+                    result=exec_result,
+                    execution_time_ms=execution_time_ms,
+                    is_undoable=False,
+                )
+
+                return {
+                    "success": True,
+                    "state": "executed",
+                    "session_key": log.session_key,
+                    "intent": intent_data,
+                    "auto_executed": True,
+                    "result": exec_result,
+                    "response": response_text,
+                    "confirmation_prompt": None,
+                    "resolved_data": resolved_data,
+                    "error": None,
+                }
+
+            # Build confirmation prompt
+            confirmation_prompt = self._build_confirmation_prompt(intent_type, intent_data, resolved_data)
+            log.confirmation_prompt = confirmation_prompt
+            log.flush()
+
+            return {
+                "success": True,
+                "state": "pending_confirmation",
+                "session_key": log.session_key,
+                "intent": intent_data,
+                "confirmation_prompt": confirmation_prompt,
+                "resolved_data": resolved_data,
+                "auto_executed": False,
+                "result": None,
+                "response": response_text,
+                "error": None,
+            }
+
+        except UserError as e:
+            return self._error_response(str(e))
+        except Exception as e:
+            _logger.error("AI assistant parse failed: %s", e, exc_info=True)
+            return self._error_response(f"An error occurred: {e}")
+
+    @api.model
+    def execute_confirmed(self, session_key, confirmed=True):
+        """
+        Phase 2: Execute or reject a pending intent.
+        
+        Args:
+            session_key: Session key from parse_and_confirm
+            confirmed: True to execute, False to reject
+        
+        Returns:
+            dict: {
+                "success": bool,
+                "state": "executed" | "rejected" | "error",
+                "result": dict | None,
+                "undo_available": bool,
+                "undo_expires_in_minutes": int | None,
+                "error": str | None
+            }
+        """
+        ActionLog = self.env["dojo.ai.action.log"]
+        log = ActionLog.find_by_session_key(session_key)
+
+        if not log:
+            return self._error_response("Session not found or expired.")
+
+        if log.confirmation_status != "pending":
+            return self._error_response(f"This action is already {log.confirmation_status}.")
+
+        # Record confirmation
+        log.log_confirmation(confirmed, self.env.user.id)
+
+        if not confirmed:
+            return {
+                "success": True,
+                "state": "rejected",
+                "result": {"message": "Action cancelled."},
+                "undo_available": False,
+                "undo_expires_in_minutes": None,
+                "error": None,
+            }
+
+        # Execute the intent
+        start_time = time.time()
+
+        try:
+            intent_data = json.loads(log.parsed_intent) if log.parsed_intent else {}
+            resolved_data = json.loads(log.resolved_data) if log.resolved_data else {}
+
+            result = self._execute_intent(log.intent_type, intent_data, resolved_data, log)
+            execution_time_ms = int((time.time() - start_time) * 1000)
+
+            # Check if this action is undoable
+            schema = self.env["dojo.ai.intent.schema"].get_by_type(log.intent_type)
+            is_undoable = schema.is_undoable if schema else False
+
+            log.log_execution(
+                success=result.get("success", False),
+                result=result,
+                execution_time_ms=execution_time_ms,
+                is_undoable=is_undoable,
+            )
+
+            # Calculate undo expiry
+            undo_minutes = None
+            if is_undoable:
+                undo_minutes = int(self.env["ir.config_parameter"].sudo().get_param(
+                    "dojo_assistant.undo_expiry_minutes", "60"
+                ))
+
+            return {
+                "success": result.get("success", False),
+                "state": "executed",
+                "result": result,
+                "undo_available": is_undoable,
+                "undo_expires_in_minutes": undo_minutes,
+                "error": result.get("error"),
+            }
+
+        except Exception as e:
+            _logger.error("AI assistant execution failed: %s", e, exc_info=True)
+            log.log_execution(success=False, error=str(e))
+            return self._error_response(f"Execution failed: {e}")
+
+    @api.model
+    def undo_last_action(self, user_id=None):
+        """
+        Undo the most recent undoable action.
+        
+        Returns:
+            dict: {
+                "success": bool,
+                "state": "pending_confirmation" | "executed" | "error",
+                "session_key": str | None,
+                "confirmation_prompt": str | None,
+                "undo_target": dict | None,
+                "result": dict | None,
+                "error": str | None
+            }
+        """
+        ActionLog = self.env["dojo.ai.action.log"]
+        log = ActionLog.get_last_undoable(user_id)
+
+        if not log:
+            return {
+                "success": False,
+                "state": "error",
+                "error": "No undoable actions found in the last hour.",
+                "session_key": None,
+                "confirmation_prompt": None,
+                "undo_target": None,
+                "result": None,
+            }
+
+        # Get the undo snapshots
+        snapshots = self.env["dojo.ai.undo.snapshot"].get_available_for_action(log.id)
+        if not snapshots:
+            return self._error_response("Undo data is no longer available.")
+
+        # Build undo target info
+        intent_data = json.loads(log.parsed_intent) if log.parsed_intent else {}
+        undo_target = {
+            "action_log_id": log.id,
+            "intent_type": log.intent_type,
+            "created_at": log.timestamp.isoformat() if log.timestamp else None,
+            "input_text": log.input_text,
+            "snapshot_count": len(snapshots),
+        }
+
+        # Create confirmation prompt for undo
+        time_ago = self._format_time_ago(log.timestamp)
+        confirmation_prompt = f"Undo {log.intent_type} from {time_ago}? ({log.input_text[:50]}...)" \
+            if len(log.input_text or "") > 50 else f"Undo {log.intent_type} from {time_ago}? ({log.input_text})"
+
+        # Create a new action log for the undo operation
+        undo_log = ActionLog.log_parse(
+            input_text=f"Undo: {log.input_text}",
+            role=log.role,
+            intent_type="undo_action",
+            parsed_intent={"original_action_log_id": log.id},
+            confidence=1.0,
+            resolved_data={"snapshots": [s.id for s in snapshots]},
+            confirmation_prompt=confirmation_prompt,
+            requires_confirmation=True,
+        )
+
+        return {
+            "success": True,
+            "state": "pending_confirmation",
+            "session_key": undo_log.session_key,
+            "confirmation_prompt": confirmation_prompt,
+            "undo_target": undo_target,
+            "result": None,
+            "error": None,
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Legacy API: Backward Compatibility
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def process_text_query(self, text):
+        """
+        Legacy entry point: process a text query through the AI assistant.
+        
+        DEPRECATED: Use handle_command() or parse_and_confirm() for the new two-phase flow.
+
+        Returns:
+            dict: {
+                "response": str,
+                "action": dict | None
+            }
+        """
+        result = self.parse_and_confirm(text, role="instructor")
+
+        if not result.get("success"):
+            return {"response": result.get("error", "An error occurred."), "action": None}
+
+        # For auto-executed intents, return the result
+        if result.get("auto_executed"):
+            return {
+                "response": result.get("response") or str(result.get("result", {}).get("message", "")),
+                "action": None,
+            }
+
+        # For pending confirmation, return the prompt as response with action
+        intent = result.get("intent", {})
+        resolved = result.get("resolved_data", {})
+
+        # Build legacy action format for contact_parent
+        action = None
+        if intent.get("intent_type") == "contact_parent":
+            action = {
+                "type": "contact_parent",
+                "member_id": resolved.get("member_id"),
+                "member_name": resolved.get("member_name"),
+                "guardian_name": resolved.get("guardian_name"),
+                "guardian_email": resolved.get("guardian_email"),
+                "guardian_phone": resolved.get("guardian_phone"),
+                "suggested_subject": intent.get("parameters", {}).get("subject"),
+                "suggested_body": intent.get("parameters", {}).get("body"),
+            }
+
+        return {
+            "response": result.get("response") or result.get("confirmation_prompt", ""),
+            "action": action,
+            "session_key": result.get("session_key"),
+            "requires_confirmation": True,
+        }
+
+    @api.model
+    def send_parent_message(self, member_id, subject, body, send_email=True, send_sms=True):
+        """
+        Send a message to the primary guardian of member_id.
+        Delegates to dojo.send.message.wizard for consistent delivery logic.
+        """
+        member = self.env["dojo.member"].browse(int(member_id))
+        if not member.exists():
+            raise UserError("Member not found.")
+
+        wizard = self.env["dojo.send.message.wizard"].create({
+            "member_ids": [(6, 0, [member.id])],
+            "subject": subject or "Message from Dojo",
+            "message_body": body or "",
+            "send_email": bool(send_email),
+            "send_sms": bool(send_sms),
+        })
+        wizard.action_send()
+        return {
+            "success": True,
+            "message": "Message sent to the guardian of {}.".format(member.name),
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # DB Context Builder
+    # ─────────────────────────────────────────────────────────────────────────
+
+    @api.model
+    def _build_db_context(self, query_text=""):
+        """Build a text block describing relevant dojo data for the AI prompt."""
+        lines = []
+
+        # ── Members matching any name-like tokens in the query ───────────────
+        potential_name = self._extract_name_tokens(query_text)
+        if potential_name:
+            members = self._search_members(potential_name)
+            if members:
+                lines.append("=== Matching Students ===")
+                for m in members[:6]:
+                    guardian_str = self._guardian_summary(m)
+                    sub = m.active_subscription_id if hasattr(m, 'active_subscription_id') else None
+                    plan_str = " plan:{}".format(sub.plan_id.name) if sub and sub.plan_id else ""
+                    rank_str = ""
+                    if hasattr(m, 'current_rank_id') and m.current_rank_id:
+                        rank_str = " rank:{}".format(m.current_rank_id.name)
+                    lines.append(
+                        "  - {} [id:{}, role:{}, state:{}{}{}]{}".format(
+                            m.name, m.id, getattr(m, 'role', 'student'), 
+                            getattr(m, 'membership_state', 'unknown'),
+                            plan_str, rank_str, guardian_str,
+                        )
+                    )
+
+        # ── Today's sessions ─────────────────────────────────────────────────
+        try:
+            from datetime import date as _date
+            today = _date.today().isoformat()
+            sessions = self.env["dojo.class.session"].search_read(
+                [
+                    ["start_datetime", ">=", today + " 00:00:00"],
+                    ["start_datetime", "<=", today + " 23:59:59"],
+                ],
+                ["template_id", "start_datetime", "seats_taken", "capacity", "state"],
+                limit=10,
+                order="start_datetime asc",
+            )
+            if sessions:
+                lines.append("=== Today's Sessions ===")
+                for s in sessions:
+                    lines.append(
+                        "  - {} at {} ({}/{} enrolled, state:{})".format(
+                            s["template_id"][1] if s["template_id"] else "—",
+                            s["start_datetime"][:16],
+                            s["seats_taken"],
+                            s["capacity"],
+                            s["state"],
+                        )
+                    )
+        except Exception as exc:
+            _logger.warning("Could not fetch sessions for AI context: %s", exc)
+
+        # ── School stats ─────────────────────────────────────────────────────
+        try:
+            active_count = self.env["dojo.member"].search_count(
+                [["membership_state", "=", "active"]]
+            )
+            lines.append("=== School Stats ===")
+            lines.append("  - Active members: {}".format(active_count))
+        except Exception:
+            pass
+
+        return "\n".join(lines) if lines else "No specific context loaded."
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Helpers
+    # ─────────────────────────────────────────────────────────────────────────
+
+    @api.model
+    def _extract_name_tokens(self, text):
+        """Heuristic: extract a 1-3 word capitalised sequence from text."""
+        if not text:
+            return ""
+        words = text.split()
+        caps = [re.sub(r"[^a-zA-Z]", "", w) for w in words if w and w[0].isupper() and len(w) > 1]
+        return " ".join(caps[:3])
+
+    @api.model
+    def _search_members(self, name, limit=6):
+        """Case-insensitive ilike search on member name."""
+        return self.env["dojo.member"].search([["name", "ilike", name]], limit=limit)
+
+    @api.model
+    def _guardian_summary(self, member):
+        """Return a compact string describing the primary guardian."""
+        household = getattr(member, 'household_id', None)
+        if household and household.primary_guardian_id:
+            gp = household.primary_guardian_id.partner_id
+            email_part = " email:{}".format(gp.email) if gp.email else ""
+            phone_part = " phone:{}".format(gp.phone or gp.mobile or "") if (gp.phone or gp.mobile) else ""
+            return " guardian:{}{}{}".format(gp.name, email_part, phone_part)
+        return ""
+
+    @api.model
+    def _error_response(self, error_msg):
+        """Build a standard error response dict."""
+        return {
+            "success": False,
+            "state": "error",
+            "session_key": None,
+            "intent": None,
+            "confirmation_prompt": None,
+            "resolved_data": None,
+            "auto_executed": False,
+            "result": None,
+            "response": None,
+            "error": error_msg,
+        }
+
+    @api.model
+    def _requires_confirmation(self, intent_type):
+        """
+        Check if an intent requires user confirmation before execution.
+        Read-only intents auto-execute; mutating intents require confirmation.
+        """
+        if intent_type in _AUTO_EXECUTE_INTENTS:
+            return False
+
+        # Check schema for explicit configuration
+        schema = self.env["dojo.ai.intent.schema"].get_by_type(intent_type)
+        if schema:
+            return schema.requires_confirmation
+
+        # Default to requiring confirmation for unknown mutating intents
+        return True
+
+    @api.model
+    def _build_confirmation_prompt(self, intent_type, intent_data, resolved_data):
+        """Build a human-readable confirmation prompt for an intent."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+
+        # Check for custom template in schema
+        schema = self.env["dojo.ai.intent.schema"].get_by_type(intent_type)
+        if schema and schema.confirmation_template:
+            return schema.format_confirmation_prompt(intent_data, resolved_data)
+
+        # Default confirmation prompts by intent type
+        prompts = {
+            "member_enroll": lambda: "Enroll {} in {}?".format(
+                resolved_data.get("member_name", params.get("member_name", "member")),
+                resolved_data.get("session_name", params.get("class_name", "the class"))
+            ),
+            "member_unenroll": lambda: "Remove {} from {}?".format(
+                resolved_data.get("member_name", "member"),
+                resolved_data.get("session_name", "the class")
+            ),
+            "belt_promote": lambda: "Promote {} to {}?".format(
+                resolved_data.get("member_name", "member"),
+                resolved_data.get("new_rank_name", params.get("new_belt", "next belt"))
+            ),
+            "subscription_create": lambda: "Create {} subscription for {}?".format(
+                params.get("plan_name", "a"),
+                resolved_data.get("member_name", "member")
+            ),
+            "subscription_cancel": lambda: "Cancel subscription for {}?".format(
+                resolved_data.get("member_name", "member")
+            ),
+            "contact_parent": lambda: "Send message to {}'s guardian?".format(
+                resolved_data.get("member_name", "member")
+            ),
+            "attendance_checkin": lambda: "Check in {}?".format(
+                resolved_data.get("member_name", params.get("member_name", "member"))
+            ),
+            "attendance_checkout": lambda: "Check out {}?".format(
+                resolved_data.get("member_name", "member")
+            ),
+            "member_create": lambda: "Create new member {}?".format(
+                params.get("name", "record")
+            ),
+            "member_update": lambda: "Update {} profile?".format(
+                resolved_data.get("member_name", "member")
+            ),
+            "class_create": lambda: "Create new class {}?".format(
+                params.get("class_name", "template")
+            ),
+            "class_cancel": lambda: "Cancel {}?".format(
+                resolved_data.get("session_name", "the session")
+            ),
+            "undo_action": lambda: "Undo the previous action?",
+        }
+
+        if intent_type in prompts:
+            try:
+                return prompts[intent_type]()
+            except Exception as e:
+                _logger.warning("Error building confirmation prompt: %s", e)
+
+        return f"Confirm {intent_type.replace('_', ' ')}?"
+
+    @api.model
+    def _resolve_entities(self, intent_data):
+        """
+        Resolve named entities to database IDs.
+        
+        Takes parsed intent parameters like {member_name: "John Doe"} and
+        resolves to {member_id: 123, member_name: "John Doe"}.
+        """
+        if not intent_data:
+            return {}
+
+        resolved = {}
+        params = intent_data.get("parameters", {})
+
+        # Resolve member by name or ID
+        if params.get("member_name"):
+            members = self._search_members(params["member_name"], limit=3)
+            if members:
+                member = members[0]
+                resolved["member_id"] = member.id
+                resolved["member_name"] = member.name
+                resolved["member_rank"] = member.current_rank_id.name if hasattr(member, 'current_rank_id') and member.current_rank_id else None
+                resolved["member_state"] = getattr(member, 'membership_state', None)
+
+                # Include guardian info
+                household = getattr(member, 'household_id', None)
+                if household and household.primary_guardian_id:
+                    g = household.primary_guardian_id.partner_id
+                    resolved["guardian_id"] = g.id
+                    resolved["guardian_name"] = g.name
+                    resolved["guardian_email"] = g.email
+                    resolved["guardian_phone"] = g.phone or g.mobile
+
+        elif params.get("member_id"):
+            member = self.env["dojo.member"].browse(int(params["member_id"]))
+            if member.exists():
+                resolved["member_id"] = member.id
+                resolved["member_name"] = member.name
+                resolved["member_rank"] = member.current_rank_id.name if hasattr(member, 'current_rank_id') and member.current_rank_id else None
+
+        # Resolve class/session
+        if params.get("class_name") or params.get("session_id"):
+            session = None
+            if params.get("session_id"):
+                session = self.env["dojo.class.session"].browse(int(params["session_id"]))
+            elif params.get("class_name"):
+                # Search for today's sessions matching the class name
+                from datetime import date as _date
+                today = _date.today().isoformat()
+                sessions = self.env["dojo.class.session"].search([
+                    ("template_id.name", "ilike", params["class_name"]),
+                    ("start_datetime", ">=", today + " 00:00:00"),
+                    ("start_datetime", "<=", today + " 23:59:59"),
+                ], limit=1)
+                session = sessions[0] if sessions else None
+
+            if session and session.exists():
+                resolved["session_id"] = session.id
+                resolved["session_name"] = session.template_id.name if session.template_id else f"Session #{session.id}"
+                resolved["session_datetime"] = session.start_datetime.isoformat() if session.start_datetime else None
+
+        # Resolve belt rank
+        if params.get("belt_name") or params.get("new_belt"):
+            belt_name = params.get("new_belt") or params.get("belt_name")
+            ranks = self.env["dojo.belt.rank"].search([
+                ("name", "ilike", belt_name)
+            ], limit=1)
+            if ranks:
+                resolved["new_rank_id"] = ranks[0].id
+                resolved["new_rank_name"] = ranks[0].name
+
+        # Resolve subscription plan
+        if params.get("plan_name") or params.get("plan_id"):
+            plan = None
+            if params.get("plan_id"):
+                plan = self.env["dojo.subscription.plan"].browse(int(params["plan_id"]))
+            elif params.get("plan_name"):
+                plans = self.env["dojo.subscription.plan"].search([
+                    ("name", "ilike", params["plan_name"])
+                ], limit=1)
+                plan = plans[0] if plans else None
+
+            if plan and plan.exists():
+                resolved["plan_id"] = plan.id
+                resolved["plan_name"] = plan.name
+
+        return resolved
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Intent Execution Router
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _execute_intent(self, intent_type, intent_data, resolved_data, action_log):
+        """
+        Route intent to appropriate handler and execute.
+        
+        For undoable actions, creates snapshots before execution.
+        """
+        handlers = {
+            # Read-only intents
+            "member_lookup": self._handle_member_lookup,
+            "class_list": self._handle_class_list,
+            "belt_lookup": self._handle_belt_lookup,
+            "subscription_lookup": self._handle_subscription_lookup,
+            "attendance_history": self._handle_attendance_history,
+            "schedule_today": self._handle_schedule_today,
+
+            # Mutating intents
+            "member_enroll": self._handle_member_enroll,
+            "member_unenroll": self._handle_member_unenroll,
+            "belt_promote": self._handle_belt_promote,
+            "subscription_create": self._handle_subscription_create,
+            "subscription_cancel": self._handle_subscription_cancel,
+            "contact_parent": self._handle_contact_parent,
+            "attendance_checkin": self._handle_attendance_checkin,
+            "attendance_checkout": self._handle_attendance_checkout,
+            "member_create": self._handle_member_create,
+            "member_update": self._handle_member_update,
+            "class_create": self._handle_class_create,
+            "class_cancel": self._handle_class_cancel,
+
+            # Special intents
+            "undo_action": self._handle_undo_action,
+            "unknown": self._handle_unknown,
+        }
+
+        handler = handlers.get(intent_type, self._handle_unknown)
+
+        try:
+            return handler(intent_data, resolved_data, action_log)
+        except UserError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            _logger.error("Intent handler %s failed: %s", intent_type, e, exc_info=True)
+            return {"success": False, "error": f"Handler error: {e}"}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Intent Handlers: Read-Only (Auto-Execute)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _handle_member_lookup(self, intent_data, resolved_data, action_log):
+        """Look up member information."""
+        member_id = resolved_data.get("member_id")
+        if not member_id:
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            name = params.get("member_name", "")
+            return {"success": False, "error": f"Could not find member '{name}'."}
+
+        member = self.env["dojo.member"].browse(member_id)
+
+        # Gather member details
+        data = {
+            "id": member.id,
+            "name": member.name,
+            "role": getattr(member, 'role', None),
+            "state": getattr(member, 'membership_state', None),
+            "rank": member.current_rank_id.name if hasattr(member, 'current_rank_id') and member.current_rank_id else None,
+            "subscription": None,
+            "guardian": resolved_data.get("guardian_name"),
+            "guardian_phone": resolved_data.get("guardian_phone"),
+            "guardian_email": resolved_data.get("guardian_email"),
+        }
+
+        if hasattr(member, 'active_subscription_id') and member.active_subscription_id:
+            sub = member.active_subscription_id
+            data["subscription"] = {
+                "plan": sub.plan_id.name if sub.plan_id else None,
+                "status": sub.status,
+                "end_date": sub.end_date.isoformat() if sub.end_date else None,
+            }
+
+        # Get recent attendance
+        try:
+            AttLog = self.env["dojo.attendance.log"]
+            recent = AttLog.search([("member_id", "=", member.id)], order="check_in desc", limit=5)
+            if recent:
+                data["recent_attendance"] = [
+                    {"date": r.check_in.date().isoformat() if r.check_in else None}
+                    for r in recent
+                ]
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": f"Found {member.name} — {data.get('state', 'unknown')}",
+            "data": data,
+        }
+
+    @api.model
+    def _handle_class_list(self, intent_data, resolved_data, action_log):
+        """List classes/sessions for a date range."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+
+        # Default to today
+        from datetime import date, timedelta
+        target_date = params.get("date", date.today().isoformat())
+
+        sessions = self.env["dojo.class.session"].search([
+            ("start_datetime", ">=", target_date + " 00:00:00"),
+            ("start_datetime", "<=", target_date + " 23:59:59"),
+        ], order="start_datetime asc", limit=20)
+
+        data = []
+        for s in sessions:
+            data.append({
+                "id": s.id,
+                "name": s.template_id.name if s.template_id else f"Session #{s.id}",
+                "time": s.start_datetime.strftime("%H:%M") if s.start_datetime else None,
+                "enrolled": s.seats_taken,
+                "capacity": s.capacity,
+                "state": s.state,
+            })
+
+        return {
+            "success": True,
+            "message": f"Found {len(data)} sessions for {target_date}.",
+            "data": data,
+        }
+
+    @api.model
+    def _handle_belt_lookup(self, intent_data, resolved_data, action_log):
+        """Look up belt rank information."""
+        # If looking up a specific rank
+        if resolved_data.get("new_rank_id"):
+            rank = self.env["dojo.belt.rank"].browse(resolved_data["new_rank_id"])
+            return {
+                "success": True,
+                "message": f"Belt: {rank.name}",
+                "data": {
+                    "id": rank.id,
+                    "name": rank.name,
+                    "sequence": rank.sequence if hasattr(rank, "sequence") else None,
+                },
+            }
+
+        # List all belt ranks
+        ranks = self.env["dojo.belt.rank"].search([], order="sequence asc")
+        data = [{"id": r.id, "name": r.name, "sequence": r.sequence if hasattr(r, "sequence") else i}
+                for i, r in enumerate(ranks)]
+
+        return {
+            "success": True,
+            "message": f"Found {len(data)} belt ranks.",
+            "data": data,
+        }
+
+    @api.model
+    def _handle_subscription_lookup(self, intent_data, resolved_data, action_log):
+        """Look up subscription information for a member."""
+        member_id = resolved_data.get("member_id")
+        if not member_id:
+            return {"success": False, "error": "No member specified."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        sub = member.active_subscription_id if hasattr(member, 'active_subscription_id') else None
+
+        if not sub:
+            return {
+                "success": True,
+                "message": f"{member.name} has no active subscription.",
+                "data": None,
+            }
+
+        data = {
+            "id": sub.id,
+            "member_name": member.name,
+            "plan": sub.plan_id.name if sub.plan_id else None,
+            "status": sub.status,
+            "start_date": sub.start_date.isoformat() if sub.start_date else None,
+            "end_date": sub.end_date.isoformat() if sub.end_date else None,
+        }
+
+        return {
+            "success": True,
+            "message": f"{member.name} has {data['plan']} subscription ({data['status']}).",
+            "data": data,
+        }
+
+    @api.model
+    def _handle_attendance_history(self, intent_data, resolved_data, action_log):
+        """Get attendance history for a member."""
+        member_id = resolved_data.get("member_id")
+        if not member_id:
+            return {"success": False, "error": "No member specified."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        limit = params.get("limit", 10)
+
+        member = self.env["dojo.member"].browse(member_id)
+        logs = self.env["dojo.attendance.log"].search(
+            [("member_id", "=", member.id)],
+            order="check_in desc",
+            limit=limit
+        )
+
+        data = []
+        for log in logs:
+            data.append({
+                "date": log.check_in.date().isoformat() if log.check_in else None,
+                "check_in": log.check_in.isoformat() if log.check_in else None,
+                "check_out": log.check_out.isoformat() if log.check_out else None,
+                "session": log.session_id.template_id.name if log.session_id and log.session_id.template_id else None,
+            })
+
+        return {
+            "success": True,
+            "message": f"Found {len(data)} attendance records for {member.name}.",
+            "data": data,
+        }
+
+    @api.model
+    def _handle_schedule_today(self, intent_data, resolved_data, action_log):
+        """Get today's schedule."""
+        return self._handle_class_list(intent_data, resolved_data, action_log)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Intent Handlers: Mutating (Require Confirmation)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _handle_member_enroll(self, intent_data, resolved_data, action_log):
+        """Enroll a member in a class session."""
+        member_id = resolved_data.get("member_id")
+        session_id = resolved_data.get("session_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+        if not session_id:
+            return {"success": False, "error": "Class session not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        session = self.env["dojo.class.session"].browse(session_id)
+
+        # Create undo snapshot
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+
+        # Check if already enrolled
+        Enrollment = self.env["dojo.class.enrollment"]
+        existing = Enrollment.search([
+            ("member_id", "=", member.id),
+            ("session_id", "=", session.id),
+        ], limit=1)
+
+        if existing:
+            return {
+                "success": False,
+                "error": f"{member.name} is already enrolled in {session.template_id.name}.",
+            }
+
+        # Check capacity
+        if session.seats_taken >= session.capacity:
+            return {
+                "success": False,
+                "error": f"{session.template_id.name} is at capacity ({session.capacity}).",
+            }
+
+        # Create enrollment
+        enrollment = Enrollment.create({
+            "member_id": member.id,
+            "session_id": session.id,
+            "status": "enrolled",
+        })
+
+        # Create snapshot for undo
+        Snapshot.create_snapshot(action_log.id, Enrollment._name, enrollment.id, "create")
+
+        return {
+            "success": True,
+            "message": f"Enrolled {member.name} in {session.template_id.name}.",
+            "data": {"enrollment_id": enrollment.id},
+        }
+
+    @api.model
+    def _handle_member_unenroll(self, intent_data, resolved_data, action_log):
+        """Remove a member from a class session."""
+        member_id = resolved_data.get("member_id")
+        session_id = resolved_data.get("session_id")
+
+        if not member_id or not session_id:
+            return {"success": False, "error": "Member or session not found."}
+
+        Enrollment = self.env["dojo.class.enrollment"]
+        enrollment = Enrollment.search([
+            ("member_id", "=", member_id),
+            ("session_id", "=", session_id),
+        ], limit=1)
+
+        if not enrollment:
+            return {"success": False, "error": "No enrollment found."}
+
+        # Create snapshot for undo (capture before deletion)
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, Enrollment._name, enrollment.id, "unlink")
+
+        member_name = enrollment.member_id.name
+        session_name = enrollment.session_id.template_id.name if enrollment.session_id.template_id else "the session"
+
+        enrollment.unlink()
+
+        return {
+            "success": True,
+            "message": f"Removed {member_name} from {session_name}.",
+        }
+
+    @api.model
+    def _handle_belt_promote(self, intent_data, resolved_data, action_log):
+        """Promote a member to a new belt rank."""
+        member_id = resolved_data.get("member_id")
+        new_rank_id = resolved_data.get("new_rank_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+        if not new_rank_id:
+            return {"success": False, "error": "New belt rank not specified."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        new_rank = self.env["dojo.belt.rank"].browse(new_rank_id)
+        old_rank = member.current_rank_id if hasattr(member, 'current_rank_id') else None
+
+        # Create snapshot of current rank
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(
+            action_log.id, "dojo.member", member.id, "write",
+            snapshot_data={"current_rank_id": old_rank.id if old_rank else False}
+        )
+
+        # Create member rank record
+        MemberRank = self.env["dojo.member.rank"]
+        member_rank = MemberRank.create({
+            "member_id": member.id,
+            "rank_id": new_rank.id,
+            "awarded_date": fields.Date.today(),
+        })
+
+        # Update member's current rank
+        member.current_rank_id = new_rank.id
+
+        old_name = old_rank.name if old_rank else "no belt"
+        return {
+            "success": True,
+            "message": f"Promoted {member.name} from {old_name} to {new_rank.name}.",
+            "data": {"member_rank_id": member_rank.id},
+        }
+
+    @api.model
+    def _handle_subscription_create(self, intent_data, resolved_data, action_log):
+        """Create a new subscription for a member."""
+        member_id = resolved_data.get("member_id")
+        plan_id = resolved_data.get("plan_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+        if not plan_id:
+            return {"success": False, "error": "Subscription plan not specified."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        plan = self.env["dojo.subscription.plan"].browse(plan_id)
+
+        # Check if member already has active subscription
+        if hasattr(member, 'active_subscription_id') and member.active_subscription_id:
+            return {
+                "success": False,
+                "error": f"{member.name} already has an active subscription.",
+            }
+
+        # Create subscription
+        Subscription = self.env["dojo.member.subscription"]
+        subscription = Subscription.create({
+            "member_id": member.id,
+            "plan_id": plan.id,
+            "status": "active",
+            "start_date": fields.Date.today(),
+        })
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, Subscription._name, subscription.id, "create")
+
+        return {
+            "success": True,
+            "message": f"Created {plan.name} subscription for {member.name}.",
+            "data": {"subscription_id": subscription.id},
+        }
+
+    @api.model
+    def _handle_subscription_cancel(self, intent_data, resolved_data, action_log):
+        """Cancel a member's subscription."""
+        member_id = resolved_data.get("member_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+        sub = member.active_subscription_id if hasattr(member, 'active_subscription_id') else None
+
+        if not sub:
+            return {"success": False, "error": f"{member.name} has no active subscription."}
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(
+            action_log.id, sub._name, sub.id, "write",
+            snapshot_data={"status": sub.status}
+        )
+
+        old_status = sub.status
+        sub.status = "cancelled"
+
+        return {
+            "success": True,
+            "message": f"Cancelled {member.name}'s subscription.",
+            "data": {"subscription_id": sub.id, "old_status": old_status},
+        }
+
+    @api.model
+    def _handle_contact_parent(self, intent_data, resolved_data, action_log):
+        """Send a message to a member's guardian."""
+        member_id = resolved_data.get("member_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        subject = params.get("subject", "Message from Dojo")
+        body = params.get("body", params.get("message", ""))
+
+        if not body:
+            return {"success": False, "error": "Message body is required."}
+
+        result = self.send_parent_message(
+            member_id=member_id,
+            subject=subject,
+            body=body,
+            send_email=params.get("send_email", True),
+            send_sms=params.get("send_sms", True),
+        )
+
+        return result
+
+    @api.model
+    def _handle_attendance_checkin(self, intent_data, resolved_data, action_log):
+        """Check in a member for attendance."""
+        member_id = resolved_data.get("member_id")
+        session_id = resolved_data.get("session_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+
+        # Create attendance log
+        AttLog = self.env["dojo.attendance.log"]
+
+        # Check if already checked in today without checkout
+        from datetime import datetime, date as _date
+        today_start = datetime.combine(_date.today(), datetime.min.time())
+        existing = AttLog.search([
+            ("member_id", "=", member.id),
+            ("check_in", ">=", today_start),
+            ("check_out", "=", False),
+        ], limit=1)
+
+        if existing:
+            return {
+                "success": False,
+                "error": f"{member.name} is already checked in.",
+            }
+
+        values = {
+            "member_id": member.id,
+            "check_in": fields.Datetime.now(),
+        }
+        if session_id:
+            values["session_id"] = session_id
+
+        log = AttLog.create(values)
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, AttLog._name, log.id, "create")
+
+        return {
+            "success": True,
+            "message": f"Checked in {member.name}.",
+            "data": {"attendance_log_id": log.id},
+        }
+
+    @api.model
+    def _handle_attendance_checkout(self, intent_data, resolved_data, action_log):
+        """Check out a member from attendance."""
+        member_id = resolved_data.get("member_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+
+        member = self.env["dojo.member"].browse(member_id)
+
+        # Find unclosed attendance log
+        AttLog = self.env["dojo.attendance.log"]
+        from datetime import datetime, date as _date
+        today_start = datetime.combine(_date.today(), datetime.min.time())
+
+        log = AttLog.search([
+            ("member_id", "=", member.id),
+            ("check_in", ">=", today_start),
+            ("check_out", "=", False),
+        ], order="check_in desc", limit=1)
+
+        if not log:
+            return {"success": False, "error": f"{member.name} is not checked in."}
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(
+            action_log.id, AttLog._name, log.id, "write",
+            snapshot_data={"check_out": False}
+        )
+
+        log.check_out = fields.Datetime.now()
+
+        return {
+            "success": True,
+            "message": f"Checked out {member.name}.",
+            "data": {"attendance_log_id": log.id},
+        }
+
+    @api.model
+    def _handle_member_create(self, intent_data, resolved_data, action_log):
+        """Create a new member record."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+
+        name = params.get("name")
+        if not name:
+            return {"success": False, "error": "Member name is required."}
+
+        values = {
+            "name": name,
+            "role": params.get("role", "student"),
+            "membership_state": "pending",
+        }
+
+        if params.get("email"):
+            values["email"] = params["email"]
+        if params.get("phone"):
+            values["phone"] = params["phone"]
+
+        Member = self.env["dojo.member"]
+        member = Member.create(values)
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, Member._name, member.id, "create")
+
+        return {
+            "success": True,
+            "message": f"Created member {member.name}.",
+            "data": {"member_id": member.id},
+        }
+
+    @api.model
+    def _handle_member_update(self, intent_data, resolved_data, action_log):
+        """Update an existing member record."""
+        member_id = resolved_data.get("member_id")
+
+        if not member_id:
+            return {"success": False, "error": "Member not found."}
+
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        member = self.env["dojo.member"].browse(member_id)
+
+        # Build update values from params (excluding system fields)
+        allowed_fields = {"name", "email", "phone", "role"}
+        values = {k: v for k, v in params.items() if k in allowed_fields and v is not None}
+
+        if not values:
+            return {"success": False, "error": "No update values specified."}
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        old_values = {k: getattr(member, k, None) for k in values.keys()}
+        Snapshot.create_snapshot(
+            action_log.id, "dojo.member", member.id, "write",
+            snapshot_data=old_values
+        )
+
+        member.write(values)
+
+        return {
+            "success": True,
+            "message": f"Updated {member.name}.",
+            "data": {"member_id": member.id, "updated_fields": list(values.keys())},
+        }
+
+    @api.model
+    def _handle_class_create(self, intent_data, resolved_data, action_log):
+        """Create a new class session."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+
+        template_id = params.get("template_id")
+        if not template_id:
+            # Try to find template by name
+            template_name = params.get("class_name")
+            if template_name:
+                templates = self.env["dojo.class.template"].search([
+                    ("name", "ilike", template_name)
+                ], limit=1)
+                if templates:
+                    template_id = templates[0].id
+
+        if not template_id:
+            return {"success": False, "error": "Class template not found."}
+
+        from datetime import datetime
+        start_str = params.get("start_datetime")
+        if start_str:
+            try:
+                start_dt = datetime.fromisoformat(start_str)
+            except ValueError:
+                return {"success": False, "error": "Invalid datetime format."}
+        else:
+            start_dt = datetime.now()
+
+        Session = self.env["dojo.class.session"]
+        session = Session.create({
+            "template_id": template_id,
+            "start_datetime": start_dt,
+            "state": "scheduled",
+        })
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, Session._name, session.id, "create")
+
+        return {
+            "success": True,
+            "message": f"Created session for {session.template_id.name}.",
+            "data": {"session_id": session.id},
+        }
+
+    @api.model
+    def _handle_class_cancel(self, intent_data, resolved_data, action_log):
+        """Cancel a class session."""
+        session_id = resolved_data.get("session_id")
+
+        if not session_id:
+            return {"success": False, "error": "Session not found."}
+
+        session = self.env["dojo.class.session"].browse(session_id)
+
+        if session.state == "cancelled":
+            return {"success": False, "error": "Session is already cancelled."}
+
+        # Create snapshot for undo
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(
+            action_log.id, "dojo.class.session", session.id, "write",
+            snapshot_data={"state": session.state}
+        )
+
+        old_state = session.state
+        session.state = "cancelled"
+
+        return {
+            "success": True,
+            "message": f"Cancelled {session.template_id.name}.",
+            "data": {"session_id": session.id, "old_state": old_state},
+        }
+
+    @api.model
+    def _handle_undo_action(self, intent_data, resolved_data, action_log):
+        """Execute an undo operation."""
+        snapshot_ids = resolved_data.get("snapshots", [])
+
+        if not snapshot_ids:
+            return {"success": False, "error": "No undo data available."}
+
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        snapshots = Snapshot.browse(snapshot_ids)
+
+        errors = []
+        for snapshot in snapshots:
+            result = snapshot.execute_undo()
+            if not result.get("success"):
+                errors.append(result.get("error", "Unknown error"))
+
+        if errors:
+            return {
+                "success": False,
+                "error": f"Undo failed: {'; '.join(errors)}",
+            }
+
+        # Mark original action as undone
+        original_log_id = intent_data.get("original_action_log_id") if intent_data else None
+        if original_log_id:
+            original_log = self.env["dojo.ai.action.log"].browse(original_log_id)
+            if original_log.exists():
+                original_log.log_undo()
+
+        return {
+            "success": True,
+            "message": "Action undone successfully.",
+            "data": {"undone_snapshots": len(snapshots)},
+        }
+
+    @api.model
+    def _handle_unknown(self, intent_data, resolved_data, action_log):
+        """Handle unknown/unrecognized intents."""
+        return {
+            "success": True,
+            "message": "I'm not sure what action you want. Could you please rephrase?",
+            "data": None,
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Utility Methods
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _format_time_ago(self, dt):
+        """Format a datetime as a human-readable time ago string."""
+        if not dt:
+            return "unknown time"
+
+        from datetime import datetime
+        now = datetime.now()
+        if dt.tzinfo:
+            now = now.replace(tzinfo=dt.tzinfo)
+
+        diff = now - dt
+        seconds = diff.total_seconds()
+
+        if seconds < 60:
+            return "just now"
+        elif seconds < 3600:
+            minutes = int(seconds / 60)
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+        elif seconds < 86400:
+            hours = int(seconds / 3600)
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        else:
+            days = int(seconds / 86400)
+            return f"{days} day{'s' if days != 1 else ''} ago"

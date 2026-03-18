@@ -19,4 +19,6 @@
         <field name="interval_type">hours</field>
         <field name="active">True</field>
     </record>
+
+    <!-- AI Assistant crons moved to dojo_assistant module -->
 </odoo>

@@ -1,9 +1,12 @@
 import os
 import hashlib
+import logging
 
 from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessError
+
+_logger = logging.getLogger(__name__)
 
 
 def _static_ver(*rel_paths):
@@ -521,6 +524,114 @@ class KioskController(http.Controller):
         return svc.execute_voice_action(
             int(member_id), session_id, action, params or {}
         )
+
+    # ------------------------------------------------------------------
+    # AI assistant (dojo_assistant integration)  
+    # ------------------------------------------------------------------
+
+    _KIOSK_ALLOWED_ROLES = {"kiosk", "instructor"}
+
+    @http.route("/kiosk/ai/text", type="jsonrpc", auth="public", methods=["POST"], csrf=False)
+    def kiosk_ai_text(self, text="", token=None, role="kiosk", **kw):
+        """
+        Process a plain-text query through the dojo AI assistant.
+        Role is caller-supplied but restricted to 'kiosk' or 'instructor'.
+        Token-validated; does not require an Odoo user session.
+        """
+        if not token:
+            return {"success": False, "state": "error", "error": "token_required"}
+        if not self._require_token(token):
+            return {"success": False, "state": "error", "error": "invalid_token"}
+
+        text = (text or "").strip()
+        if not text:
+            return {"success": False, "state": "error", "error": "No text provided."}
+
+        safe_role = role if role in self._KIOSK_ALLOWED_ROLES else "kiosk"
+
+        try:
+            assistant = request.env["ai.assistant.service"].sudo()
+            return assistant.handle_command(text, role=safe_role, input_type="text")
+        except Exception as exc:
+            _logger.error("Kiosk AI /kiosk/ai/text failed: %s", exc, exc_info=True)
+            return {"success": False, "state": "error", "error": str(exc)}
+
+    @http.route("/kiosk/ai/voice", type="http", auth="public", methods=["POST"], csrf=False)
+    def kiosk_ai_voice(self, token=None, role="kiosk", **kw):
+        """
+        Accept a multipart audio upload, transcribe with ElevenLabs STT, then
+        process through the dojo AI assistant.
+        Role is caller-supplied but restricted to 'kiosk' or 'instructor'.
+        Token-validated; does not require an Odoo user session.
+        """
+        import json as _json
+        import base64 as _b64
+
+        def _resp(data, status=200):
+            return request.make_response(
+                _json.dumps(data, ensure_ascii=False).encode("utf-8"),
+                headers=[("Content-Type", "application/json; charset=utf-8")],
+                status=status,
+            )
+
+        if not token:
+            return _resp({"success": False, "state": "error", "error": "token_required"}, 400)
+        if not self._require_token(token):
+            return _resp({"success": False, "state": "error", "error": "invalid_token"}, 403)
+
+        audio_file = request.httprequest.files.get("audio")
+        if not audio_file:
+            return _resp({"success": False, "state": "error", "error": "No audio file provided."}, 400)
+
+        audio_bytes = audio_file.read()
+        if not audio_bytes:
+            return _resp({"success": False, "state": "error", "error": "Empty audio file."}, 400)
+
+        try:
+            # Optional audit attachment
+            attachment = None
+            try:
+                attachment = request.env["ir.attachment"].sudo().create({
+                    "name": f"kiosk_voice_{audio_file.filename or 'audio.webm'}",
+                    "datas": _b64.b64encode(audio_bytes),
+                    "mimetype": audio_file.content_type or "audio/webm",
+                    "res_model": "dojo.ai.action.log",
+                })
+            except Exception as e:
+                _logger.warning("Kiosk AI: could not save audio attachment: %s", e)
+
+            # Speech-to-text
+            lang = request.env["ir.config_parameter"].sudo().get_param(
+                "elevenlabs_connector.language", "en"
+            )
+            try:
+                transcribed = request.env["elevenlabs.service"].sudo().transcribe_audio(
+                    audio_bytes, language=lang
+                )
+            except Exception as exc:
+                _logger.error("Kiosk AI STT failed: %s", exc)
+                return _resp({"success": False, "state": "error",
+                              "error": "Speech-to-text failed. Please check the ElevenLabs API key."}, 500)
+
+            transcribed = (transcribed or "").strip()
+            if not transcribed:
+                return _resp({"success": False, "state": "error",
+                              "error": "Could not understand the audio. Please try again."})
+
+            safe_role = role if role in self._KIOSK_ALLOWED_ROLES else "kiosk"
+            assistant = request.env["ai.assistant.service"].sudo()
+            result = assistant.handle_command(
+                transcribed,
+                role=safe_role,
+                input_type="voice",
+                audio_attachment_id=attachment.id if attachment else None,
+            )
+            result["transcribed"] = transcribed
+            return _resp(result)
+
+        except Exception as exc:
+            _logger.error("Kiosk AI /kiosk/ai/voice failed: %s", exc, exc_info=True)
+            return _resp({"success": False, "state": "error", "error": str(exc)}, 500)
 
 
 # ------------------------------------------------------------------

@@ -10,6 +10,7 @@
         "dojo_members",
         "dojo_belt_progression",
         "dojo_subscriptions",
+        "dojo_assistant",
     ],
     "data": [
         "security/ir.model.access.csv",

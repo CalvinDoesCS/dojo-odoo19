@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        AI Intent Schema Seed Data
+        
+        Defines the available AI assistant intents, their parameters,
+        role permissions, and confirmation requirements.
+    -->
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Read-Only Intents (Auto-Execute)                                     -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_member_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">member_lookup</field>
+        <field name="name">Member Lookup</field>
+        <field name="description">Look up member information by name or ID</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to look up"},
+        "member_id": {"type": "integer", "description": "ID of the member to look up"}
+    }
+}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_class_list" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_list</field>
+        <field name="name">Class List</field>
+        <field name="description">List classes/sessions for a given date</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "date": {"type": "string", "format": "date", "description": "Date to list classes for (YYYY-MM-DD)"}
+    }
+}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_schedule_today" model="dojo.ai.intent.schema">
+        <field name="intent_type">schedule_today</field>
+        <field name="name">Today's Schedule</field>
+        <field name="description">Get today's class schedule</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_belt_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_lookup</field>
+        <field name="name">Belt Lookup</field>
+        <field name="description">Look up belt rank information</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "belt_name": {"type": "string", "description": "Name of the belt rank to look up"}
+    }
+}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_subscription_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_lookup</field>
+        <field name="name">Subscription Lookup</field>
+        <field name="description">Look up a member's subscription status</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"}
+    }
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_attendance_history" model="dojo.ai.intent.schema">
+        <field name="intent_type">attendance_history</field>
+        <field name="name">Attendance History</field>
+        <field name="description">Get attendance history for a member</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "limit": {"type": "integer", "description": "Max records to return", "default": 10}
+    }
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Attendance Intents                                                   -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_attendance_checkin" model="dojo.ai.intent.schema">
+        <field name="intent_type">attendance_checkin</field>
+        <field name="name">Check In Member</field>
+        <field name="description">Check in a member for attendance</field>
+        <field name="category">attendance</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to check in"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "session_id": {"type": "integer", "description": "Optional session ID"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Check in {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_attendance_checkout" model="dojo.ai.intent.schema">
+        <field name="intent_type">attendance_checkout</field>
+        <field name="name">Check Out Member</field>
+        <field name="description">Check out a member from attendance</field>
+        <field name="category">attendance</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to check out"},
+        "member_id": {"type": "integer", "description": "ID of the member"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Check out {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Enrollment Intents                                                   -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_member_enroll" model="dojo.ai.intent.schema">
+        <field name="intent_type">member_enroll</field>
+        <field name="name">Enroll Member</field>
+        <field name="description">Enroll a member in a class session</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to enroll"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "class_name": {"type": "string", "description": "Name of the class"},
+        "session_id": {"type": "integer", "description": "ID of the session"}
+    },
+    "required": ["member_name", "class_name"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Enroll {member_name} in {class_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_member_unenroll" model="dojo.ai.intent.schema">
+        <field name="intent_type">member_unenroll</field>
+        <field name="name">Unenroll Member</field>
+        <field name="description">Remove a member from a class session</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to unenroll"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "class_name": {"type": "string", "description": "Name of the class"},
+        "session_id": {"type": "integer", "description": "ID of the session"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Remove {member_name} from {class_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Belt Progression Intents                                             -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_belt_promote" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_promote</field>
+        <field name="name">Promote Belt Rank</field>
+        <field name="description">Promote a member to a new belt rank</field>
+        <field name="category">belt</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to promote"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "new_belt": {"type": "string", "description": "Name of the new belt rank"}
+    },
+    "required": ["member_name", "new_belt"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Promote {member_name} to {new_belt}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Subscription Intents                                                 -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_subscription_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_create</field>
+        <field name="name">Create Subscription</field>
+        <field name="description">Create a new subscription for a member</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "plan_name": {"type": "string", "description": "Name of the subscription plan"},
+        "plan_id": {"type": "integer", "description": "ID of the subscription plan"}
+    },
+    "required": ["member_name", "plan_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Create {plan_name} subscription for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_subscription_cancel" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_cancel</field>
+        <field name="name">Cancel Subscription</field>
+        <field name="description">Cancel a member's subscription</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Cancel subscription for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Communication Intents                                                -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_contact_parent" model="dojo.ai.intent.schema">
+        <field name="intent_type">contact_parent</field>
+        <field name="name">Contact Parent/Guardian</field>
+        <field name="description">Send a message to a member's guardian</field>
+        <field name="category">communication</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "subject": {"type": "string", "description": "Email subject line"},
+        "body": {"type": "string", "description": "Message body text"},
+        "message": {"type": "string", "description": "Alternative for body"},
+        "send_email": {"type": "boolean", "description": "Send via email", "default": true},
+        "send_sms": {"type": "boolean", "description": "Send via SMS", "default": true}
+    },
+    "required": ["member_name", "body"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Send message to {member_name}'s guardian about "{subject}"?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Member Management Intents                                            -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_member_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">member_create</field>
+        <field name="name">Create Member</field>
+        <field name="description">Create a new member record</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Full name of the new member"},
+        "email": {"type": "string", "format": "email", "description": "Email address"},
+        "phone": {"type": "string", "description": "Phone number"},
+        "role": {"type": "string", "enum": ["student", "instructor"], "default": "student"}
+    },
+    "required": ["name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Create new member "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_member_update" model="dojo.ai.intent.schema">
+        <field name="intent_type">member_update</field>
+        <field name="name">Update Member</field>
+        <field name="description">Update an existing member's information</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member to update"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "name": {"type": "string", "description": "New name"},
+        "email": {"type": "string", "format": "email", "description": "New email"},
+        "phone": {"type": "string", "description": "New phone"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Update {member_name}'s profile?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Class Management Intents                                             -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_class_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_create</field>
+        <field name="name">Create Class Session</field>
+        <field name="description">Create a new class session</field>
+        <field name="category">class</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "class_name": {"type": "string", "description": "Name of the class template"},
+        "template_id": {"type": "integer", "description": "ID of the class template"},
+        "start_datetime": {"type": "string", "format": "date-time", "description": "Start date/time (ISO 8601)"}
+    },
+    "required": ["class_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Create new "{class_name}" session?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_class_cancel" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_cancel</field>
+        <field name="name">Cancel Class Session</field>
+        <field name="description">Cancel a scheduled class session</field>
+        <field name="category">class</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "class_name": {"type": "string", "description": "Name of the class"},
+        "session_id": {"type": "integer", "description": "ID of the session to cancel"}
+    }
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Cancel the "{class_name}" session?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- System Intents                                                       -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_undo_action" model="dojo.ai.intent.schema">
+        <field name="intent_type">undo_action</field>
+        <field name="name">Undo Action</field>
+        <field name="description">Undo the most recent undoable action</field>
+        <field name="category">system</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "original_action_log_id": {"type": "integer", "description": "ID of the action to undo"}
+    }
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="confirmation_template">Undo the previous action?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_unknown" model="dojo.ai.intent.schema">
+        <field name="intent_type">unknown</field>
+        <field name="name">Unknown Intent</field>
+        <field name="description">Unrecognized or conversational query</field>
+        <field name="category">system</field>
+        <field name="parameters_schema">{}</field>
+        <field name="allowed_roles">kiosk,instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

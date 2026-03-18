@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_intent_schema_instructor,dojo.ai.intent.schema instructor,model_dojo_ai_intent_schema,dojo_base.group_dojo_instructor,1,0,0,0
+access_ai_intent_schema_admin,dojo.ai.intent.schema admin,model_dojo_ai_intent_schema,dojo_base.group_dojo_admin,1,1,1,1
+access_ai_action_log_instructor,dojo.ai.action.log instructor,model_dojo_ai_action_log,dojo_base.group_dojo_instructor,1,0,0,0
+access_ai_action_log_admin,dojo.ai.action.log admin,model_dojo_ai_action_log,dojo_base.group_dojo_admin,1,1,1,1
+access_ai_undo_snapshot_instructor,dojo.ai.undo.snapshot instructor,model_dojo_ai_undo_snapshot,dojo_base.group_dojo_instructor,1,0,0,0
+access_ai_undo_snapshot_admin,dojo.ai.undo.snapshot admin,model_dojo_ai_undo_snapshot,dojo_base.group_dojo_admin,1,1,1,1
