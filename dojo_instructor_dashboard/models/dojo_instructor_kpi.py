@@ -155,14 +155,14 @@ class DojoInstructorProfile(models.Model):
     )
 
     @api.model
-    def _get_recent_students(self, domain, limit=24):
-        """Return up to `limit` unique recently-enrolled members matching `domain`.
-        Oversamples the enrollment query to compensate for duplicates."""
+    def _get_recent_students(self, domain, limit=None):
+        """Return all unique recently-enrolled members matching `domain`, ordered
+        by most-recent enrollment first.  Pass ``limit`` to cap the result."""
         Enrollment = self.env['dojo.class.enrollment']
         enrollments = Enrollment.search(
             domain,
             order='create_date desc',
-            limit=limit * 4,
+            limit=limit * 4 if limit else False,
         )
         seen = set()
         result = []
@@ -176,7 +176,7 @@ class DojoInstructorProfile(models.Model):
                 'name': m.name or '—',
                 'partner_id': m.partner_id.id,
             })
-            if len(result) >= limit:
+            if limit and len(result) >= limit:
                 break
         return result
 
@@ -190,7 +190,7 @@ class DojoInstructorProfile(models.Model):
             return False
         recent_students = self._get_recent_students([
             ('session_id.instructor_profile_id', '=', profile.id),
-            ('status', 'in', ['registered', 'attended']),
+            ('status', 'in', ['registered', 'waitlist', 'cancelled']),
         ])
         return {
             'id': profile.id,

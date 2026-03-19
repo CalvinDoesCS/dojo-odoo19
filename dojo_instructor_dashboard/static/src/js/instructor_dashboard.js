@@ -10,7 +10,7 @@ class InstructorDashboard extends Component {
     static components = { DojoVoiceAssistant };
 
     setup() {
-        this.orm    = useService("orm");
+        this.orm = useService("orm");
         this.action = useService("action");
         this.rootRef = useRef("root");
 
@@ -42,10 +42,10 @@ class InstructorDashboard extends Component {
     }
 
     async _loadData() {
-        const pad  = (n) => String(n).padStart(2, "0");
-        const iso  = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-        const now  = new Date();
-        const today    = iso(now);
+        const pad = (n) => String(n).padStart(2, "0");
+        const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const now = new Date();
+        const today = iso(now);
         const tomorrow = iso(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
         const twoWeeks = iso(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14));
 
@@ -72,7 +72,7 @@ class InstructorDashboard extends Component {
                     ["start_datetime", "<=", today + " 23:59:59"],
                 ],
                 ["template_id", "start_datetime", "end_datetime",
-                 "capacity", "seats_taken", "state"],
+                    "capacity", "seats_taken", "state"],
                 { order: "start_datetime asc" }
             ),
             this.orm.searchRead(
@@ -102,11 +102,11 @@ class InstructorDashboard extends Component {
             ).catch(() => []),
         ]);
 
-        this.state.sessionsToday    = sessionsToday;
+        this.state.sessionsToday = sessionsToday;
         this.state.upcomingSessions = upcomingSessions;
-        this.state.todos            = todos;
-        this.state.kiosks           = kiosks;
-        this.state.loading          = false;
+        this.state.todos = todos;
+        this.state.kiosks = kiosks;
+        this.state.loading = false;
     }
 
     /** "2025-03-15 09:00:00" (UTC) → "Mar 15 · 9:00 AM" local */
@@ -167,7 +167,7 @@ class InstructorDashboard extends Component {
     }
 
     // ── Student carousel ──────────────────────────────────────────────
-    static STUDENT_PAGE_SIZE = 8;
+    static STUDENT_PAGE_SIZE = 6;
 
     get visibleStudents() {
         const ps = InstructorDashboard.STUDENT_PAGE_SIZE;
@@ -203,9 +203,9 @@ class InstructorDashboard extends Component {
     }
 
     openTodaysClasses() { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_today"); }
-    openMyStudents()    { this.action.doAction("dojo_instructor_dashboard.action_my_students"); }
-    openCalendar()      { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_calendar"); }
-    openTodos()         { this.action.doAction("dojo_instructor_dashboard.action_my_todos"); }
+    openMyStudents() { this.action.doAction("dojo_instructor_dashboard.action_my_students"); }
+    openCalendar() { this.action.doAction("dojo_instructor_dashboard.action_my_sessions_calendar"); }
+    openTodos() { this.action.doAction("dojo_instructor_dashboard.action_my_todos"); }
     openKiosk() {
         this.action.doAction({
             type: "ir.actions.act_window",

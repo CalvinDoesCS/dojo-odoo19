@@ -10,7 +10,7 @@ class AdminDashboard extends Component {
     static components = { DojoVoiceAssistant };
 
     setup() {
-        this.orm    = useService("orm");
+        this.orm = useService("orm");
         this.action = useService("action");
         this.rootRef = useRef("root");
 
@@ -51,13 +51,13 @@ class AdminDashboard extends Component {
             "get_admin_dashboard_data",
             []
         );
-        this.state.summary        = data.summary;
-        this.state.instructors    = data.instructors;
+        this.state.summary = data.summary;
+        this.state.instructors = data.instructors;
         this.state.droppedStudents = data.dropped_students;
-        this.state.recentSessions  = data.recent_sessions;
-        this.state.recentStudents  = data.recent_students || [];
-        this.state.studentPage     = 0;
-        this.state.loading        = false;
+        this.state.recentSessions = data.recent_sessions;
+        this.state.recentStudents = data.recent_students || [];
+        this.state.studentPage = 0;
+        this.state.loading = false;
     }
 
     async _reload() {
@@ -157,10 +157,10 @@ class AdminDashboard extends Component {
     }
 
     // ── Navigation helpers ─────────────────────────────────────────────
-    openAllStudents()       { this.action.doAction("dojo_instructor_dashboard.action_all_students"); }
-    openTodaysSessions()    { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_today"); }
-    openCalendar()          { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_calendar"); }
-    openInstructorKpis()    { this.action.doAction("dojo_instructor_dashboard.action_all_instructor_kpis"); }
+    openAllStudents() { this.action.doAction("dojo_instructor_dashboard.action_all_students"); }
+    openTodaysSessions() { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_today"); }
+    openCalendar() { this.action.doAction("dojo_instructor_dashboard.action_all_sessions_calendar"); }
+    openInstructorKpis() { this.action.doAction("dojo_instructor_dashboard.action_all_instructor_kpis"); }
     openInvoices() {
         this.action.doAction({
             type: "ir.actions.act_window",
@@ -183,7 +183,7 @@ class AdminDashboard extends Component {
         });
     }
 
-    toggleDropped()  { this.state.droppedExpanded  = !this.state.droppedExpanded; }
+    toggleDropped() { this.state.droppedExpanded = !this.state.droppedExpanded; }
     toggleSessions() { this.state.sessionsExpanded = !this.state.sessionsExpanded; }
 
     openOnboarding() {
@@ -208,7 +208,7 @@ class AdminDashboard extends Component {
     }
 
     // ── Student carousel ──────────────────────────────────────────────
-    static STUDENT_PAGE_SIZE = 8;
+    static STUDENT_PAGE_SIZE = 6;
 
     get visibleStudents() {
         const ps = AdminDashboard.STUDENT_PAGE_SIZE;

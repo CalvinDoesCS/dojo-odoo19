@@ -34,18 +34,16 @@
                         <p><strong>Import in order:</strong></p>
                         <ol>
                             <li>01 — Belt Rank Definitions</li>
-                            <li>02 — Partners</li>
-                            <li>03 — Households</li>
-                            <li>04 — Members</li>
-                            <li>05 — Household Guardian Update</li>
-                            <li>06 — Guardian Links</li>
-                            <li>07 — Emergency Contacts</li>
-                            <li>08 — Member Belt Ranks</li>
-                            <li>09 — Member Stripe Counts</li>
-                            <li>10 — Programs</li>
-                            <li>11 — Class Templates</li>
-                            <li>12 — Subscription Plans</li>
-                            <li>13 — Member Subscriptions</li>
+                            <li>02 — Partners (Students &amp; Guardians)</li>
+                            <li>03 — Members</li>
+                            <li>04 — Households</li>
+                            <li>05 — Emergency Contacts</li>
+                            <li>06 — Member Belt Ranks</li>
+                            <li>07 — Programs</li>
+                            <li>08 — Class Templates</li>
+                            <li>09 — Subscription Plans</li>
+                            <li>10 — Member Subscriptions</li>
+                            <li>11 — Class Template Members</li>
                         </ol>
                     </div>
                     <div invisible="state != 'preview'" style="width: 100%; overflow-x: auto;">
@@ -72,15 +70,15 @@
     </record>
 
     <record id="action_import_odoo_csv_households" model="ir.actions.act_window">
-        <field name="name">03. Import Households</field>
+        <field name="name">04. Import Households</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
-        <field name="context">{'default_model_name': 'res.partner'}</field>
+        <field name="context">{'default_model_name': 'res.partner+household'}</field>
     </record>
 
     <record id="action_import_odoo_csv_members" model="ir.actions.act_window">
-        <field name="name">04. Import Members</field>
+        <field name="name">03. Import Members</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -96,7 +94,7 @@
     </record>
 
     <record id="action_import_odoo_csv_emergency_contacts" model="ir.actions.act_window">
-        <field name="name">07. Import Emergency Contacts</field>
+        <field name="name">05. Import Emergency Contacts</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -104,7 +102,7 @@
     </record>
 
     <record id="action_import_odoo_csv_member_ranks" model="ir.actions.act_window">
-        <field name="name">08. Import Member Belt Ranks</field>
+        <field name="name">06. Import Member Belt Ranks</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -112,7 +110,7 @@
     </record>
 
     <record id="action_import_odoo_csv_programs" model="ir.actions.act_window">
-        <field name="name">10. Import Programs</field>
+        <field name="name">07. Import Programs</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -120,7 +118,7 @@
     </record>
 
     <record id="action_import_odoo_csv_sub_plans" model="ir.actions.act_window">
-        <field name="name">10b / 12. Import Subscription Plans</field>
+        <field name="name">09. Import Subscription Plans</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -128,7 +126,7 @@
     </record>
 
     <record id="action_import_odoo_csv_class_templates" model="ir.actions.act_window">
-        <field name="name">11. Import Class Templates</field>
+        <field name="name">08. Import Class Templates</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
@@ -136,10 +134,18 @@
     </record>
 
     <record id="action_import_odoo_csv_member_subs" model="ir.actions.act_window">
-        <field name="name">13. Import Member Subscriptions</field>
+        <field name="name">10. Import Member Subscriptions</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
         <field name="context">{'default_model_name': 'dojo.member.subscription'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_class_template_members" model="ir.actions.act_window">
+        <field name="name">11. Import Class Template Members</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.class.template+members'}</field>
     </record>
 </odoo>

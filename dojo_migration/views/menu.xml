@@ -36,72 +36,65 @@
               sequence="20"
               groups="dojo_migration.group_migration_admin"/>
 
-    <menuitem id="menu_import_csv_households"
-              name="03. Households"
+    <menuitem id="menu_import_csv_members"
+              name="03. Members"
               parent="menu_dojo_migration_import_csv"
-              action="action_import_odoo_csv_households"
+              action="action_import_odoo_csv_members"
               sequence="30"
               groups="dojo_migration.group_migration_admin"/>
 
-    <menuitem id="menu_import_csv_members"
-              name="04. Members"
+    <menuitem id="menu_import_csv_households"
+              name="04. Households"
               parent="menu_dojo_migration_import_csv"
-              action="action_import_odoo_csv_members"
+              action="action_import_odoo_csv_households"
               sequence="40"
               groups="dojo_migration.group_migration_admin"/>
 
-    <menuitem id="menu_import_csv_household_update"
-              name="05. Household Guardian Update"
+    <menuitem id="menu_import_csv_emergency_contacts"
+              name="05. Emergency Contacts"
               parent="menu_dojo_migration_import_csv"
-              action="action_import_odoo_csv_household_update"
+              action="action_import_odoo_csv_emergency_contacts"
               sequence="50"
               groups="dojo_migration.group_migration_admin"/>
 
-    <menuitem id="menu_import_csv_emergency_contacts"
-              name="07. Emergency Contacts"
-              parent="menu_dojo_migration_import_csv"
-              action="action_import_odoo_csv_emergency_contacts"
-              sequence="70"
-              groups="dojo_migration.group_migration_admin"/>
-
     <menuitem id="menu_import_csv_member_ranks"
-              name="08. Member Belt Ranks"
+              name="06. Member Belt Ranks"
               parent="menu_dojo_migration_import_csv"
               action="action_import_odoo_csv_member_ranks"
-              sequence="80"
-              groups="dojo_migration.group_migration_admin"/>
-
-    <menuitem id="menu_import_csv_member_stripes"
-              name="09. Member Stripe Counts"
-              parent="menu_dojo_migration_import_csv"
-              action="action_import_member_stripes_wizard"
-              sequence="90"
+              sequence="60"
               groups="dojo_migration.group_migration_admin"/>
 
     <menuitem id="menu_import_csv_programs"
-              name="10. Programs"
+              name="07. Programs"
               parent="menu_dojo_migration_import_csv"
               action="action_import_odoo_csv_programs"
-              sequence="100"
+              sequence="70"
               groups="dojo_migration.group_migration_admin"/>
 
     <menuitem id="menu_import_csv_class_templates"
-              name="11. Class Templates"
+              name="08. Class Templates"
               parent="menu_dojo_migration_import_csv"
               action="action_import_odoo_csv_class_templates"
-              sequence="110"
+              sequence="80"
               groups="dojo_migration.group_migration_admin"/>
 
     <menuitem id="menu_import_csv_sub_plans_update"
-              name="12. Subscription Plans"
+              name="09. Subscription Plans"
               parent="menu_dojo_migration_import_csv"
               action="action_import_odoo_csv_sub_plans"
-              sequence="120"
+              sequence="90"
               groups="dojo_migration.group_migration_admin"/>
     <menuitem id="menu_import_csv_member_subs"
-              name="13. Member Subscriptions"
+              name="10. Member Subscriptions"
               parent="menu_dojo_migration_import_csv"
               action="action_import_odoo_csv_member_subs"
-              sequence="130"
+              sequence="100"
+              groups="dojo_migration.group_migration_admin"/>
+
+    <menuitem id="menu_import_csv_class_template_members"
+              name="11. Class Template Members"
+              parent="menu_dojo_migration_import_csv"
+              action="action_import_odoo_csv_class_template_members"
+              sequence="110"
               groups="dojo_migration.group_migration_admin"/>
 </odoo>
