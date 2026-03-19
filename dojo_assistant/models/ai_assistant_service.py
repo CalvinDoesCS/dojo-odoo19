@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+#test update
 """
 AI Assistant Service — Central service for handling AI assistant commands.
 
@@ -213,6 +214,21 @@ class AiAssistantService(models.AbstractModel):
                             _logger.info("Recovered member_name from user text: %s", m.name)
                             break
 
+            # For belt_promote, recover belt name if AI returned a placeholder
+            if intent_type == "belt_promote" and intent_data is not None:
+                params = intent_data.setdefault("parameters", {})
+                _BELT_PLACEHOLDERS = {"new_belt", "belt", "next_belt", "target_belt", "blue_belt", ""}
+                current = (params.get("new_belt") or params.get("target_belt") or "").lower().strip()
+                if not current or current in _BELT_PLACEHOLDERS:
+                    import re as _re3
+                    belt_match = _re3.search(
+                        r'\b(white|yellow|orange|green|blue|purple|brown|red|black|stripe)\s+(?:stripe\s+)?belt\b',
+                        text_lower
+                    )
+                    if belt_match:
+                        params["new_belt"] = belt_match.group(0).title()
+                        _logger.info("Recovered new_belt from user text: %s", params["new_belt"])
+
             # For contact_parent, ensure subject has a readable default for confirmation
             if intent_type == "contact_parent" and intent_data is not None:
                 params = intent_data.setdefault("parameters", {})
@@ -231,6 +247,24 @@ class AiAssistantService(models.AbstractModel):
                 schema = self.env["dojo.ai.intent.schema"].get_by_type(intent_type)
                 if schema and not schema.check_role_permission(role):
                     return self._error_response(f"You don't have permission to execute '{intent_type}'.")
+
+            # General member name recovery — runs for all member-related intents
+            # (belt_test_register has its own recovery above; this covers everything else)
+            _MEMBER_INTENTS = {
+                "member_lookup", "attendance_history", "subscription_lookup", "belt_lookup",
+                "attendance_checkin", "attendance_checkout", "member_enroll", "member_unenroll",
+                "course_enroll", "belt_promote", "subscription_cancel", "contact_parent",
+                "member_update", "subscription_pause", "subscription_resume",
+            }
+            if intent_type in _MEMBER_INTENTS and intent_data is not None:
+                params = intent_data.setdefault("parameters", {})
+                if not params.get("member_name") and not params.get("member_id"):
+                    members = self.env["dojo.member"].search([], limit=200, order="name asc")
+                    for m in members:
+                        if m.name.lower() in text_lower:
+                            params["member_name"] = m.name
+                            _logger.info("General recovery: member_name=%s for %s", m.name, intent_type)
+                            break
 
             # Resolve entities (member IDs, session IDs, etc.)
             resolved_data = self._resolve_entities(intent_data) if intent_data else {}
@@ -1064,17 +1098,17 @@ class AiAssistantService(models.AbstractModel):
             sub = member.active_subscription_id
             data["subscription"] = {
                 "plan": sub.plan_id.name if sub.plan_id else None,
-                "status": sub.status,
+                "status": sub.state,
                 "end_date": sub.end_date.isoformat() if sub.end_date else None,
             }
 
         # Get recent attendance
         try:
             AttLog = self.env["dojo.attendance.log"]
-            recent = AttLog.search([("member_id", "=", member.id)], order="check_in desc", limit=5)
+            recent = AttLog.search([("member_id", "=", member.id)], order="checkin_datetime desc", limit=5)
             if recent:
                 data["recent_attendance"] = [
-                    {"date": r.check_in.date().isoformat() if r.check_in else None}
+                    {"date": r.checkin_datetime.date().isoformat() if r.checkin_datetime else None}
                     for r in recent
                 ]
         except Exception:
@@ -1120,6 +1154,16 @@ class AiAssistantService(models.AbstractModel):
     @api.model
     def _handle_belt_lookup(self, intent_data, resolved_data, action_log):
         """Look up belt rank information."""
+        # If a member name was resolved, return that member's current rank
+        if resolved_data.get("member_id"):
+            member = self.env["dojo.member"].browse(resolved_data["member_id"])
+            rank = member.current_rank_id if hasattr(member, "current_rank_id") and member.current_rank_id else None
+            return {
+                "success": True,
+                "message": f"{member.name}'s current belt rank: {rank.name if rank else 'No rank assigned'}",
+                "data": {"member": member.name, "rank": rank.name if rank else None},
+            }
+
         # If looking up a specific rank
         if resolved_data.get("new_rank_id"):
             rank = self.env["dojo.belt.rank"].browse(resolved_data["new_rank_id"])
@@ -1189,16 +1233,16 @@ class AiAssistantService(models.AbstractModel):
         member = self.env["dojo.member"].browse(member_id)
         logs = self.env["dojo.attendance.log"].search(
             [("member_id", "=", member.id)],
-            order="check_in desc",
+            order="checkin_datetime desc",
             limit=limit
         )
 
         data = []
         for log in logs:
             data.append({
-                "date": log.check_in.date().isoformat() if log.check_in else None,
-                "check_in": log.check_in.isoformat() if log.check_in else None,
-                "check_out": log.check_out.isoformat() if log.check_out else None,
+                "date": log.checkin_datetime.date().isoformat() if log.checkin_datetime else None,
+                "check_in": log.checkin_datetime.isoformat() if log.checkin_datetime else None,
+                "check_out": log.checkout_datetime.isoformat() if log.checkout_datetime else None,
                 "session": log.session_id.template_id.name if log.session_id and log.session_id.template_id else None,
             })
 
@@ -1332,7 +1376,7 @@ class AiAssistantService(models.AbstractModel):
         member_rank = MemberRank.create({
             "member_id": member.id,
             "rank_id": new_rank.id,
-            "awarded_date": fields.Date.today(),
+            "date_awarded": fields.Date.today(),
         })
 
         # Update member's current rank
@@ -1371,7 +1415,7 @@ class AiAssistantService(models.AbstractModel):
         subscription = Subscription.create({
             "member_id": member.id,
             "plan_id": plan.id,
-            "status": "active",
+            "state": "active",
             "start_date": fields.Date.today(),
         })
 
@@ -1403,11 +1447,11 @@ class AiAssistantService(models.AbstractModel):
         Snapshot = self.env["dojo.ai.undo.snapshot"]
         Snapshot.create_snapshot(
             action_log.id, sub._name, sub.id, "write",
-            snapshot_data={"status": sub.status}
+            snapshot_data={"state": sub.state}
         )
 
-        old_status = sub.status
-        sub.status = "cancelled"
+        old_status = sub.state
+        sub.state = "cancelled"
 
         return {
             "success": True,
@@ -1459,8 +1503,8 @@ class AiAssistantService(models.AbstractModel):
         today_start = datetime.combine(_date.today(), datetime.min.time())
         existing = AttLog.search([
             ("member_id", "=", member.id),
-            ("check_in", ">=", today_start),
-            ("check_out", "=", False),
+            ("checkin_datetime", ">=", today_start),
+            ("checkout_datetime", "=", False),
         ], limit=1)
 
         if existing:
@@ -1471,7 +1515,7 @@ class AiAssistantService(models.AbstractModel):
 
         values = {
             "member_id": member.id,
-            "check_in": fields.Datetime.now(),
+            "checkin_datetime": fields.Datetime.now(),
         }
         if session_id:
             values["session_id"] = session_id
@@ -1505,9 +1549,9 @@ class AiAssistantService(models.AbstractModel):
 
         log = AttLog.search([
             ("member_id", "=", member.id),
-            ("check_in", ">=", today_start),
-            ("check_out", "=", False),
-        ], order="check_in desc", limit=1)
+            ("checkin_datetime", ">=", today_start),
+            ("checkout_datetime", "=", False),
+        ], order="checkin_datetime desc", limit=1)
 
         if not log:
             return {"success": False, "error": f"{member.name} is not checked in."}
@@ -1516,10 +1560,10 @@ class AiAssistantService(models.AbstractModel):
         Snapshot = self.env["dojo.ai.undo.snapshot"]
         Snapshot.create_snapshot(
             action_log.id, AttLog._name, log.id, "write",
-            snapshot_data={"check_out": False}
+            snapshot_data={"checkout_datetime": False}
         )
 
-        log.check_out = fields.Datetime.now()
+        log.checkout_datetime = fields.Datetime.now()
 
         return {
             "success": True,
@@ -1786,38 +1830,15 @@ class AiAssistantService(models.AbstractModel):
 
     @api.model
     def _handle_undo_action(self, intent_data, resolved_data, action_log):
-        """Execute an undo operation."""
-        snapshot_ids = resolved_data.get("snapshots", [])
-
-        if not snapshot_ids:
-            return {"success": False, "error": "No undo data available."}
-
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        snapshots = Snapshot.browse(snapshot_ids)
-
-        errors = []
-        for snapshot in snapshots:
-            result = snapshot.execute_undo()
-            if not result.get("success"):
-                errors.append(result.get("error", "Unknown error"))
-
-        if errors:
-            return {
-                "success": False,
-                "error": f"Undo failed: {'; '.join(errors)}",
-            }
-
-        # Mark original action as undone
-        original_log_id = intent_data.get("original_action_log_id") if intent_data else None
-        if original_log_id:
-            original_log = self.env["dojo.ai.action.log"].browse(original_log_id)
-            if original_log.exists():
-                original_log.log_undo()
-
+        """Execute an undo operation via chat — delegates to undo_last_action()."""
+        user_id = self.env.user.id
+        result = self.undo_last_action(user_id=user_id)
+        if not result.get("success"):
+            return {"success": False, "error": result.get("error", "No undo data available.")}
         return {
             "success": True,
-            "message": "Action undone successfully.",
-            "data": {"undone_snapshots": len(snapshots)},
+            "message": result.get("confirmation_prompt") or "Undo complete.",
+            "data": result,
         }
 
     @api.model
@@ -1841,14 +1862,14 @@ class AiAssistantService(models.AbstractModel):
         days = int(params.get("days", 14))
         cutoff = datetime.now() - timedelta(days=days)
 
-        members = self.env["dojo.member"].search([("status", "=", "active")])
+        members = self.env["dojo.member"].search([("membership_state", "=", "active")])
         at_risk = []
         for m in members:
-            last = self.env["dojo.attendance"].search(
-                [("member_id", "=", m.id)], order="check_in desc", limit=1
+            last = self.env["dojo.attendance.log"].search(
+                [("member_id", "=", m.id)], order="checkin_datetime desc", limit=1
             )
-            if not last or last.check_in < cutoff:
-                days_ago = (datetime.now() - last.check_in).days if last else None
+            if not last or last.checkin_datetime < cutoff:
+                days_ago = (datetime.now() - last.checkin_datetime).days if last else None
                 at_risk.append({
                     "name": m.name,
                     "days_since_visit": days_ago if days_ago is not None else "never",
@@ -1909,13 +1930,14 @@ class AiAssistantService(models.AbstractModel):
         if not member_id:
             return {"success": False, "error": "Could not identify the member."}
 
-        sub = self.env["dojo.subscription"].search(
+        sub = self.env["dojo.member.subscription"].search(
             [("member_id", "=", member_id), ("state", "=", "active")], limit=1
         )
         if not sub:
             return {"success": False, "error": "No active subscription found for this member."}
 
-        self._save_undo_snapshot(action_log, "dojo.subscription", sub.id, {"state": sub.state})
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, "dojo.member.subscription", sub.id, "write", snapshot_data={"state": sub.state})
         sub.write({"state": "paused"})
         member = self.env["dojo.member"].browse(member_id)
         return {
@@ -1931,13 +1953,14 @@ class AiAssistantService(models.AbstractModel):
         if not member_id:
             return {"success": False, "error": "Could not identify the member."}
 
-        sub = self.env["dojo.subscription"].search(
+        sub = self.env["dojo.member.subscription"].search(
             [("member_id", "=", member_id), ("state", "=", "paused")], limit=1
         )
         if not sub:
             return {"success": False, "error": "No paused subscription found for this member."}
 
-        self._save_undo_snapshot(action_log, "dojo.subscription", sub.id, {"state": sub.state})
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, "dojo.member.subscription", sub.id, "write", snapshot_data={"state": sub.state})
         sub.write({"state": "active"})
         member = self.env["dojo.member"].browse(member_id)
         return {
@@ -1964,7 +1987,8 @@ class AiAssistantService(models.AbstractModel):
             "send_sms": send_sms,
             "state": "draft",
         })
-        self._save_undo_snapshot(action_log, "dojo.marketing.campaign", campaign.id, None)
+        Snapshot = self.env["dojo.ai.undo.snapshot"]
+        Snapshot.create_snapshot(action_log.id, "dojo.marketing.campaign", campaign.id, "create")
         return {
             "success": True,
             "message": f"Created campaign '{name}' in draft state. Activate it when ready to send.",
