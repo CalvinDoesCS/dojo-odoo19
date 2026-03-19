@@ -12,11 +12,11 @@ tracking and creation in ir.model.data automatically.
 
 Covered CSV files (import in order):
   01_dojo_belt_rank.csv           → model: dojo.belt.rank
-  02_res_partner.csv              → model: res.partner
+  02_dojo_household.csv           → model: res.partner  (is_household=True injected)
+  03_res_partner.csv              → model: res.partner
                                      (remap: household_id → parent_id)
-  03_dojo_member.csv              → model: dojo.member
+  04_dojo_member.csv              → model: dojo.member
                                      (skip: current_rank_id, current_stripe_count)
-  04_dojo_household.csv           → model: res.partner  (is_household=True injected)
   05_dojo_emergency_contact.csv   → model: dojo.emergency.contact
   06_dojo_member_rank.csv         → model: dojo.member.rank
   07_dojo_program.csv             → model: dojo.program
@@ -28,9 +28,8 @@ Covered CSV files (import in order):
                                      (skip: program_id — readonly related field)
 
 Import order note for households:
-  - Run 02_res_partner.csv first (creates all student/guardian partners).
-  - Run 04_dojo_household.csv second (creates household records, references guardians).
-  - Re-run 02_res_partner.csv to update partner→household links via parent_id.
+  - Households must be created first (step 02) so that partner records can
+    reference them via household_id/id (mapped to parent_id) in step 03.
 """
 import base64
 import csv
@@ -44,9 +43,9 @@ _logger = logging.getLogger(__name__)
 
 MODEL_CHOICES = [
     ("dojo.belt.rank",          "01. Belt Ranks (dojo.belt.rank)"),
-    ("res.partner",             "02. Partners – Students & Guardians (res.partner)"),
-    ("dojo.member",             "03. Members (dojo.member)"),
-    ("res.partner+household",   "04. Household Partners (res.partner, is_household=True)"),
+    ("res.partner+household",   "02. Household Partners (res.partner, is_household=True)"),
+    ("res.partner",             "03. Partners – Students & Guardians (res.partner)"),
+    ("dojo.member",             "04. Members (dojo.member)"),
     ("dojo.emergency.contact",  "05. Emergency Contacts (dojo.emergency.contact)"),
     ("dojo.member.rank",        "06. Member Belt Ranks (dojo.member.rank)"),
     ("dojo.program",            "07. Programs (dojo.program)"),
