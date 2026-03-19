@@ -104,35 +104,6 @@ class DojoClassEnrollment(models.Model):
                         ))
                         plan_ok = False
 
-                # ── Billing-period cap (course-based only) ────────────────
-                if (plan_ok
-                        and plan.plan_type == 'course'
-                        and not plan.unlimited_sessions
-                        and plan.sessions_per_period > 0
-                        and sub.start_date and sub.next_billing_date):
-                    domain = [
-                        ('member_id', '=', member.id),
-                        ('status', '=', 'registered'),
-                        ('session_id.start_datetime', '>=',
-                         '%s 00:00:00' % sub.start_date),
-                        ('session_id.start_datetime', '<',
-                         '%s 00:00:00' % sub.next_billing_date),
-                        ('id', '!=', rec.id),
-                    ]
-                    if plan.allowed_template_ids:
-                        domain.append(
-                            ('session_id.template_id', 'in', plan.allowed_template_ids.ids)
-                        )
-                    period_count = self.env['dojo.class.enrollment'].search_count(domain)
-                    if period_count >= plan.sessions_per_period:
-                        cap_errors.append(_(
-                            'Period limit reached: the "%s" plan allows %d session(s) per %s '
-                            'and %s already has %d enrolled this period.',
-                            plan.name, plan.sessions_per_period,
-                            plan.billing_period, member.name, period_count,
-                        ))
-                        plan_ok = False
-
                 # If this plan passes all caps, enrollment is allowed — done.
                 if plan_ok:
                     return

@@ -300,24 +300,21 @@ plan_kids = env["dojo.subscription.plan"].create({
     "name": "Kids BJJ Monthly", "code": "KIDS-MTH",
     "plan_type": "program", "program_id": prog_kids.id,
     "billing_period": "monthly", "price": 80.00, "initial_fee": 50.00,
-    "currency_id": currency.id, "unlimited_sessions": True,
-    "max_sessions_per_week": 3,
+    "currency_id": currency.id, "max_sessions_per_week": 3,
     "description": "Unlimited BJJ Kids classes, up to 3 sessions per week.",
 })
 plan_adult = env["dojo.subscription.plan"].create({
     "name": "Adult BJJ Monthly", "code": "ADV-MTH",
     "plan_type": "program", "program_id": prog_adults.id,
     "billing_period": "monthly", "price": 120.00, "initial_fee": 50.00,
-    "currency_id": currency.id, "unlimited_sessions": False,
-    "max_sessions_per_week": 5, "credits_per_period": 12,
+    "currency_id": currency.id, "max_sessions_per_week": 5, "credits_per_period": 12,
     "description": "12 credits per month. Access to all adult BJJ classes, up to 5 sessions per week.",
 })
 env["dojo.subscription.plan"].create({
     "name": "Private Lessons", "code": "PRIV-MTH",
     "plan_type": "course", "billing_period": "monthly",
     "price": 250.00, "initial_fee": 0.00,
-    "currency_id": currency.id, "unlimited_sessions": False,
-    "credits_per_period": 4, "max_sessions_per_week": 1,
+    "currency_id": currency.id, "credits_per_period": 4, "max_sessions_per_week": 1,
     "allowed_template_ids": [(4, tmpl_adv.id)],
     "description": "4 credits per month. Advanced Sparring sessions only.",
 })

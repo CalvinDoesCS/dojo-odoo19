@@ -25,7 +25,6 @@ class DojoMigrationLog(models.Model):
             ("partners", "Partners"),
             ("households", "Households"),
             ("members", "Members & Households"),
-            ("guardian_links", "Guardian Links"),
             ("emergency_contacts", "Emergency Contacts"),
             ("subscriptions", "Subscriptions"),
             ("class_templates", "Class Templates"),
