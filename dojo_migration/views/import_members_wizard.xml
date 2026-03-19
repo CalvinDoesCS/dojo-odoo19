@@ -53,6 +53,6 @@
         <field name="name">Import Members &amp; Households</field>
         <field name="res_model">dojo.migration.import.members</field>
         <field name="view_mode">form</field>
-        <field name="target">new</field>
+        <field name="target">main</field>
     </record>
 </odoo>

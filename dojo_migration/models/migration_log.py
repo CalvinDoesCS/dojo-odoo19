@@ -21,9 +21,18 @@ class DojoMigrationLog(models.Model):
     import_type = fields.Selection(
         [
             ("programs", "Programs & Styles"),
+            ("belt_rank_defs", "Belt Rank Definitions"),
+            ("partners", "Partners"),
+            ("households", "Households"),
             ("members", "Members & Households"),
+            ("guardian_links", "Guardian Links"),
+            ("emergency_contacts", "Emergency Contacts"),
             ("subscriptions", "Subscriptions"),
+            ("class_templates", "Class Templates"),
+            ("subscription_plans", "Subscription Plans"),
+            ("member_subscriptions", "Member Subscriptions"),
             ("ranks", "Belt Ranks"),
+            ("member_stripe_update", "Member Stripe Update"),
             ("attendance", "Attendance"),
         ],
         string="Import Type",

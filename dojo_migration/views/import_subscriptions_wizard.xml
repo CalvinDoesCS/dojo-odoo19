@@ -52,6 +52,6 @@
         <field name="name">Import Subscriptions</field>
         <field name="res_model">dojo.migration.import.subscriptions</field>
         <field name="view_mode">form</field>
-        <field name="target">new</field>
+        <field name="target">main</field>
     </record>
 </odoo>

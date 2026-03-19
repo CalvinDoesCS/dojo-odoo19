@@ -1,12 +1,15 @@
 """
-Programs & Styles import wizard.
+Belt Rank Definitions import wizard.
 
 Expected CSV columns (case-insensitive after strip):
-  name*        — dojo.program name  (required)
-  code         — short code
-  style_name   — dojo.martial.art.style name (auto-created if missing)
+  name*         — dojo.belt.rank name (required)
+  sequence      — sort order integer (default 10)
+  dan_level     — dan degree integer (default 0)
+  is_dan        — TRUE/FALSE boolean (default False)
+  max_stripes   — integer (default 4)
+  active        — TRUE/FALSE boolean (default True)
 
-Dedup: skips programs whose name already exists (case-insensitive).
+Dedup: skips ranks whose name already exists (case-insensitive).
 """
 import base64
 import csv
@@ -14,22 +17,37 @@ import io
 import json
 import logging
 
-from odoo import api, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
 REQUIRED_COLS = {"name"}
+
 TEMPLATE_ROWS = [
-    ["name", "code", "style_name"],
-    ["Brazilian Jiu-Jitsu", "BJJ", "Grappling"],
-    ["Muay Thai", "MT", "Striking"],
+    ["name", "sequence", "dan_level", "is_dan", "max_stripes", "active"],
+    ["White Belt", "1", "0", "FALSE", "4", "TRUE"],
+    ["Yellow Belt", "2", "0", "FALSE", "4", "TRUE"],
+    ["1st Degree Black Belt", "13", "1", "TRUE", "0", "TRUE"],
 ]
 
 
-class DojoMigrationImportPrograms(models.TransientModel):
-    _name = "dojo.migration.import.programs"
-    _description = "Import Programs & Styles from CSV"
+def _parse_bool(val, default=False):
+    if not val:
+        return default
+    return val.strip().upper() in ("TRUE", "1", "YES", "T")
+
+
+def _parse_int(val, default=0):
+    try:
+        return int(val.strip()) if val and val.strip() else default
+    except (ValueError, AttributeError):
+        return default
+
+
+class DojoMigrationImportBeltRankDefinitions(models.TransientModel):
+    _name = "dojo.migration.import.belt.rank.defs"
+    _description = "Import Belt Rank Definitions from CSV"
 
     state = fields.Selection(
         [("upload", "Upload"), ("preview", "Preview"), ("done", "Done")],
@@ -49,7 +67,7 @@ class DojoMigrationImportPrograms(models.TransientModel):
             writer.writerow(row)
         data = base64.b64encode(output.getvalue().encode("utf-8"))
         attachment = self.env["ir.attachment"].create({
-            "name": "spark_programs_template.csv",
+            "name": "belt_rank_definitions_template.csv",
             "datas": data,
             "mimetype": "text/csv",
         })
@@ -64,8 +82,7 @@ class DojoMigrationImportPrograms(models.TransientModel):
     def action_preview(self):
         self.ensure_one()
         rows, _ = self._parse_csv()
-        html = self._rows_to_html(rows[:5])
-        self.preview_html = html
+        self.preview_html = self._rows_to_html(rows[:5])
         self.state = "preview"
         return self._reopen()
 
@@ -81,8 +98,7 @@ class DojoMigrationImportPrograms(models.TransientModel):
         log_lines = []
         success = skip = error = 0
 
-        Program = self.env["dojo.program"]
-        Style = self.env["dojo.martial.art.style"]
+        BeltRank = self.env["dojo.belt.rank"]
 
         for idx, row in enumerate(rows, start=2):  # row 1 = header
             raw = json.dumps(row)
@@ -95,37 +111,29 @@ class DojoMigrationImportPrograms(models.TransientModel):
                 error += 1
                 continue
 
-            existing = Program.search(
-                [("name", "=ilike", name)], limit=1
-            )
+            existing = BeltRank.search([("name", "=ilike", name)], limit=1)
             if existing:
                 log_lines.append((0, 0, {
                     "row_number": idx, "status": "skip",
-                    "message": f"Program '{name}' already exists (id={existing.id})",
+                    "message": f"Belt rank '{name}' already exists (id={existing.id})",
                     "raw_data": raw,
                 }))
                 skip += 1
                 continue
 
             try:
-                style_name = (row.get("style_name") or "").strip()
-                style_id = False
-                if style_name:
-                    style = Style.search([("name", "=ilike", style_name)], limit=1)
-                    if not style:
-                        style = Style.create({"name": style_name})
-                    style_id = style.id
-
-                vals = {"name": name}
-                if row.get("code"):
-                    vals["code"] = row["code"].strip()
-                if style_id:
-                    vals["style_id"] = style_id
-
-                Program.create(vals)
+                vals = {
+                    "name": name,
+                    "sequence": _parse_int(row.get("sequence"), default=10),
+                    "dan_level": _parse_int(row.get("dan_level"), default=0),
+                    "is_dan": _parse_bool(row.get("is_dan"), default=False),
+                    "max_stripes": _parse_int(row.get("max_stripes"), default=4),
+                    "active": _parse_bool(row.get("active"), default=True),
+                }
+                BeltRank.create(vals)
                 log_lines.append((0, 0, {
                     "row_number": idx, "status": "success",
-                    "message": f"Created program '{name}'", "raw_data": raw,
+                    "message": f"Created belt rank '{name}'", "raw_data": raw,
                 }))
                 success += 1
             except Exception as exc:
@@ -137,7 +145,7 @@ class DojoMigrationImportPrograms(models.TransientModel):
 
         state = "done" if error == 0 else ("partial" if success + skip > 0 else "failed")
         log = self.env["dojo.migration.log"].create({
-            "import_type": "programs",
+            "import_type": "belt_rank_defs",
             "filename": self.filename or "unknown.csv",
             "state": state,
             "date": fields.Datetime.now(),

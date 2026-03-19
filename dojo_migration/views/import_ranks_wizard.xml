@@ -49,6 +49,6 @@
         <field name="name">Import Belt Rank History</field>
         <field name="res_model">dojo.migration.import.ranks</field>
         <field name="view_mode">form</field>
-        <field name="target">new</field>
+        <field name="target">main</field>
     </record>
 </odoo>

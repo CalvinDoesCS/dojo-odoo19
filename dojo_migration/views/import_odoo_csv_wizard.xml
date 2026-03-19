@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_odoo_csv_wizard_form" model="ir.ui.view">
+        <field name="name">dojo.migration.import.odoo.csv.form</field>
+        <field name="model">dojo.migration.import.odoo.csv</field>
+        <field name="arch" type="xml">
+            <form string="Import Odoo-Format CSV">
+                <header>
+                    <button name="action_preview" string="Preview" type="object"
+                            class="btn-primary" invisible="state != 'upload'"/>
+                    <button name="action_import" string="Import" type="object"
+                            class="btn-primary" invisible="state != 'preview'"/>
+                    <button name="action_preview" string="Re-preview" type="object"
+                            class="btn-secondary" invisible="state != 'preview'"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Import Odoo-Format CSV</h1>
+                    </div>
+                    <group invisible="state == 'done'">
+                        <field name="model_name" readonly="state == 'preview'"/>
+                        <field name="csv_file" widget="binary" filename="filename"
+                               readonly="state == 'preview'"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="state" invisible="1"/>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="state != 'upload'">
+                        <p>
+                            <strong>Supported CSVs:</strong> any file following Odoo's native import format —
+                            <code>id</code> column with <code>__import__.*</code> external IDs,
+                            <code>field/id</code> for Many2one by external ID,
+                            <code>field/name</code> for Many2one by display name.
+                        </p>
+                        <p><strong>Import in order:</strong></p>
+                        <ol>
+                            <li>01 — Belt Rank Definitions</li>
+                            <li>02 — Partners</li>
+                            <li>03 — Households</li>
+                            <li>04 — Members</li>
+                            <li>05 — Household Guardian Update</li>
+                            <li>06 — Guardian Links</li>
+                            <li>07 — Emergency Contacts</li>
+                            <li>08 — Member Belt Ranks</li>
+                            <li>09 — Member Stripe Counts</li>
+                            <li>10 — Programs</li>
+                            <li>11 — Class Templates</li>
+                            <li>12 — Subscription Plans</li>
+                            <li>13 — Member Subscriptions</li>
+                        </ol>
+                    </div>
+                    <div invisible="state != 'preview'" style="width: 100%; overflow-x: auto;">
+                        <h4 class="mt-3 mb-1">Preview (first 5 rows)</h4>
+                        <field name="preview_html" widget="html" nolabel="1"/>
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="state != 'done'">
+                        Import complete.
+                        <a type="object" name="action_open_log">View log →</a>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- One action per CSV step, each pre-sets the target model via context -->
+
+    <record id="action_import_odoo_csv_partners" model="ir.actions.act_window">
+        <field name="name">02. Import Partners</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'res.partner'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_households" model="ir.actions.act_window">
+        <field name="name">03. Import Households</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.household'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_members" model="ir.actions.act_window">
+        <field name="name">04. Import Members</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.member'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_household_update" model="ir.actions.act_window">
+        <field name="name">05. Household Guardian Update</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.household'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_guardian_links" model="ir.actions.act_window">
+        <field name="name">06. Import Guardian Links</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.guardian.link'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_emergency_contacts" model="ir.actions.act_window">
+        <field name="name">07. Import Emergency Contacts</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.emergency.contact'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_member_ranks" model="ir.actions.act_window">
+        <field name="name">08. Import Member Belt Ranks</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.member.rank'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_programs" model="ir.actions.act_window">
+        <field name="name">10. Import Programs</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.program'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_sub_plans" model="ir.actions.act_window">
+        <field name="name">10b / 12. Import Subscription Plans</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.subscription.plan'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_class_templates" model="ir.actions.act_window">
+        <field name="name">11. Import Class Templates</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.class.template'}</field>
+    </record>
+
+    <record id="action_import_odoo_csv_member_subs" model="ir.actions.act_window">
+        <field name="name">13. Import Member Subscriptions</field>
+        <field name="res_model">dojo.migration.import.odoo.csv</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'default_model_name': 'dojo.member.subscription'}</field>
+    </record>
+</odoo>

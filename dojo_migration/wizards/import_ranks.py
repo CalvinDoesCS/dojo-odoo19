@@ -281,7 +281,7 @@ class DojoMigrationImportRanks(models.TransientModel):
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
-            "target": "new",
+            "target": "main",
         }
 
     def _open_log(self, log):

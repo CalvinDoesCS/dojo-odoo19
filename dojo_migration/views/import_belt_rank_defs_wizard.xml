@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_import_programs_wizard_form" model="ir.ui.view">
-        <field name="name">dojo.migration.import.programs.form</field>
-        <field name="model">dojo.migration.import.programs</field>
+    <record id="view_import_belt_rank_defs_wizard_form" model="ir.ui.view">
+        <field name="name">dojo.migration.import.belt.rank.defs.form</field>
+        <field name="model">dojo.migration.import.belt.rank.defs</field>
         <field name="arch" type="xml">
-            <form string="Import Programs &amp; Styles">
+            <form string="Import Belt Rank Definitions">
                 <header>
                     <!-- Upload state -->
                     <button name="action_preview" string="Preview" type="object"
@@ -19,7 +19,7 @@
                 </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1>Import Programs &amp; Styles</h1>
+                        <h1>Import Belt Rank Definitions</h1>
                     </div>
                     <group invisible="state == 'done'">
                         <field name="csv_file" widget="binary" filename="filename"/>
@@ -29,9 +29,13 @@
                     <div class="alert alert-info" role="alert" invisible="state != 'upload'">
                         <strong>Expected columns:</strong>
                         <code>name</code> (required),
-                        <code>code</code>,
-                        <code>style_name</code>
+                        <code>sequence</code>,
+                        <code>dan_level</code>,
+                        <code>is_dan</code>,
+                        <code>max_stripes</code>,
+                        <code>active</code>
                         — Download the template for a ready-to-fill example.
+                        The <code>id</code> column (if present) is ignored.
                     </div>
                     <!-- Preview table -->
                     <group invisible="state != 'preview'" string="Preview (first 5 rows)">
@@ -39,7 +43,7 @@
                     </group>
                     <!-- Done state: show log link -->
                     <div class="alert alert-success" role="alert" invisible="state != 'done'">
-                        Import complete. 
+                        Import complete.
                         <a type="object" name="action_open_log">View log →</a>
                     </div>
                 </sheet>
@@ -47,9 +51,9 @@
         </field>
     </record>
 
-    <record id="action_import_programs_wizard" model="ir.actions.act_window">
-        <field name="name">Import Programs &amp; Styles</field>
-        <field name="res_model">dojo.migration.import.programs</field>
+    <record id="action_import_belt_rank_defs_wizard" model="ir.actions.act_window">
+        <field name="name">Import Belt Rank Definitions</field>
+        <field name="res_model">dojo.migration.import.belt.rank.defs</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
     </record>
