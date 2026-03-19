@@ -561,8 +561,8 @@ class AiAssistantService(models.AbstractModel):
                     if hasattr(m, 'current_rank_id') and m.current_rank_id:
                         rank_str = " rank:{}".format(m.current_rank_id.name)
                     lines.append(
-                        "  - {} [id:{}, role:{}, state:{}{}{}]{}".format(
-                            m.name, m.id, getattr(m, 'role', 'student'), 
+                        "  - {} [id:{}, state:{}{}{}]{}".format(
+                            m.name, m.id,
                             getattr(m, 'membership_state', 'unknown'),
                             plan_str, rank_str, guardian_str,
                         )
@@ -631,9 +631,9 @@ class AiAssistantService(models.AbstractModel):
     @api.model
     def _guardian_summary(self, member):
         """Return a compact string describing the primary guardian."""
-        household = getattr(member, 'household_id', None)
-        if household and household.primary_guardian_id:
-            gp = household.primary_guardian_id.partner_id
+        household = member.partner_id.parent_id if hasattr(member, 'partner_id') else None
+        if household and household.is_household and household.primary_guardian_id:
+            gp = household.primary_guardian_id
             email_part = " email:{}".format(gp.email) if gp.email else ""
             phone_part = " phone:{}".format(gp.phone or gp.mobile or "") if (gp.phone or gp.mobile) else ""
             return " guardian:{}{}{}".format(gp.name, email_part, phone_part)
@@ -775,9 +775,9 @@ class AiAssistantService(models.AbstractModel):
                 resolved["member_state"] = getattr(member, 'membership_state', None)
 
                 # Include guardian info
-                household = getattr(member, 'household_id', None)
-                if household and household.primary_guardian_id:
-                    g = household.primary_guardian_id.partner_id
+                household = member.partner_id.parent_id if hasattr(member, 'partner_id') else None
+                if household and household.is_household and household.primary_guardian_id:
+                    g = household.primary_guardian_id
                     resolved["guardian_id"] = g.id
                     resolved["guardian_name"] = g.name
                     resolved["guardian_email"] = g.email

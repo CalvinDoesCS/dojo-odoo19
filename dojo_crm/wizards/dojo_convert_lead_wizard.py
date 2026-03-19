@@ -46,6 +46,7 @@ class DojoConvertLeadWizard(models.TransientModel):
         string="Role",
         default="student",
         required=True,
+        help="Student: trains at the dojo. Parent: guardian account only. Standalone: trains and is own guardian.",
     )
 
     # ------------------------------------------------------------------
@@ -57,8 +58,9 @@ class DojoConvertLeadWizard(models.TransientModel):
         default=True,
     )
     household_id = fields.Many2one(
-        "dojo.household",
+        "res.partner",
         string="Existing Household",
+        domain=[("is_household", "=", True)],
     )
     guardian_name = fields.Char(
         string="Guardian / Parent Name",
@@ -156,7 +158,8 @@ class DojoConvertLeadWizard(models.TransientModel):
                 raise UserError(
                     _("Please provide a guardian name when creating a household for a student.")
                 )
-            # Create guardian partner
+            # Create guardian partner (if guardian name provided)
+            guardian_partner = None
             if self.guardian_name:
                 guardian_partner = self.env["res.partner"].create(
                     {
@@ -164,56 +167,60 @@ class DojoConvertLeadWizard(models.TransientModel):
                         "email": self.guardian_email,
                         "mobile": self.guardian_mobile,
                         "company_type": "person",
+                        "is_guardian": True,
                     }
                 )
-                guardian_member = self.env["dojo.member"].create(
-                    {
-                        "partner_id": guardian_partner.id,
-                        "role": "parent",
-                        "membership_state": "active",
-                    }
-                )
-                household = self.env["dojo.household"].create(
+                household = self.env["res.partner"].create(
                     {
                         "name": f"{self.last_name or full_name} Household",
-                        "primary_guardian_id": guardian_member.id,
+                        "is_household": True,
+                        "is_company": True,
+                        "primary_guardian_id": guardian_partner.id,
                     }
                 )
+                guardian_partner.write({"parent_id": household.id})
             else:
-                household = self.env["dojo.household"].create(
-                    {"name": f"{self.last_name or full_name} Household"}
+                household = self.env["res.partner"].create(
+                    {
+                        "name": f"{self.last_name or full_name} Household",
+                        "is_household": True,
+                        "is_company": True,
+                    }
                 )
         elif self.household_id:
             household = self.household_id
 
-        # ---- Create dojo.member ----
-        member_vals = {
-            "partner_id": partner.id,
-            "role": self.role,
-            "date_of_birth": self.date_of_birth,
-            "membership_state": "active",
-        }
-        if household:
-            member_vals["household_id"] = household.id
-
-        member = self.env["dojo.member"].create(member_vals)
-
-        # Link guardian if created
-        if household and household.primary_guardian_id and self.role == "student":
-            self.env["dojo.guardian.link"].create(
-                {
-                    "household_id": household.id,
-                    "guardian_member_id": household.primary_guardian_id.id,
-                    "student_member_id": member.id,
-                    "relation": "guardian",
-                    "is_primary": True,
-                }
-            )
-            # Update household member list
-            household.primary_guardian_id.household_id = household.id
+        # ---- Create member or partner ----
+        if self.role == "parent":
+            # Pure guardian — create dojo.member so they can access the portal
+            partner.write({
+                "is_guardian": True,
+            })
+            if household:
+                partner.write({"parent_id": household.id})
+            if household and not household.primary_guardian_id:
+                household.primary_guardian_id = partner.id
+            member = self.env["dojo.member"].create({
+                "partner_id": partner.id,
+                "membership_state": "active",
+            })
+        else:
+            member_vals = {
+                "partner_id": partner.id,
+                "date_of_birth": self.date_of_birth,
+                "membership_state": "active",
+            }
+            member = self.env["dojo.member"].create(member_vals)
+            if self.role == "both":
+                partner.write({"is_guardian": True})
+            if household:
+                partner.write({"parent_id": household.id})
+            if household and not household.primary_guardian_id:
+                if self.role == "both":
+                    household.primary_guardian_id = partner.id
 
         # ---- Create subscription ----
-        if self.create_subscription and self.plan_id:
+        if self.create_subscription and self.plan_id and member:
             plan = self.plan_id
             start = self.subscription_start_date or fields.Date.today()
             self.env["dojo.member.subscription"].create(
@@ -227,7 +234,7 @@ class DojoConvertLeadWizard(models.TransientModel):
             )
 
         # ---- Link back to lead ----
-        lead.dojo_member_id = member.id
+        lead.dojo_member_id = member.id if member else False
         lead.trial_attended = True
 
         # ---- Move lead to Converted stage ----

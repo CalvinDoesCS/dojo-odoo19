@@ -7,7 +7,7 @@ posting the Odoo invoice, when the household has a saved native payment.token.
 Architecture (native payment_stripe):
   - payment.token  (provider_ref = cus_xxx, stripe_payment_method = pm_xxx)
     linked to the primary guardian's partner_id.
-  - action_charge_invoice() on dojo.household creates a payment.transaction
+  - action_charge_invoice() on res.partner (household) creates a payment.transaction
     with operation='offline' and calls _send_payment_request().
   - Odoo reconciles the invoice via Stripe webhook or status-check cron.
 
@@ -43,8 +43,8 @@ class DojoMemberSubscriptionStripe(models.Model):
         """
         invoice = super().action_generate_invoice()
 
-        household = self.member_id.household_id
-        if not household:
+        household = self.member_id.partner_id.parent_id
+        if not household or not household.is_household:
             return invoice
 
         # Use the computed payment_token_count field from dojo_household_billing
@@ -109,7 +109,7 @@ class DojoMemberSubscriptionStripe(models.Model):
             return invoice
 
         # All subs in a billing group share the same household/billing partner.
-        household = subs[0].member_id.household_id if subs else None
+        household = subs[0].member_id.partner_id.parent_id if subs else None
         if not household or not getattr(household, 'payment_token_count', 0):
             return invoice
 

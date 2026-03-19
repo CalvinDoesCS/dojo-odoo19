@@ -26,7 +26,9 @@ class MemberProfile extends Component {
                     email: "",
                     phone: "",
                     date_of_birth: "",
-                    role: "",
+                    is_student: false,
+                    is_guardian: false,
+                    is_minor: false,
                     blood_type: "",
                     allergies: "",
                     medical_notes: "",
@@ -89,7 +91,9 @@ class MemberProfile extends Component {
             email: m.email || "",
             phone: m.phone || "",
             date_of_birth: m.date_of_birth || "",
-            role: m.role || "",
+            is_student: !!m.is_student,
+            is_guardian: !!m.is_guardian,
+            is_minor: !!m.is_minor,
             blood_type: m.blood_type || "",
             allergies: m.allergies || "",
             medical_notes: m.medical_notes || "",
@@ -116,7 +120,9 @@ class MemberProfile extends Component {
                 email: f.email || false,
                 phone: f.phone || false,
                 date_of_birth: f.date_of_birth || false,
-                role: f.role || "student",
+                is_student: f.is_student,
+                is_guardian: f.is_guardian,
+                is_minor: f.is_minor,
                 blood_type: f.blood_type || false,
                 allergies: f.allergies || false,
                 medical_notes: f.medical_notes || false,
@@ -134,7 +140,7 @@ class MemberProfile extends Component {
     onEditFieldChange(ev) {
         const field = ev.target.dataset.field;
         if (field) {
-            this.state.editOverlay.form[field] = ev.target.value;
+            this.state.editOverlay.form[field] = ev.target.type === "checkbox" ? ev.target.checked : ev.target.value;
         }
     }
 
@@ -279,11 +285,11 @@ class MemberProfile extends Component {
 
     // ── Label helpers ────────────────────────────────────────────────
 
-    roleLabel(role) {
-        return (
-            { student: "Student", parent: "Parent", both: "Standalone" }[role]
-            || role
-        );
+    roleLabel(member) {
+        const parts = [];
+        if (member.is_student) parts.push("Student");
+        if (member.is_guardian) parts.push("Guardian");
+        return parts.join(" / ") || "—";
     }
 
     stateLabel(state) {

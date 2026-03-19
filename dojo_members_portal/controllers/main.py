@@ -49,31 +49,36 @@ class DojoMemberPortal(CustomerPortal):
     def _get_household_member_ids(self):
         """Return member IDs scoped to the current user's access level.
 
-        Students (role == 'student') are strictly limited to their own record.
-        Parents and 'both' roles see the entire household.
+        Students (non-guardians) are strictly limited to their own record.
+        Guardians see all members in the household.
         """
         member = self._get_current_member()
         if not member:
             return []
-        # Students may only ever see their own data — never siblings or parents
-        if member.role == 'student':
+        partner = member.partner_id
+        # Non-guardians may only ever see their own data
+        if not partner.is_guardian:
             return [member.id]
-        if member.household_id:
-            return member.household_id.member_ids.ids
+        household = partner.parent_id
+        if household and household.is_household:
+            hh_members = request.env['dojo.member'].sudo().search([
+                ('partner_id.parent_id', '=', household.id),
+            ])
+            return hh_members.ids
         return [member.id]
 
     def _get_student_members(self):
         """Return dojo.member records that are students in the current household.
 
-        Only meaningful for parents; returns an empty RecordSet for students.
+        Only meaningful for guardians; returns an empty RecordSet for students.
         """
         member = self._get_current_member()
-        if not member or member.role == 'student':
+        if not member or not member.partner_id.is_guardian:
             return request.env['dojo.member'].sudo().browse([])
         all_members = request.env['dojo.member'].sudo().browse(
             self._get_household_member_ids()
         )
-        return all_members.filtered(lambda m: m.role in ('student', 'both'))
+        return all_members.filtered(lambda m: m.partner_id.is_student)
 
     def _resolve_view_member_ids(self, member_id=None):
         """Return the list of member IDs to use for a JSON data request.
@@ -85,7 +90,7 @@ class DojoMemberPortal(CustomerPortal):
         member = self._get_current_member()
         if not member:
             return []
-        if member.role == 'student':
+        if not member.partner_id.is_guardian:
             return [member.id]
         if member_id:
             try:
@@ -147,8 +152,8 @@ class DojoMemberPortal(CustomerPortal):
         if not member:
             return request.render('dojo_members_portal.portal_no_member', {})
         env = request.env
-        is_parent = member.role in ('parent', 'both')
-        is_student_only = member.role == 'student'
+        is_parent = member.partner_id.is_guardian
+        is_student_only = not member.partner_id.is_guardian
         household_member_ids = self._get_household_member_ids()
 
         attendance_count = env['dojo.attendance.log'].sudo().search_count([
@@ -161,7 +166,7 @@ class DojoMemberPortal(CustomerPortal):
             ('session_id.state', 'in', ['open', 'draft']),
         ])
         household_members = env['dojo.member'].sudo().browse(household_member_ids)
-        members_json = json.dumps([{'id': m.id, 'name': m.name, 'role': m.role or ''} for m in household_members])
+        members_json = json.dumps([{'id': m.id, 'name': m.name, 'is_student': m.partner_id.is_student, 'is_guardian': m.partner_id.is_guardian} for m in household_members])
 
         # Student members for the household switcher (parents only)
         student_members = self._get_student_members() if is_parent else env['dojo.member'].sudo().browse([])
@@ -221,7 +226,7 @@ class DojoMemberPortal(CustomerPortal):
             )
         # Resolve target member
         target = current
-        if member_id and current.role != 'student':
+        if member_id and current.partner_id.is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -255,14 +260,14 @@ class DojoMemberPortal(CustomerPortal):
     @http.route('/my/dojo/json/schedule', type='http', auth='user')
     def portal_json_schedule(self, member_id=None, **kwargs):
         member = self._get_current_member()
-        is_parent = member.role in ('parent', 'both') if member else True
+        is_parent = member.partner_id.is_guardian if member else True
         household_member_ids = self._resolve_view_member_ids(member_id)
         household_members = request.env['dojo.member'].sudo().browse(household_member_ids)
 
         # Scope sessions to programs covered by each member's active subscription.
         # Build: program_id -> [member_ids subscribed to it]
         program_member_map = {}  # {program_id: [member_id, ...]}
-        for m in household_members.filtered(lambda x: x.role in ('student', 'both')):
+        for m in household_members.filtered(lambda x: x.partner_id.is_student):
             sub = m.active_subscription_id
             if not sub:
                 continue
@@ -369,7 +374,7 @@ class DojoMemberPortal(CustomerPortal):
         household_members = request.env['dojo.member'].sudo().browse(member_ids)
         # Parents are guardians, not class participants — only query students.
         household_members = household_members.filtered(
-            lambda m: m.role in ('student', 'both')
+            lambda m: m.partner_id.is_student
         )
         if not household_members:
             return request.make_response(
@@ -598,8 +603,8 @@ class DojoMemberPortal(CustomerPortal):
                 json.dumps({'error': 'No member found'}),
                 headers=[('Content-Type', 'application/json')],
             )
-        is_parent = member.role in ('parent', 'both')
-        household = member.sudo().household_id
+        is_parent = member.partner_id.is_guardian
+        household = member.sudo().partner_id.parent_id
         hm_records = request.env['dojo.member'].sudo().browse(
             self._get_household_member_ids()
         )
@@ -631,7 +636,8 @@ class DojoMemberPortal(CustomerPortal):
             members_data.append({
                 'id': m.id,
                 'name': m.name or '',
-                'role': m.role or '',
+                'is_student': m.partner_id.is_student,
+                'is_guardian': m.partner_id.is_guardian,
                 'emergency_contacts': contacts,
                 'courses': [
                     {'id': t.id, 'name': t.name, 'level': t.level or 'all'}
@@ -672,7 +678,7 @@ class DojoMemberPortal(CustomerPortal):
         env = request.env
         # Only members with a student role may be enrolled in classes
         enroll_target = env['dojo.member'].sudo().browse(member_id)
-        if not enroll_target.exists() or enroll_target.role not in ('student', 'both'):
+        if not enroll_target.exists() or not enroll_target.partner_id.is_student:
             return _err('Only students can be enrolled in classes.')
         session = env['dojo.class.session'].sudo().browse(session_id)
         if not session.exists() or session.state not in ('open', 'draft'):
@@ -733,13 +739,13 @@ class DojoMemberPortal(CustomerPortal):
                 headers=[('Content-Type', 'application/json')],
             )
         member = self._get_current_member()
-        if not member or member.role not in ('parent', 'both'):
+        if not member or not member.partner_id.is_guardian:
             return _err('Not authorised.')
         try:
             payload = json.loads(request.httprequest.data)
         except Exception:
             return _err('Invalid request body.')
-        household = member.sudo().household_id
+        household = member.sudo().partner_id.parent_id
         if household and payload.get('household_name'):
             household.sudo().write({'name': payload['household_name'].strip()})
         nc = payload.get('new_contact')
@@ -925,12 +931,12 @@ class DojoMemberPortal(CustomerPortal):
                 json.dumps(d), headers=[('Content-Type', 'application/json')]
             )
         # Parent without a specific student selected → return all students' data
-        if not member_id and current.role != 'student':
+        if not member_id and current.partner_id.is_guardian:
             hm_ids = self._get_household_member_ids()
             students_data = []
             for mid in hm_ids:
                 m = request.env['dojo.member'].sudo().browse(mid)
-                if not m.exists() or m.role not in ('student', 'both'):
+                if not m.exists() or not m.partner_id.is_student:
                     continue
                 students_data.append({
                     'id': m.id,
@@ -941,7 +947,7 @@ class DojoMemberPortal(CustomerPortal):
             return _json({'programs': [], 'students': students_data})
         # Specific member or student self-view
         target = current
-        if member_id and current.role != 'student':
+        if member_id and current.partner_id.is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -962,7 +968,7 @@ class DojoMemberPortal(CustomerPortal):
                 headers=[('Content-Type', 'application/json')],
             )
         target = current
-        if member_id and current.role != 'student':
+        if member_id and current.partner_id.is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -1017,7 +1023,7 @@ class DojoMemberPortal(CustomerPortal):
         if not member:
             return _err('Not authenticated.')
         target = member
-        if member_id and member.role != 'student':
+        if member_id and member.partner_id.is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -1027,7 +1033,7 @@ class DojoMemberPortal(CustomerPortal):
                         return _err('Member not found.')
             except (TypeError, ValueError):
                 return _err('Invalid member ID.')
-        if target.role not in ('student', 'both'):
+        if not target.partner_id.is_student:
             return _err('Belt tests are for students only.')
         if getattr(target, 'test_invite_pending', False):
             return _err('A belt test request is already pending.')
@@ -1074,7 +1080,7 @@ class DojoMemberPortal(CustomerPortal):
             return _err('Message cannot be empty.')
         target = member
         mid_param = payload.get('member_id')
-        if mid_param and member.role != 'student':
+        if mid_param and member.partner_id.is_guardian:
             try:
                 mid = int(mid_param)
                 hm_ids = self._get_household_member_ids()
@@ -1100,7 +1106,7 @@ class DojoMemberPortal(CustomerPortal):
     @http.route('/my/dojo/json/billing', type='http', auth='user')
     def portal_json_billing(self, **kwargs):
         member = self._get_current_member()
-        if not member or member.role not in ('parent', 'both'):
+        if not member or not member.partner_id.is_guardian:
             return request.make_response(
                 json.dumps({'error': 'Not authorised'}),
                 headers=[('Content-Type', 'application/json')],
@@ -1108,23 +1114,25 @@ class DojoMemberPortal(CustomerPortal):
         member_ids = self._get_household_member_ids()
         env = request.env
 
-        # Active subscription for any household member
-        sub = env['dojo.member.subscription'].sudo().search([
+        # All non-cancelled subscriptions for the household
+        subs = env['dojo.member.subscription'].sudo().search([
             ('member_id', 'in', member_ids),
-            ('state', '=', 'active'),
-        ], limit=1)
-        # Fall back to any non-cancelled subscription
-        if not sub:
-            sub = env['dojo.member.subscription'].sudo().search([
+            ('state', '!=', 'cancelled'),
+        ], order='start_date desc')
+        # If none, also look for recently cancelled ones
+        if not subs:
+            subs = env['dojo.member.subscription'].sudo().search([
                 ('member_id', 'in', member_ids),
-                ('state', 'not in', ('cancelled',)),
-            ], order='start_date desc', limit=1)
+            ], order='start_date desc')
 
-        sub_data = None
-        if sub:
+        subs_data = []
+        all_invoices = env['account.move'].browse()
+        for sub in subs:
             plan = sub.plan_id
-            sub_data = {
+            subs_data.append({
                 'id': sub.id,
+                'member_id': sub.member_id.id,
+                'member_name': sub.member_id.name or '',
                 'plan_id': plan.id,
                 'plan_name': plan.name or '',
                 'price': plan.price,
@@ -1139,7 +1147,11 @@ class DojoMemberPortal(CustomerPortal):
                 'credit_balance': getattr(sub, 'credit_balance', 0),
                 'credit_pending': getattr(sub, 'credit_pending', 0),
                 'credit_confirmed': getattr(sub, 'credit_confirmed', 0),
-            }
+            })
+            all_invoices |= sub.invoice_ids | sub.household_invoice_ids
+
+        # Keep legacy 'subscription' key for backwards compat (first active or first overall)
+        sub_data = subs_data[0] if subs_data else None
 
         # Available plans (for plan-switch overlay)
         plans = env['dojo.subscription.plan'].sudo().search([('active', '=', True)])
@@ -1152,25 +1164,24 @@ class DojoMemberPortal(CustomerPortal):
             'description': p.description or '',
         } for p in plans]
 
-        # Last 12 invoices for this household's subscriptions
+        # Last 12 invoices for this household's subscriptions (deduplicated)
         invoices_data = []
-        if sub:
-            sorted_invoices = (sub.invoice_ids | sub.household_invoice_ids).sorted(
-                key=lambda i: i.invoice_date or fields.Date.today(), reverse=True
-            )[:12]
-            for inv in sorted_invoices:
-                invoices_data.append({
-                    'id': inv.id,
-                    'date': fields.Date.to_string(inv.invoice_date) if inv.invoice_date else None,
-                    'amount': inv.amount_total,
-                    'currency': inv.currency_id.name if inv.currency_id else 'USD',
-                    'payment_state': inv.payment_state,
-                })
+        sorted_invoices = all_invoices.sorted(
+            key=lambda i: i.invoice_date or fields.Date.today(), reverse=True
+        )[:12]
+        for inv in sorted_invoices:
+            invoices_data.append({
+                'id': inv.id,
+                'date': fields.Date.to_string(inv.invoice_date) if inv.invoice_date else None,
+                'amount': inv.amount_total,
+                'currency': inv.currency_id.name if inv.currency_id else 'USD',
+                'payment_state': inv.payment_state,
+            })
 
         # Saved payment method (card-on-file) for the household
         payment_method_data = None
-        household = member.household_id
-        if household and household.primary_guardian_id:
+        household = member.partner_id.parent_id
+        if household and household.is_household and household.primary_guardian_id:
             guardian = household.primary_guardian_id
             provider = env['payment.provider'].sudo().search(
                 [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))], limit=1
@@ -1178,7 +1189,7 @@ class DojoMemberPortal(CustomerPortal):
             if provider:
                 token = env['payment.token'].sudo().search([
                     ('provider_id', '=', provider.id),
-                    ('partner_id', '=', guardian.partner_id.id),
+                    ('partner_id', '=', guardian.id),
                     ('active', '=', True),
                 ], limit=1)
                 if token:
@@ -1187,6 +1198,7 @@ class DojoMemberPortal(CustomerPortal):
         return request.make_response(
             json.dumps({
                 'subscription': sub_data,
+                'subscriptions': subs_data,
                 'plans': plans_data,
                 'invoices': invoices_data,
                 'payment_method': payment_method_data,
@@ -1195,12 +1207,25 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     # ── Billing action endpoints (parents only) ───────────────────────────
-    def _get_household_active_sub(self):
-        """Return the active subscription for the current household, or None."""
+    def _get_household_sub(self, sub_id=None):
+        """Return a subscription for the current household.
+
+        If *sub_id* is provided, validate it belongs to the household and
+        return it.  Otherwise fall back to the first active/paused sub.
+        """
         member = self._get_current_member()
-        if not member or member.role not in ('parent', 'both'):
+        if not member or not member.partner_id.is_guardian:
             return None
         member_ids = self._get_household_member_ids()
+        if sub_id:
+            try:
+                sub_id = int(sub_id)
+            except (TypeError, ValueError):
+                return None
+            sub = request.env['dojo.member.subscription'].sudo().browse(sub_id)
+            if sub.exists() and sub.member_id.id in member_ids:
+                return sub
+            return None
         sub = request.env['dojo.member.subscription'].sudo().search([
             ('member_id', 'in', member_ids),
             ('state', 'in', ('active', 'paused')),
@@ -1208,13 +1233,13 @@ class DojoMemberPortal(CustomerPortal):
         return sub or None
 
     @http.route('/my/dojo/billing/change-plan', type='http', auth='user', methods=['POST'])
-    def portal_billing_change_plan(self, plan_id=None, **kwargs):
+    def portal_billing_change_plan(self, plan_id=None, subscription_id=None, **kwargs):
         def _err(msg):
             return request.make_response(
                 json.dumps({'ok': False, 'error': msg}),
                 headers=[('Content-Type', 'application/json')],
             )
-        sub = self._get_household_active_sub()
+        sub = self._get_household_sub(subscription_id)
         if not sub:
             return _err('No active subscription found.')
         try:
@@ -1231,8 +1256,8 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     @http.route('/my/dojo/billing/pause', type='http', auth='user', methods=['POST'])
-    def portal_billing_pause(self, **kwargs):
-        sub = self._get_household_active_sub()
+    def portal_billing_pause(self, subscription_id=None, **kwargs):
+        sub = self._get_household_sub(subscription_id)
         if not sub or sub.state != 'active':
             return request.make_response(
                 json.dumps({'ok': False, 'error': 'No active subscription to pause.'}),
@@ -1245,8 +1270,8 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     @http.route('/my/dojo/billing/resume', type='http', auth='user', methods=['POST'])
-    def portal_billing_resume(self, **kwargs):
-        sub = self._get_household_active_sub()
+    def portal_billing_resume(self, subscription_id=None, **kwargs):
+        sub = self._get_household_sub(subscription_id)
         if not sub or sub.state != 'paused':
             return request.make_response(
                 json.dumps({'ok': False, 'error': 'Subscription is not paused.'}),
@@ -1259,8 +1284,8 @@ class DojoMemberPortal(CustomerPortal):
         )
 
     @http.route('/my/dojo/billing/cancel', type='http', auth='user', methods=['POST'])
-    def portal_billing_cancel(self, **kwargs):
-        sub = self._get_household_active_sub()
+    def portal_billing_cancel(self, subscription_id=None, **kwargs):
+        sub = self._get_household_sub(subscription_id)
         if not sub:
             return request.make_response(
                 json.dumps({'ok': False, 'error': 'No active subscription found.'}),
@@ -1283,8 +1308,8 @@ class DojoMemberPortal(CustomerPortal):
         if not member:
             return request.render('dojo_members_portal.portal_no_member', {})
 
-        can_edit = member.role in ('parent', 'both')
-        household = member.sudo().household_id
+        can_edit = member.partner_id.is_guardian
+        household = member.sudo().partner_id.parent_id
         error = {}
         success = False
 

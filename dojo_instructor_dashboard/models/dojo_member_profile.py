@@ -59,7 +59,9 @@ class DojoMemberProfile(models.Model):
             "email": member.email or "",
             "phone": member.phone or "",
             "date_of_birth": str(member.date_of_birth) if member.date_of_birth else "",
-            "role": member.role or "",
+            "is_student": member.partner_id.is_student,
+            "is_guardian": member.partner_id.is_guardian,
+            "is_minor": member.partner_id.is_minor,
             "membership_state": member.membership_state or "",
             "emergency_note": member.emergency_note or "",
             "plan_name": plan_name,
@@ -159,8 +161,11 @@ class DojoMemberProfile(models.Model):
         data["credit_transactions"] = credit_transactions
 
         # ── Household ─────────────────────────────────────────────────────
-        hh = member.household_id
-        if hh:
+        hh = member.partner_id.parent_id
+        if hh and hh.is_household:
+            hh_members = self.env['dojo.member'].sudo().search([
+                ('partner_id.parent_id', '=', hh.id),
+            ])
             data["household"] = {
                 "id": hh.id,
                 "name": hh.name or "",
@@ -168,8 +173,13 @@ class DojoMemberProfile(models.Model):
                     hh.primary_guardian_id.name if hh.primary_guardian_id else ""
                 ),
                 "members": [
-                    {"id": m.id, "name": m.name or "", "role": m.role or ""}
-                    for m in hh.member_ids
+                    {
+                        "id": m.id,
+                        "name": m.name or "",
+                        "is_student": m.partner_id.is_student,
+                        "is_guardian": m.partner_id.is_guardian,
+                    }
+                    for m in hh_members
                 ],
             }
         else:

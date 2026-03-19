@@ -14,30 +14,28 @@
                 <field name="stripe_card_display" invisible="1"/>
             </xpath>
 
-            <!-- 2. Breadcrumb spans for the payment step -->
-            <xpath expr="//div[hasclass('alert-info', 'mb-3')]" position="inside">
-                <span invisible="step != 'payment' or not create_new_household">
-                    &#x2713; Member Info > &#x2713; Household > &#x2713; Guardian Setup > &#x2713; Enrollment > &#x2713; Auto-Enroll > &#x2713; Subscription > <b>Step 6: Payment</b> > Portal Access
-                </span>
-                <span invisible="step != 'payment' or create_new_household">
-                    &#x2713; Member Info > &#x2713; Household > &#x2713; Enrollment > &#x2713; Auto-Enroll > &#x2713; Subscription > <b>Step 5: Payment</b> > Portal Access
+            <!-- 2. Payment breadcrumb in the guardian-phase progress header -->
+            <xpath expr="//div[hasclass('alert-info')]//span[@invisible=&quot;step != 'guardian_portal'&quot;]"
+                   position="after">
+                <span invisible="step != 'payment'">
+                    ✓ Guardian Contact  ›  ✓ Household  ›  ✓ Guardian Portal  ›  <b>Payment</b>
                 </span>
             </xpath>
 
-            <!-- 3. Payment step content block (inserted before the footer) -->
-            <xpath expr="//footer" position="before">
-                <group string="Payment Method" invisible="step != 'payment'">
-                    <div class="alert alert-info py-3 px-3 mb-0" invisible="not plan_id"
+            <!-- 3. Payment step content (inserted after Guardian Portal, still in guardian phase area) -->
+            <xpath expr="//group[@name='group_guardian_portal']" position="after">
+                <group string="Payment Method" invisible="step != 'payment'" name="group_payment">
+                    <div class="alert alert-info py-3 px-3 mb-0"
                          colspan="2" role="alert">
                         <div class="d-flex align-items-start gap-2">
                             <i class="fa fa-credit-card fa-lg mt-1 flex-shrink-0" title="Payment"/>
                             <div>
                                 <div class="fw-semibold mb-1">
-                                    Plan: <field name="plan_id" readonly="1" nolabel="1"/>
+                                    Save a payment method for this household
                                 </div>
                                 <div class="text-muted">
-                                    After completing onboarding, the saved card will be charged
-                                    for the enrollment fee and first recurring invoice.
+                                    Student invoices will be automatically charged to the saved card.
+                                    You can skip this step to use invoice-only billing.
                                 </div>
                             </div>
                         </div>
@@ -46,6 +44,62 @@
                         <widget name="onboarding_stripe_payment"/>
                     </div>
                 </group>
+            </xpath>
+
+            <!-- 4. Hide "Pay Later" toggle on subscription step (defer_payment) -->
+            <xpath expr="//field[@name='defer_payment']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+            <!-- 5. Replace footer with payment-aware navigation -->
+            <xpath expr="//footer" position="replace">
+                <footer>
+                    <!-- Guardian contact with existing household → Next (to payment or student) -->
+                    <button name="action_next" type="object"
+                            string="Next →"
+                            class="btn btn-primary"
+                            invisible="step != 'guardian_contact' or not use_existing_household"/>
+                    <!-- Guardian phase: Next (new guardian flow, not on portal/payment steps) -->
+                    <button name="action_next" type="object" string="Next →"
+                            class="btn btn-primary"
+                            invisible="wizard_phase != 'guardian' or step in ('guardian_portal', 'payment') or use_existing_household"/>
+                    <!-- Guardian portal: Create Guardian &amp; Next (to payment) -->
+                    <button name="action_next" type="object"
+                            string="Create Guardian &amp; Next →"
+                            class="btn btn-primary"
+                            invisible="step != 'guardian_portal'"/>
+                    <!-- Payment step: Continue to Students -->
+                    <button name="action_next" type="object"
+                            string="Continue to Students →"
+                            class="btn btn-primary"
+                            invisible="step != 'payment'"/>
+
+                    <!-- Student phase: Next (not on student_portal or summary) -->
+                    <button name="action_next" type="object" string="Next →"
+                            class="btn btn-primary"
+                            invisible="wizard_phase != 'student' or step in ('student_portal', 'summary')"/>
+                    <!-- Student phase: Confirm Student (on student_portal step) -->
+                    <button name="action_confirm_student" type="object"
+                            string="Confirm &amp; Register Student"
+                            class="btn btn-primary"
+                            invisible="step != 'student_portal'"/>
+                    <!-- Summary: Add another -->
+                    <button name="action_add_another_student" type="object"
+                            string="Register Another Student"
+                            class="btn btn-primary"
+                            invisible="step != 'summary'"/>
+                    <!-- Summary: Finish -->
+                    <button name="action_finish" type="object"
+                            string="Finish Onboarding"
+                            class="btn btn-success"
+                            invisible="step != 'summary'"/>
+
+                    <!-- Back button -->
+                    <button name="action_back" type="object" string="← Previous"
+                            class="btn btn-secondary"
+                            invisible="step in ('guardian_contact', 'summary')"/>
+                    <button special="cancel" string="Cancel" class="btn btn-secondary"/>
+                </footer>
             </xpath>
 
         </field>

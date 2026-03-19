@@ -53,12 +53,11 @@ class DojoAttendanceLog(models.Model):
     def _send_checkin_notification(self, log):
         """Send SMS + email to the primary guardian of the checked-in member."""
         member = log.member_id
-        household = member.household_id
+        household = member.partner_id.parent_id
 
         # Resolve notification recipient
-        if household and household.primary_guardian_id:
-            guardian_member = household.primary_guardian_id
-            guardian_partner = guardian_member.partner_id
+        if household.is_household and household.primary_guardian_id:
+            guardian_partner = household.primary_guardian_id
         else:
             # No household; notify the member themselves (adult student)
             guardian_partner = member.partner_id

@@ -67,7 +67,7 @@
                                 <t t-esc="stateLabel(state.member.membership_state)"/>
                             </span>
                             <span class="o_mp_role_badge">
-                                <t t-esc="roleLabel(state.member.role)"/>
+                                <t t-esc="roleLabel(state.member)"/>
                             </span>
                             <t t-if="state.member.current_rank">
                                 <span class="o_mp_belt_badge"
@@ -327,12 +327,12 @@
                                         <td t-esc="hm.name"/>
                                         <td>
                                             <span class="o_di_badge o_di_badge_secondary">
-                                                <t t-esc="roleLabel(hm.role)"/>
+                                                <t t-esc="roleLabel(hm)"/>
                                             </span>
                                         </td>
                                         <td>
                                             <button class="o_mp_hh_contact_btn"
-                                                    t-on-click="() => contactGuardian(hm.id)"
+                                                    t-on-click="() => this.contactGuardian(hm.id)"
                                                     title="Contact this member">
                                                 <i class="fa fa-envelope-o"/>
                                             </button>
@@ -749,17 +749,27 @@
                                        t-on-input="onEditFieldChange"/>
                             </div>
                             <div class="o_mp_form_group">
-                                <label class="o_mp_form_label">Role</label>
-                                <select class="o_mp_form_control"
-                                        data-field="role"
-                                        t-on-change="onEditFieldChange">
-                                    <option value="student"
-                                            t-att-selected="state.editOverlay.form.role === 'student'">Student</option>
-                                    <option value="parent"
-                                            t-att-selected="state.editOverlay.form.role === 'parent'">Parent</option>
-                                    <option value="both"
-                                            t-att-selected="state.editOverlay.form.role === 'both'">Standalone</option>
-                                </select>
+                                <label class="o_mp_form_label">Flags</label>
+                                <div class="d-flex gap-3 align-items-center" style="min-height:34px;">
+                                    <label class="d-flex align-items-center gap-1" style="cursor:pointer;">
+                                        <input type="checkbox" data-field="is_student"
+                                               t-att-checked="state.editOverlay.form.is_student"
+                                               t-on-change="onEditFieldChange"/>
+                                        Student
+                                    </label>
+                                    <label class="d-flex align-items-center gap-1" style="cursor:pointer;">
+                                        <input type="checkbox" data-field="is_guardian"
+                                               t-att-checked="state.editOverlay.form.is_guardian"
+                                               t-on-change="onEditFieldChange"/>
+                                        Guardian
+                                    </label>
+                                    <label class="d-flex align-items-center gap-1" style="cursor:pointer;">
+                                        <input type="checkbox" data-field="is_minor"
+                                               t-att-checked="state.editOverlay.form.is_minor"
+                                               t-on-change="onEditFieldChange"/>
+                                        Minor
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

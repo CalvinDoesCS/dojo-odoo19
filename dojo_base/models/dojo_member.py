@@ -15,19 +15,8 @@ class DojoMember(models.Model):
 
     partner_id = fields.Many2one("res.partner", required=True, ondelete="cascade")
     active = fields.Boolean(default=True)
-    household_id = fields.Many2one("dojo.household", tracking=True, index=True)
     company_id = fields.Many2one(
         "res.company", default=lambda self: self.env.company, index=True
-    )
-    role = fields.Selection(
-        [
-            ("student", "Student"),
-            ("parent", "Parent"),
-            ("both", "Standalone"),
-        ],
-        default="student",
-        required=True,
-        tracking=True,
     )
     date_of_birth = fields.Date()
     emergency_note = fields.Text()
@@ -45,12 +34,6 @@ class DojoMember(models.Model):
     allergies = fields.Text(string="Allergies")
     medical_notes = fields.Text(string="Medical Notes")
 
-    guardian_for_link_ids = fields.One2many(
-        "dojo.guardian.link", "guardian_member_id", string="Guardian Of"
-    )
-    dependent_link_ids = fields.One2many(
-        "dojo.guardian.link", "student_member_id", string="Dependents"
-    )
     user_ids = fields.One2many(
         "res.users", "partner_id", string="Linked Users",
         related="partner_id.user_ids",
@@ -99,8 +82,15 @@ class DojoMember(models.Model):
                         partner_vals[field_name] = vals.pop(field_name)
                 if not partner_vals.get("name"):
                     partner_vals["name"] = "New Member"
+                partner_vals["is_student"] = True
                 partner = self.env["res.partner"].sudo().create(partner_vals)
                 vals["partner_id"] = partner.id
+            else:
+                # Ensure existing partner is flagged as student, unless they are
+                # a pure-guardian (parent-only) member who does not train.
+                partner = self.env["res.partner"].browse(vals["partner_id"])
+                if not partner.is_student and not partner.is_guardian:
+                    partner.sudo().write({"is_student": True})
         return super().create(vals_list)
 
     @api.depends("partner_id.user_ids")
@@ -110,26 +100,33 @@ class DojoMember(models.Model):
                 user.share for user in member.partner_id.user_ids
             )
 
+    def _get_household(self):
+        """Return the household res.partner for this member, or empty recordset."""
+        self.ensure_one()
+        return self.partner_id.parent_id.filtered("is_household")
+
     def action_create_household(self):
         """Create a household for this solo member if they don't already have one."""
         self.ensure_one()
-        if self.household_id:
+        household = self._get_household()
+        if household:
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
-                    'message': _('%s is already in household "%s".') % (self.name, self.household_id.name),
+                    'message': _('%s is already in household "%s".') % (self.name, household.name),
                     'type': 'warning',
                     'sticky': False,
                 },
             }
-        household = self.env['dojo.household'].create({
+        household = self.env['res.partner'].sudo().create({
             'name': _("%s's Household") % self.name,
+            'is_household': True,
+            'is_company': True,
             'company_id': self.company_id.id,
+            'primary_guardian_id': self.partner_id.id,
         })
-        self.household_id = household
-        if self.role in ('parent', 'both'):
-            household.primary_guardian_id = self
+        self.partner_id.parent_id = household
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -144,33 +141,7 @@ class DojoMember(models.Model):
         """Grant portal access and return credentials dict for new users, or None
         if the user already existed and just needed a group added."""
         self.ensure_one()
-        partner = self.partner_id
-        if not partner.email:
-            raise UserError(_(
-                "The member must have an email address before portal access can be granted."
-            ))
-        group_parent = self.env.ref("dojo_base.group_dojo_parent_student")
-        user = self.env["res.users"].sudo().search(
-            [("partner_id", "=", partner.id)], limit=1
-        )
-        if user:
-            if group_parent not in user.group_ids:
-                user.sudo().write({"group_ids": [(4, group_parent.id)]})
-            return None  # existing user — no new credentials to show
-        else:
-            temp_password = secrets.token_urlsafe(10)
-            user = self.env["res.users"].sudo().create({
-                "partner_id": partner.id,
-                "login": partner.email,
-                "name": partner.name,
-                "group_ids": [(4, group_parent.id)],
-            })
-            user.sudo().write({'password': temp_password})
-            return {
-                "name": partner.name,
-                "login": partner.email,
-                "temp_password": temp_password,
-            }
+        return self.partner_id._grant_portal_access_credentials()
 
     def unlink(self):
         """Delete associated user accounts and res.partner contacts when a
@@ -183,21 +154,23 @@ class DojoMember(models.Model):
                          explicitly after the member row is gone.
 
         Household handling:
-        - If the member is the only person in a household, the household is
-          deleted as well.
+        - If the member is the only person in a household, the household
+          partner is archived as well.
         - If the household has other members and this member is the primary
           guardian, deletion is blocked; staff must assign a new guardian first.
         """
-        # Collect households that will become empty after this deletion, and
-        # block deletion if the member is the sole guardian of a non-empty one.
-        households_to_delete = self.env['dojo.household']
+        households_to_archive = self.env['res.partner']
         for member in self:
-            household = member.sudo().household_id
+            household = member.sudo().partner_id.parent_id.filtered('is_household')
             if not household:
                 continue
-            other_members = household.member_ids - self  # members NOT being deleted
+            # Other members in same household (those not being deleted)
+            other_members = self.sudo().search([
+                ('partner_id.parent_id', '=', household.id),
+                ('id', 'not in', self.ids),
+            ])
             if other_members:
-                if household.primary_guardian_id == member:
+                if household.primary_guardian_id == member.partner_id:
                     raise UserError(_(
                         'Cannot delete %s: they are the primary guardian of '
                         '"%s" which still has other members. Please assign a '
@@ -206,8 +179,7 @@ class DojoMember(models.Model):
                         member.name, household.name,
                     ))
             else:
-                # This member is the last one — household can be cleaned up.
-                households_to_delete |= household
+                households_to_archive |= household
 
         partners = self.sudo().mapped("partner_id")
 
@@ -232,8 +204,8 @@ class DojoMember(models.Model):
         # all normal views while keeping the audit trail intact.
         if partners:
             partners.sudo().write({'active': False})
-        if households_to_delete:
-            households_to_delete.sudo().unlink()
+        if households_to_archive:
+            households_to_archive.sudo().write({'active': False})
         return res
 
     def action_grant_portal_access(self):

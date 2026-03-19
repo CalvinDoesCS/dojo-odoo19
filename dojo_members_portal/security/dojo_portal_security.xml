@@ -4,7 +4,7 @@
     <!--
         The dojo_base module already defines row-level record rules that restrict
         portal users (group_dojo_parent_student) to their own household data for
-        dojo.member, dojo.household, dojo.guardian.link, dojo.class.enrollment,
+        dojo.member, res.partner (households), dojo.class.enrollment,
         dojo.attendance.log, dojo.emergency.contact, and dojo.member.subscription.
 
         Invoice access for portal users is handled entirely inside the

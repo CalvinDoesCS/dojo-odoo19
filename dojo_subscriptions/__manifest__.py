@@ -1,7 +1,7 @@
 {
     "name": "Dojang Subscriptions",
     "summary": "Membership plans and subscriptions",
-    "version": "19.0.4.2.0",
+    "version": "19.0.4.3.0",
     "category": "Services",
     "license": "LGPL-3",
     "author": "Dojang",

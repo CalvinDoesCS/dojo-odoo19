@@ -7,9 +7,11 @@
             <list>
                 <field name="name"/>
                 <field name="email"/>
-                <field name="role"/>
+                <field name="is_student" optional="hide"/>
+                <field name="is_guardian" optional="hide"/>
+                <field name="is_minor" optional="hide"/>
                 <field name="membership_state"/>
-                <field name="household_id"/>
+                <field name="parent_id" string="Household"/>
                 <field name="has_portal_login"/>
             </list>
         </field>
@@ -25,7 +27,7 @@
                         string="Create Household"
                         type="object"
                         class="btn-secondary"
-                        invisible="household_id != False"
+                        invisible="parent_id != False"
                         groups="dojo_base.group_dojo_admin"/>
                     <button name="action_grant_portal_access"
                         string="Grant Portal Access"
@@ -69,11 +71,14 @@
                             <field name="partner_id" readonly="1"/>
                             <field name="email"/>
                             <field name="phone"/>
-                            <field name="role"/>
                             <field name="date_of_birth"/>
                         </group>
                         <group>
-                            <field name="household_id"/>
+                            <field name="parent_id" string="Household"
+                                   domain="[('is_household', '=', True)]"/>
+                            <field name="is_student"/>
+                            <field name="is_guardian"/>
+                            <field name="is_minor"/>
                             <field name="has_portal_login" readonly="1"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
@@ -82,12 +87,6 @@
                         <field name="emergency_note"/>
                     </group>
                     <notebook>
-                        <page string="Dependents">
-                            <field name="dependent_link_ids" readonly="1"/>
-                        </page>
-                        <page string="Guardian Of">
-                            <field name="guardian_for_link_ids" readonly="1"/>
-                        </page>
                         <page string="Medical Info">
                             <group>
                                 <group>
@@ -102,38 +101,6 @@
                     </notebook>
                 </sheet>
                 <chatter/>
-            </form>
-        </field>
-    </record>
-
-    <record id="view_dojo_guardian_link_list" model="ir.ui.view">
-        <field name="name">dojo.guardian.link.list</field>
-        <field name="model">dojo.guardian.link</field>
-        <field name="arch" type="xml">
-            <list>
-                <field name="household_id"/>
-                <field name="guardian_member_id"/>
-                <field name="student_member_id"/>
-                <field name="relation"/>
-                <field name="is_primary"/>
-            </list>
-        </field>
-    </record>
-
-    <record id="view_dojo_guardian_link_form" model="ir.ui.view">
-        <field name="name">dojo.guardian.link.form</field>
-        <field name="model">dojo.guardian.link</field>
-        <field name="arch" type="xml">
-            <form>
-                <sheet>
-                    <group>
-                        <field name="household_id"/>
-                        <field name="guardian_member_id"/>
-                        <field name="student_member_id"/>
-                        <field name="relation"/>
-                        <field name="is_primary"/>
-                    </group>
-                </sheet>
             </form>
         </field>
     </record>

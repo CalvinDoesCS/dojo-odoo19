@@ -1,11 +1,11 @@
 """
 dojo_household_billing.py
 ──────────────────────────
-Extends dojo.household with Stripe payment token integration.
+Extends res.partner (household) with Stripe payment token integration.
 
 Architecture (native payment_stripe)
 ──────────────────────────────────────
-  dojo.household  ─►  payment.token  (via guardian partner_id)
+  res.partner (household)  ─►  payment.token  (via guardian partner_id)
                       └► provider_ref         = Stripe Customer ID (cus_…)
                       └► stripe_payment_method = Stripe PaymentMethod ID (pm_…)
 
@@ -19,8 +19,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 
-class DojoHousehold(models.Model):
-    _inherit = "dojo.household"
+class DojoHouseholdBilling(models.Model):
+    _inherit = "res.partner"
 
     # ── Computed: count of saved payment tokens for the primary guardian ──
     payment_token_count = fields.Integer(
@@ -28,11 +28,11 @@ class DojoHousehold(models.Model):
         compute="_compute_payment_token_count",
     )
 
-    @api.depends("primary_guardian_id.partner_id")
+    @api.depends("primary_guardian_id")
     def _compute_payment_token_count(self):
         for record in self:
             guardian = record.primary_guardian_id
-            if not guardian or not guardian.partner_id:
+            if not guardian:
                 record.payment_token_count = 0
                 continue
             provider = self.env["payment.provider"].sudo().search(
@@ -45,7 +45,7 @@ class DojoHousehold(models.Model):
             record.payment_token_count = self.env["payment.token"].sudo().search_count(
                 [
                     ("provider_id", "=", provider.id),
-                    ("partner_id", "=", guardian.partner_id.id),
+                    ("partner_id", "=", guardian.id),
                     ("active", "=", True),
                 ]
             )
@@ -55,15 +55,15 @@ class DojoHousehold(models.Model):
         """Open payment tokens for the primary guardian of this household."""
         self.ensure_one()
         guardian = self.primary_guardian_id
-        if not guardian or not guardian.partner_id:
+        if not guardian:
             raise UserError(_("No primary guardian set on this household."))
         return {
             "type": "ir.actions.act_window",
             "name": "Payment Methods",
             "res_model": "payment.token",
             "view_mode": "list,form",
-            "domain": [("partner_id", "=", guardian.partner_id.id)],
-            "context": {"default_partner_id": guardian.partner_id.id},
+            "domain": [("partner_id", "=", guardian.id)],
+            "context": {"default_partner_id": guardian.id},
         }
 
     def action_charge_invoice(self, invoice):
@@ -99,7 +99,7 @@ class DojoHousehold(models.Model):
         token = self.env["payment.token"].sudo().search(
             [
                 ("provider_id", "=", provider.id),
-                ("partner_id", "=", guardian.partner_id.id),
+                ("partner_id", "=", guardian.id),
                 ("active", "=", True),
             ],
             limit=1,
@@ -145,7 +145,7 @@ class DojoHousehold(models.Model):
                 "operation": "offline",
                 "amount": invoice.amount_residual,
                 "currency_id": invoice.currency_id.id,
-                "partner_id": guardian.partner_id.id,
+                "partner_id": guardian.id,
                 "invoice_ids": [(4, invoice.id)],
                 "reference": reference,
             }

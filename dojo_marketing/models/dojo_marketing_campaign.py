@@ -195,9 +195,9 @@ class DojoMarketingCampaign(models.Model):
         # Collect unique guardian/contact partners
         partner_map = {}
         for member in members:
-            household = member.household_id
-            if household and household.primary_guardian_id:
-                partner = household.primary_guardian_id.partner_id
+            household = member.partner_id.parent_id
+            if household and household.is_household and household.primary_guardian_id:
+                partner = household.primary_guardian_id
             else:
                 partner = member.partner_id
             if partner and partner.id not in partner_map:

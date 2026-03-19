@@ -51,11 +51,11 @@ class DojoClassSession(models.Model):
                 lambda e: e.status == "registered"
             ):
                 member = enrollment.member_id
-                household = member.household_id
+                household = member.partner_id.parent_id
 
                 # Resolve recipient
-                if household and household.primary_guardian_id:
-                    guardian_partner = household.primary_guardian_id.partner_id
+                if household.is_household and household.primary_guardian_id:
+                    guardian_partner = household.primary_guardian_id
                 else:
                     guardian_partner = member.partner_id
 

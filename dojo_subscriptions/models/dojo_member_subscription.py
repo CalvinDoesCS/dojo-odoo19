@@ -20,7 +20,7 @@ class DojoMemberSubscription(models.Model):
 
     member_id = fields.Many2one("dojo.member", required=True, index=True, ondelete="cascade")
     household_id = fields.Many2one(
-        "dojo.household", related="member_id.household_id", store=True, readonly=True
+        "res.partner", related="member_id.partner_id.parent_id", store=True, readonly=True
     )
     plan_id = fields.Many2one("dojo.subscription.plan", required=True, index=True)
     plan_type = fields.Selection(
@@ -116,9 +116,9 @@ class DojoMemberSubscription(models.Model):
     def _billing_partner(self):
         """Return the res.partner to invoice for this subscription."""
         self.ensure_one()
-        household = self.household_id
-        if household and household.primary_guardian_id and household.primary_guardian_id.partner_id:
-            return household.primary_guardian_id.partner_id
+        household = self.member_id.partner_id.parent_id
+        if household and household.is_household and household.primary_guardian_id:
+            return household.primary_guardian_id
         member = self.member_id
         if member.partner_id:
             return member.partner_id

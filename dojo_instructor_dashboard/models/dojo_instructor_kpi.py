@@ -302,7 +302,7 @@ class DojoInstructorProfile(models.Model):
         # ── Global KPIs ───────────────────────────────────────────────────
         all_profiles = self.search([])
         active_members = self.env['dojo.member'].search_count([
-            ('role', 'in', ['student', 'both']),
+            ('is_student', '=', True),
             ('membership_state', 'in', ['trial', 'active']),
         ])
         sessions_today = Session.search_count([
@@ -380,7 +380,7 @@ class DojoInstructorProfile(models.Model):
             month_start_str = fields.Date.to_string(today_date.replace(day=1))
             new_members_this_month = self.env['dojo.member'].search_count([
                 ('create_date', '>=', month_start_str),
-                ('role', 'in', ['student', 'both']),
+                ('is_student', '=', True),
             ])
 
         summary = {

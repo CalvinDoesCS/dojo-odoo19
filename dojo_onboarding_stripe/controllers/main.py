@@ -57,23 +57,16 @@ class OnboardingStripeController(http.Controller):
                              'Go to Settings → Payments → Stripe to enable it.'}
 
         # ── Determine guardian info from wizard fields ───────────────────
-        if wizard.create_new_household:
-            guardian_name = wizard.new_guardian_name or wizard.name
-            guardian_email = wizard.new_guardian_email or wizard.email or ''
-            guardian_phone = wizard.new_guardian_phone or wizard.phone or ''
-        elif wizard.guardian_member_id:
-            gm = wizard.guardian_member_id
-            guardian_name = gm.name or wizard.name
-            guardian_email = gm.email or ''
-            guardian_phone = gm.phone or ''
-        elif wizard.role in ('parent', 'both'):
-            guardian_name = wizard.name
-            guardian_email = wizard.email or ''
-            guardian_phone = wizard.phone or ''
-        else:
-            guardian_name = wizard.name
-            guardian_email = wizard.email or ''
-            guardian_phone = wizard.phone or ''
+        guardian_name = wizard.guardian_name or 'New Member'
+        guardian_email = wizard.guardian_email or ''
+        guardian_phone = wizard.guardian_phone or ''
+
+        # If using existing household, pull from the guardian partner
+        if wizard.use_existing_household and wizard.created_guardian_partner_id:
+            gp = wizard.created_guardian_partner_id
+            guardian_name = gp.name or guardian_name
+            guardian_email = gp.email or guardian_email
+            guardian_phone = gp.phone or guardian_phone
 
         # ── Create (or reuse) Stripe Customer ────────────────────────────
         cus_id = wizard.stripe_customer_id

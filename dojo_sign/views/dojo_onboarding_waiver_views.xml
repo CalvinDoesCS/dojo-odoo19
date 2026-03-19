@@ -7,33 +7,17 @@
         <field name="inherit_id" ref="dojo_onboarding.view_dojo_onboarding_wizard_form"/>
         <field name="arch" type="xml">
 
-            <!-- ── Add waiver step label to the progress header ─────────── -->
-            <!-- New household path: inject waiver label after subscription -->
-            <xpath expr="//span[@invisible=&quot;step != 'portal_access' or not create_new_household or role == 'parent'&quot;]"
-                   position="before">
-                <span invisible="step != 'waiver' or not create_new_household or role == 'parent'">
-                    ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 6b: Waiver</b>  ›  Portal Access
-                </span>
-            </xpath>
-            <!-- Existing household path: inject waiver label after subscription -->
-            <xpath expr="//span[@invisible=&quot;step != 'portal_access' or create_new_household&quot;]"
-                   position="before">
-                <span invisible="step != 'waiver' or create_new_household">
-                    ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 4b: Waiver</b>  ›  Portal Access
-                </span>
-            </xpath>
-            <!-- Parent path: inject waiver label after payment -->
-            <xpath expr="//span[@invisible=&quot;step != 'portal_access' or role != 'parent'&quot;]"
-                   position="before">
-                <span invisible="step != 'waiver' or role != 'parent'">
-                    ✓ Member Info  ›  ✓ Household  ›  ✓ Payment  ›  <b>Step 3b: Waiver</b>  ›  Portal Access
+            <!-- ── Add waiver step label to the student-phase progress header ── -->
+            <xpath expr="//div[hasclass('alert-primary')]//span[@invisible=&quot;step != 'subscription'&quot;]"
+                   position="after">
+                <span invisible="step != 'waiver'">
+                    ✓ Student Contact  ›  ✓ Details  ›  ✓ Enrollment  ›  ✓ Subscription  ›  <b>Waiver</b>  ›  Portal  ›  Summary
                 </span>
             </xpath>
 
-            <!-- ── Waiver step content (inserted before Portal Access group) ─ -->
-            <xpath expr="//group[@invisible=&quot;step != 'portal_access'&quot;]" position="before">
+            <!-- ── Waiver step content (inserted before Student Portal Access) ── -->
+            <xpath expr="//group[@name='group_student_portal']" position="before">
 
-                <!-- Waiver Step -->
                 <group string="Liability Waiver" invisible="step != 'waiver'">
 
                     <!-- Waiver text display -->
@@ -59,7 +43,7 @@
                     <div colspan="2" class="mb-3">
                         <field name="waiver_legal_authority"
                                widget="boolean_toggle"
-                               string="I confirm I have the legal authority to sign this waiver (on my own behalf, or as the legal guardian/representative of the above member)"/>
+                               string="I confirm I have the legal authority to sign this waiver (on my own behalf, or as the legal guardian/representative of the above student)"/>
                     </div>
 
                     <!-- Signer name -->

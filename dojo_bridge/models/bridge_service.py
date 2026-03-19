@@ -49,7 +49,9 @@ class BridgeService(models.AbstractModel):
             "phone": member.phone,
             "mobile": member.mobile,
             "membership_state": member.membership_state,
-            "role": member.role if hasattr(member, "role") else None,
+            "is_student": member.partner_id.is_student if hasattr(member.partner_id, "is_student") else None,
+            "is_guardian": member.partner_id.is_guardian if hasattr(member.partner_id, "is_guardian") else None,
+            "is_minor": member.partner_id.is_minor if hasattr(member.partner_id, "is_minor") else None,
             "company_id": member.company_id.id,
             "company_name": member.company_id.name,
             "belt_rank": (

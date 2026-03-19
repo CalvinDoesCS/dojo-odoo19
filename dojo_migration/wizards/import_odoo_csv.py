@@ -12,10 +12,9 @@ tracking and creation in ir.model.data automatically.
 
 Covered CSV files (import in order):
   02_res_partner.csv              → model: res.partner
-  03_dojo_household.csv           → model: dojo.household
+  03_res_partner_household.csv    → model: res.partner  (is_household=True)
   04_dojo_member.csv              → model: dojo.member
-  05_dojo_household_update.csv    → model: dojo.household
-  06_dojo_guardian_link.csv       → model: dojo.guardian.link
+  05_res_partner_household_update.csv → model: res.partner  (household guardian update)
   07_dojo_emergency_contact.csv   → model: dojo.emergency.contact
   08_dojo_member_rank.csv         → model: dojo.member.rank
   10_dojo_program.csv             → model: dojo.program
@@ -37,10 +36,8 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 MODEL_CHOICES = [
-    ("res.partner", "02. Partners (res.partner)"),
-    ("dojo.household", "03 / 05. Households (dojo.household)"),
+    ("res.partner", "02 / 03 / 05. Partners & Households (res.partner)"),
     ("dojo.member", "04. Members (dojo.member)"),
-    ("dojo.guardian.link", "06. Guardian Links (dojo.guardian.link)"),
     ("dojo.emergency.contact", "07. Emergency Contacts (dojo.emergency.contact)"),
     ("dojo.member.rank", "08. Member Belt Ranks (dojo.member.rank)"),
     ("dojo.program", "10. Programs (dojo.program)"),
@@ -52,9 +49,7 @@ MODEL_CHOICES = [
 # Map model name → migration log import_type
 MODEL_IMPORT_TYPE = {
     "res.partner":              "partners",
-    "dojo.household":           "households",
     "dojo.member":              "members",
-    "dojo.guardian.link":       "guardian_links",
     "dojo.emergency.contact":   "emergency_contacts",
     "dojo.member.rank":         "ranks",
     "dojo.program":             "programs",

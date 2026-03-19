@@ -25,6 +25,6 @@
         <field name="name">Member Subscription Parent Self or Household</field>
         <field name="model_id" ref="model_dojo_member_subscription"/>
         <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
-        <field name="domain_force">['|', ('member_id.partner_id', '=', user.partner_id.id), ('household_id.primary_guardian_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="domain_force">['|', ('member_id.partner_id', '=', user.partner_id.id), ('member_id.partner_id.parent_id.primary_guardian_id', '=', user.partner_id.id)]</field>
     </record>
 </odoo>

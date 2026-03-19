@@ -234,7 +234,7 @@ class DojoCheckout(http.Controller):
 
         # Stripe charge — only when a PaymentMethod ID was submitted
         if payment_method_id.startswith("pm_"):
-            household = session.sudo().resulting_member_id.household_id
+            household = session.sudo().resulting_member_id.partner_id.parent_id
             if household:
                 try:
                     household.sudo().action_save_payment_method(payment_method_id)

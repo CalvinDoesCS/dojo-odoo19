@@ -483,7 +483,7 @@ class DojoKioskService(models.AbstractModel):
             credit_balance = getattr(sub, 'credit_balance', 0) or 0
 
         # Household + emergency contacts
-        hh = member.household_id
+        hh = member.partner_id.parent_id if member.partner_id.parent_id.is_household else None
         household = None
         if hh:
             contacts = []
@@ -495,12 +495,22 @@ class DojoKioskService(models.AbstractModel):
                     "email": ec.email or "",
                     "is_primary": bool(ec.is_primary),
                 })
+            # Get all contacts in the household (students AND guardian-only partners)
+            hh_partners = self.env["res.partner"].sudo().search([
+                ("parent_id", "=", hh.id),
+                ("is_household", "=", False),
+            ])
             household = {
                 "id": hh.id,
                 "name": hh.name or "",
                 "members": [
-                    {"id": m.id, "name": m.name or "", "role": m.role or ""}
-                    for m in hh.member_ids
+                    {
+                        "id": p.id,
+                        "name": p.name or "",
+                        "is_student": p.is_student,
+                        "is_guardian": p.is_guardian,
+                    }
+                    for p in hh_partners
                 ],
                 "emergency_contacts": contacts,
             }
@@ -541,20 +551,22 @@ class DojoKioskService(models.AbstractModel):
                 })
             programs.sort(key=lambda p: p["program_name"])
 
-        # Guardians: people linked as guardians for this student
+        # Guardians: people flagged as guardians in the same household
         guardians = []
-        if hasattr(member, "dependent_link_ids") and member.dependent_link_ids:
-            for link in member.dependent_link_ids:
-                gm = link.guardian_member_id
-                if gm and gm.exists():
-                    guardians.append({
-                        "member_id": gm.id,
-                        "name": gm.name or "",
-                        "relation": link.relation or "guardian",
-                        "is_primary": bool(link.is_primary),
-                        "phone": gm.phone or "",
-                        "email": gm.email or "",
-                    })
+        if hh:
+            guardian_partners = self.env["res.partner"].sudo().search([
+                ("parent_id", "=", hh.id),
+                ("is_guardian", "=", True),
+            ])
+            for gp in guardian_partners:
+                guardians.append({
+                    "partner_id": gp.id,
+                    "name": gp.name or "",
+                    "relation": "guardian",
+                    "is_primary": gp.id == hh.primary_guardian_id.id if hh.primary_guardian_id else False,
+                    "phone": gp.phone or "",
+                    "email": gp.email or "",
+                })
         if not guardians:
             guardians.append({
                 "member_id": member.id,
@@ -570,7 +582,8 @@ class DojoKioskService(models.AbstractModel):
             "name": member.name,
             "email": member.email or "",
             "phone": member.phone or "",
-            "role": member.role or "",
+            "is_student": member.partner_id.is_student,
+            "is_guardian": member.partner_id.is_guardian,
             "member_number": member.member_number or "",
             "image_url": "/web/image/dojo.member/%d/image_128" % member.id,
             "date_of_birth": fields.Date.to_string(member.date_of_birth) if member.date_of_birth else "",
@@ -1216,8 +1229,9 @@ class DojoKioskService(models.AbstractModel):
     def send_parent_message(self, member_id, subject, message, send_sms=True, send_email=True, guardian_member_ids=None):
         """Send SMS/email to guardian(s) for a member.
 
-        If guardian_member_ids is provided, sends to each of those members.
-        Falls back to the primary guardian or the member's own contact info.
+        If guardian_member_ids is provided, treats them as res.partner IDs
+        and sends to each. Falls back to the primary guardian or the
+        member's own contact info.
         """
         import logging
         _logger = logging.getLogger(__name__)
@@ -1233,14 +1247,14 @@ class DojoKioskService(models.AbstractModel):
         targets = []
         if guardian_member_ids:
             for gid in guardian_member_ids:
-                gm = self.env["dojo.member"].browse(gid)
-                if gm.exists() and gm.partner_id:
-                    targets.append((gm.partner_id, gm.name or ""))
+                gp = self.env["res.partner"].browse(gid)
+                if gp.exists():
+                    targets.append((gp, gp.name or ""))
         if not targets:
-            household = member.household_id
-            if household and household.primary_guardian_id:
+            household = member.partner_id.parent_id
+            if household and household.is_household and household.primary_guardian_id:
                 guardian = household.primary_guardian_id
-                targets.append((guardian.partner_id, guardian.name or ""))
+                targets.append((guardian, guardian.name or ""))
             else:
                 targets.append((member.partner_id, member.name or ""))
 

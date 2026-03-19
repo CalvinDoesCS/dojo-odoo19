@@ -1,108 +1,121 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
-from dateutil.relativedelta import relativedelta
 
 
 class DojoOnboardingWizard(models.TransientModel):
     _name = 'dojo.onboarding.wizard'
     _description = 'Member Onboarding Wizard'
 
-    # ── Step navigation ──────────────────────────────────────────────────────
+    # ── Phase & Step navigation ──────────────────────────────────────────────
+    wizard_phase = fields.Selection(
+        selection=[
+            ('guardian', 'Guardian & Household'),
+            ('student', 'Student Registration'),
+        ],
+        default='guardian',
+        required=True,
+    )
     step = fields.Selection(
         selection=[
-            ('member_info',    '1. Member Info'),
-            ('household',      '2. Household'),
-            ('guardian_setup', '3. Guardian Setup'),
-            ('enrollment',     '4. Program Enrollment'),
-            ('auto_enroll',    '4b. Auto-Enroll Schedule'),
-            ('subscription',   '5. Subscription'),
-            ('portal_access',  '6. Portal Access'),
+            # Guardian phase
+            ('guardian_contact',  'Guardian Contact'),
+            ('household',        'Household'),
+            ('guardian_portal',   'Guardian Portal'),
+            # Student phase
+            ('student_contact',   'Student Contact'),
+            ('member_details',    'Member Details'),
+            ('enrollment',        'Enrollment'),
+            ('auto_enroll',       'Auto-Enroll'),
+            ('subscription',      'Subscription'),
+            ('student_portal',    'Student Portal'),
+            ('summary',           'Summary'),
         ],
-        default='member_info',
+        default='guardian_contact',
         required=True,
     )
 
-    # ── Step 1: Member Info ───────────────────────────────────────────────────
-    name = fields.Char('Full Name', required=True)
-    email = fields.Char('Email')
-    phone = fields.Char('Phone')
-    date_of_birth = fields.Date('Date of Birth')
-    role = fields.Selection(
-        selection=[
-            ('student', 'Student'),
-            ('parent', 'Parent'),
-            ('both', 'Standalone'),
-        ],
-        default='student',
-        required=True,
-        string='Role',
+    # ── Phase 1, Step 1: Guardian Contact ────────────────────────────────────
+    guardian_name = fields.Char('Guardian Full Name')
+    guardian_email = fields.Char('Guardian Email')
+    guardian_phone = fields.Char('Guardian Phone')
+    guardian_street = fields.Char('Street')
+    guardian_street2 = fields.Char('Street 2')
+    guardian_city = fields.Char('City')
+    guardian_state_id = fields.Many2one('res.country.state', string='State')
+    guardian_zip = fields.Char('ZIP')
+    guardian_country_id = fields.Many2one('res.country', string='Country')
+    guardian_is_also_student = fields.Boolean(
+        'I am also a student',
+        default=False,
+        help='Check this if the guardian also trains at the dojo.',
     )
-    emergency_note = fields.Text('Emergency / Medical Notes')
 
-    # ── Step 2: Household ────────────────────────────────────────────────────
+    # ── Phase 1, Step 2: Household ───────────────────────────────────────────
+    use_existing_household = fields.Boolean('Join Existing Household', default=False)
     household_id = fields.Many2one(
-        'dojo.household',
+        'res.partner',
         string='Existing Household',
-    )
-    create_new_household = fields.Boolean('Create a New Household', default=False)
-
-    # New household: guardian member to create first
-    new_guardian_name = fields.Char('Guardian Full Name')
-    new_guardian_email = fields.Char('Guardian Email')
-    new_guardian_phone = fields.Char('Guardian Phone')
-    new_guardian_role = fields.Selection(
-        selection=[
-            ('parent', 'Parent'),
-            ('both', 'Standalone'),
-        ],
-        default='parent',
-        string='Guardian Role',
+        domain=[('is_household', '=', True)],
     )
     new_household_name = fields.Char(
-        'New Household Name',
+        'Household Name',
         help="Leave blank to auto-generate from the guardian's name.",
     )
 
-    guardian_member_id = fields.Many2one(
-        'dojo.member',
-        string='Guardian Member',
-        help='Select an existing member to link as guardian (for students).',
+    # ── Phase 1, Step 3: Guardian Portal ─────────────────────────────────────
+    create_guardian_portal_login = fields.Boolean(
+        'Create Portal Login for Guardian',
+        default=True,
     )
-    guardian_relation = fields.Selection(
-        selection=[
-            ('mother', 'Mother'),
-            ('father', 'Father'),
-            ('guardian', 'Guardian'),
-            ('other', 'Other'),
-        ],
-        string="Guardian's Relation to New Member",
+    send_guardian_welcome_email = fields.Boolean(
+        'Send Welcome Email to Guardian',
+        default=True,
+    )
+    send_guardian_welcome_sms = fields.Boolean(
+        'Send Welcome SMS to Guardian',
+        default=False,
     )
 
-    # ── Step 3: Program ────────────────────────────────────────────────────
+    # ── Persistent refs (survive across student loops) ───────────────────────
+    created_household_id = fields.Many2one('res.partner', string='Created Household', readonly=True)
+    created_guardian_partner_id = fields.Many2one('res.partner', string='Created Guardian', readonly=True)
+    students_created_ids = fields.Many2many(
+        'dojo.member',
+        'dojo_onboarding_wizard_student_rel',
+        'wizard_id', 'member_id',
+        string='Students Created',
+        readonly=True,
+    )
+    guardian_portal_credentials = fields.Text(readonly=True)
+
+    # ── Phase 2, Step 4: Student Contact ─────────────────────────────────────
+    student_name = fields.Char('Student Full Name')
+    student_email = fields.Char('Student Email')
+    student_phone = fields.Char('Student Phone')
+    student_date_of_birth = fields.Date('Date of Birth')
+    student_is_minor = fields.Boolean('Is Minor', default=True)
+
+    # ── Phase 2, Step 5: Member Details ──────────────────────────────────────
+    emergency_note = fields.Text('Emergency / Medical Notes')
+
+    # ── Phase 2, Step 6: Enrollment ──────────────────────────────────────────
     program_id = fields.Many2one(
         'dojo.program',
         string='Program',
         domain="[('active', '=', True)]",
-        help='The program / curriculum this member is enrolling in (required).',
     )
     template_ids = fields.Many2many(
         'dojo.class.template',
         string='Add to Class Rosters',
-        help='Add this member to recurring course rosters so they are auto-enrolled in future sessions.',
     )
     session_ids = fields.Many2many(
         'dojo.class.session',
         string='Specific Sessions (optional)',
         domain="[('state', '=', 'open')]",
-        help='Optionally pre-register the member in specific upcoming sessions.',
     )
 
-    # ── Step 4b: Auto-Enroll Preferences ─────────────────────────────────────
-    auto_enroll_active = fields.Boolean(
-        'Enable Auto-Enroll',
-        default=True,
-        help='If enabled, the member will be auto-enrolled in sessions based on the chosen days and mode.',
-    )
+    # ── Phase 2, Step 7: Auto-Enroll ────────────────────────────────────────
+    auto_enroll_active = fields.Boolean('Enable Auto-Enroll', default=True)
     auto_enroll_mode = fields.Selection(
         [
             ('permanent', 'Permanent (Never Remove)'),
@@ -118,28 +131,19 @@ class DojoOnboardingWizard(models.TransientModel):
     auto_enroll_fri = fields.Boolean('Fri')
     auto_enroll_sat = fields.Boolean('Sat')
     auto_enroll_sun = fields.Boolean('Sun')
-    auto_enroll_date_from = fields.Date(
-        'Auto-Enroll From',
-        help='Required when mode is Multiday Range. First day of the date range.',
-    )
-    auto_enroll_date_to = fields.Date(
-        'Auto-Enroll To',
-        help='Required when mode is Multiday Range. Last day (inclusive) of the date range.',
-    )
+    auto_enroll_date_from = fields.Date('Auto-Enroll From')
+    auto_enroll_date_to = fields.Date('Auto-Enroll To')
 
-    # ── Step 4: Subscription ─────────────────────────────────────────────────
+    # ── Phase 2, Step 8: Subscription ────────────────────────────────────────
     plan_id = fields.Many2one(
         'dojo.subscription.plan',
         string='Subscription Plan',
         domain="['|', '&', ('plan_type', '=', 'program'), ('program_id', '=', program_id), ('plan_type', '=', 'course')]",
-        help='Choose a plan that covers the selected program, or any course-based plan.',
     )
     subscription_start_date = fields.Date(
         'Subscription Start Date',
         default=fields.Date.today,
     )
-
-    # ── Plan billing display fields (related, read-only — for UI only) ───────
     plan_currency_id = fields.Many2one(
         related='plan_id.currency_id', readonly=True, string='Currency',
     )
@@ -157,58 +161,46 @@ class DojoOnboardingWizard(models.TransientModel):
     plan_credits_per_period = fields.Integer(
         compute='_compute_plan_credits_per_period', string='Credits / Billing Cycle',
     )
-
-    @api.depends('plan_id')
-    def _compute_plan_credits_per_period(self):
-        for rec in self:
-            rec.plan_credits_per_period = getattr(rec.plan_id, 'credits_per_period', 0) or 0
     plan_description = fields.Text(
         related='plan_id.description', readonly=True, string='Plan Notes',
     )
     defer_payment = fields.Boolean(
         'Pay Later',
         default=False,
-        help='Create the subscription as Pending Payment instead of Active. '
-             'No invoice or credits are issued until the admin activates the subscription '
-             'after receiving payment.',
+        help='Create the subscription as Pending Payment instead of Active.',
     )
 
-    # ── Step 5: Portal Access ────────────────────────────────────────────────
+    @api.depends('plan_id')
+    def _compute_plan_credits_per_period(self):
+        for rec in self:
+            rec.plan_credits_per_period = getattr(rec.plan_id, 'credits_per_period', 0) or 0
+
+    # ── Phase 2, Step 9: Student Portal ──────────────────────────────────────
     create_portal_login = fields.Boolean(
-        'Create Portal Login for New Member',
+        'Create Portal Login for Student',
         default=True,
-        help='Creates a user account linked to the new member so they can log into the portal.',
     )
     send_welcome_email = fields.Boolean(
-        'Send Welcome Email to Member',
+        'Send Welcome Email to Student',
         default=True,
     )
     send_welcome_sms = fields.Boolean(
-        'Send Welcome SMS to Member',
-        default=False,
-    )
-    create_guardian_portal_login = fields.Boolean(
-        'Create Portal Login for Guardian',
-        default=True,
-        help='Also creates a portal account for the new guardian so they can manage their household online.',
-    )
-    send_guardian_welcome_email = fields.Boolean(
-        'Send Welcome Email to Guardian',
-        default=True,
-    )
-    send_guardian_welcome_sms = fields.Boolean(
-        'Send Welcome SMS to Guardian',
+        'Send Welcome SMS to Student',
         default=False,
     )
 
-    # ── Result (set after confirm) ────────────────────────────────────────────
-    created_member_id = fields.Many2one('dojo.member', string='Created Member', readonly=True)
+    # ── Result (set after each student creation, used by bridge modules) ─────
+    created_member_id = fields.Many2one('dojo.member', string='Last Created Member', readonly=True)
 
     # ── Step helpers ─────────────────────────────────────────────────────────
-    _STEP_ORDER = ['member_info', 'household', 'guardian_setup', 'enrollment', 'auto_enroll', 'subscription', 'portal_access']
+    _GUARDIAN_STEPS = ['guardian_contact', 'household', 'guardian_portal']
+    _STUDENT_STEPS = ['student_contact', 'member_details', 'enrollment', 'auto_enroll', 'subscription', 'student_portal', 'summary']
+
+    @property
+    def _STEP_ORDER(self):
+        return self._GUARDIAN_STEPS + self._STUDENT_STEPS
 
     def _reopen_wizard(self):
-        """Return an action that re-opens this transient record (keeps state)."""
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
@@ -218,222 +210,307 @@ class DojoOnboardingWizard(models.TransientModel):
             'context': self.env.context,
         }
 
-    @api.onchange('role')
-    def _onchange_role(self):
-        """Auto-enable new-household when registering a parent (they are their own guardian)."""
-        if self.role == 'parent':
-            self.create_new_household = True
+    @api.onchange('use_existing_household')
+    def _onchange_use_existing_household(self):
+        if self.use_existing_household and self.household_id:
+            guardian = self.household_id.primary_guardian_id
+            if guardian:
+                self.guardian_name = guardian.name
+                self.guardian_email = guardian.email
+                self.guardian_phone = guardian.phone
 
     def _should_skip_step(self, step_name):
         """Return True if the given step should be skipped given the current wizard state.
         Override in sub-modules (always call super()) to add additional skip conditions."""
-        if step_name == 'guardian_setup':
-            # Skip when not creating a new household, or member IS their own guardian
-            return not self.create_new_household or self.role in ('both', 'parent')
-        if step_name == 'enrollment':
-            # Parents don't enrol in a program — they register as account holders only
-            return self.role == 'parent'
+        # When using existing household, skip household and guardian_portal steps
+        if self.use_existing_household and step_name in ('household', 'guardian_portal'):
+            return True
         if step_name == 'auto_enroll':
-            return self.role == 'parent' or not self.template_ids
-        if step_name == 'subscription':
-            # Parents don't need a subscription at registration time
-            return self.role == 'parent'
+            return not self.template_ids
         return False
 
-    def action_next(self):
-        self.ensure_one()
-
-        # ── Step-specific validation ───────────────────────────────────────
-        if self.step == 'member_info':
-            if not self.email:
-                raise UserError(_(
-                    'An email address is required for the member.'
-                ))
-            if not self.phone:
-                raise UserError(_(
-                    'A phone number is required for the member.'
-                ))
-        elif self.step == 'household':
-            if not self.create_new_household:
+    # ── Validation ───────────────────────────────────────────────────────────
+    def _validate_current_step(self):
+        """Validate the current step before advancing. Raises UserError on failure."""
+        if self.step == 'guardian_contact':
+            if self.use_existing_household:
                 if not self.household_id:
-                    raise UserError(_(
-                        'Please select an existing household or choose to create a new one.'
-                    ))
-        elif self.step == 'guardian_setup':
-            if not self.new_guardian_name:
-                raise UserError(_(
-                    'Guardian full name is required to create a new household.'
-                ))
-            if not self.new_guardian_email:
-                raise UserError(_(
-                    'An email address is required for the guardian.'
-                ))
-            if not self.new_guardian_phone:
-                raise UserError(_(
-                    'A phone number is required for the guardian.'
-                ))
-            if not self.guardian_relation:
-                raise UserError(_(
-                    "Please specify the guardian's relation to the new member."
-                ))
+                    raise UserError(_('Please select an existing household or uncheck "Join Existing Household".'))
+            else:
+                if not self.guardian_name:
+                    raise UserError(_('Guardian full name is required.'))
+                if not self.guardian_email:
+                    raise UserError(_('Guardian email is required.'))
+                if not self.guardian_phone:
+                    raise UserError(_('Guardian phone is required.'))
+        elif self.step == 'household':
+            pass  # Household choice now handled in guardian_contact
+        elif self.step == 'student_contact':
+            if not self.student_name:
+                raise UserError(_('Student full name is required.'))
         elif self.step == 'enrollment':
             if not self.program_id:
-                raise UserError(_(
-                    'Please select a program for this member.'
-                ))
+                raise UserError(_('Please select a program for this student.'))
         elif self.step == 'auto_enroll':
             if self.auto_enroll_active and self.auto_enroll_mode == 'multiday':
                 if not self.auto_enroll_date_from or not self.auto_enroll_date_to:
-                    raise UserError(_(
-                        'A From and To date are required for Multiday Range mode.'
-                    ))
+                    raise UserError(_('A From and To date are required for Multiday Range mode.'))
                 if self.auto_enroll_date_from > self.auto_enroll_date_to:
-                    raise UserError(_(
-                        '"From" date must be on or before the "To" date.'
-                    ))
+                    raise UserError(_('"From" date must be on or before the "To" date.'))
         elif self.step == 'subscription':
             if not self.plan_id:
-                raise UserError(_(
-                    'A subscription plan is required. Please select a plan to continue.'
-                ))
+                raise UserError(_('A subscription plan is required.'))
 
-        # ── Advance step, cascading over any steps that should be skipped ──────
-        idx = self._STEP_ORDER.index(self.step)
-        if idx < len(self._STEP_ORDER) - 1:
+    # ── Navigation ───────────────────────────────────────────────────────────
+    def action_next(self):
+        self.ensure_one()
+        self._validate_current_step()
+
+        # Existing household selected on step 1 → use it, then advance normally
+        # (Stripe override intercepts this to route to the payment step)
+        if self.step == 'guardian_contact' and self.use_existing_household:
+            self._use_existing_household()
+            self.wizard_phase = 'student'
+            self.step = 'student_contact'
+            return self._reopen_wizard()
+
+        # End of guardian_portal → create guardian + household, then advance normally
+        # (Stripe override intercepts this to route to the payment step)
+        if self.step == 'guardian_portal':
+            self._create_guardian_and_household()
+            self.wizard_phase = 'student'
+            self.step = 'student_contact'
+            return self._reopen_wizard()
+
+        # Normal step advancement within the current phase
+        step_order = self._STEP_ORDER
+        idx = step_order.index(self.step)
+        if idx < len(step_order) - 1:
             next_idx = idx + 1
-            while next_idx < len(self._STEP_ORDER) - 1 and self._should_skip_step(self._STEP_ORDER[next_idx]):
+            while next_idx < len(step_order) - 1 and self._should_skip_step(step_order[next_idx]):
                 next_idx += 1
-            self.step = self._STEP_ORDER[next_idx]
+            self.step = step_order[next_idx]
+            # Transition wizard_phase when crossing into student steps
+            if self.step in self._STUDENT_STEPS:
+                self.wizard_phase = 'student'
         return self._reopen_wizard()
 
     def action_back(self):
         self.ensure_one()
-        idx = self._STEP_ORDER.index(self.step)
+        # Prevent going back into guardian phase from student phase
+        if self.step == 'student_contact' and self.created_household_id:
+            return self._reopen_wizard()
+
+        step_order = self._STEP_ORDER
+        idx = step_order.index(self.step)
         if idx > 0:
             prev_idx = idx - 1
-            while prev_idx > 0 and self._should_skip_step(self._STEP_ORDER[prev_idx]):
+            while prev_idx > 0 and self._should_skip_step(step_order[prev_idx]):
                 prev_idx -= 1
-            self.step = self._STEP_ORDER[prev_idx]
+            self.step = step_order[prev_idx]
         return self._reopen_wizard()
 
-    def action_confirm(self):
+    # ── Student confirm (called from Summary step) ───────────────────────────
+    def action_confirm_student(self):
+        """Create the current student's member record and all related data."""
+        self.ensure_one()
+        member = self._create_student_member()
+        self.created_member_id = member.id
+        self.students_created_ids = [(4, member.id)]
+        self.step = 'summary'
+        return self._reopen_wizard()
+
+    # ── Add another student (called from Summary step) ───────────────────────
+    def action_add_another_student(self):
+        """Reset student-specific fields and go back to student contact step."""
+        self.ensure_one()
+        self._reset_student_fields()
+        self.step = 'student_contact'
+        return self._reopen_wizard()
+
+    # ── Finish (called from Summary step) ────────────────────────────────────
+    def action_finish(self):
+        """Close the wizard and open the household or last student."""
         self.ensure_one()
 
-        if not self.name:
-            raise UserError(_('Member name is required.'))
-        if self.role != 'parent':
-            if not self.program_id:
-                raise UserError(_('A program selection is required.'))
-            if not self.plan_id:
-                raise UserError(_('A subscription plan is required.'))
+        # If guardian is also a student and hasn't been registered yet, register them
+        if self.guardian_is_also_student and self.created_guardian_partner_id:
+            guardian_already_member = self.env['dojo.member'].sudo().search(
+                [('partner_id', '=', self.created_guardian_partner_id.id)], limit=1)
+            if not guardian_already_member:
+                # The admin needs to go through the student flow for the guardian too
+                pass
 
-        # ── Resolve / create household ────────────────────────────────────────
+        # Build portal credentials notification
+        portal_credentials = []
+        if self.guardian_portal_credentials:
+            portal_credentials.append(self.guardian_portal_credentials)
+
+        household = self.created_household_id
+        if household:
+            result_action = {
+                'type': 'ir.actions.act_window',
+                'res_model': 'res.partner',
+                'res_id': household.id,
+                'view_mode': 'form',
+                'views': [(False, 'form')],
+                'target': 'current',
+            }
+        elif self.students_created_ids:
+            last = self.students_created_ids[-1]
+            result_action = {
+                'type': 'ir.actions.act_window',
+                'res_model': 'dojo.member',
+                'res_id': last.id,
+                'view_mode': 'form',
+                'views': [(False, 'form')],
+                'target': 'current',
+            }
+        else:
+            result_action = {'type': 'ir.actions.act_window_close'}
+
+        if portal_credentials:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Onboarding Complete'),
+                    'message': '\n\n'.join(portal_credentials),
+                    'type': 'success',
+                    'sticky': True,
+                    'next': result_action,
+                },
+            }
+        return result_action
+
+    # ── Guardian & Household creation ────────────────────────────────────────
+    def _create_guardian_and_household(self):
+        """Create the guardian res.partner and household. Called once at end of guardian phase."""
+        self.ensure_one()
+        # Guard against double-creation (e.g. user navigates back from payment
+        # to guardian_portal and forward again).
+        if self.created_guardian_partner_id:
+            return
+
+        # Create guardian partner
+        guardian_vals = {
+            'name': self.guardian_name,
+            'email': self.guardian_email or False,
+            'phone': self.guardian_phone or False,
+            'street': self.guardian_street or False,
+            'street2': self.guardian_street2 or False,
+            'city': self.guardian_city or False,
+            'state_id': self.guardian_state_id.id if self.guardian_state_id else False,
+            'zip': self.guardian_zip or False,
+            'country_id': self.guardian_country_id.id if self.guardian_country_id else False,
+            'is_guardian': True,
+            'company_id': self.env.company.id,
+        }
+        guardian = self.env['res.partner'].create(guardian_vals)
+
+        # Create household
+        hh_name = self.new_household_name or (self.guardian_name + ' Household')
+        household = self.env['res.partner'].create({
+            'name': hh_name,
+            'is_household': True,
+            'is_company': True,
+            'primary_guardian_id': guardian.id,
+            'street': self.guardian_street or False,
+            'street2': self.guardian_street2 or False,
+            'city': self.guardian_city or False,
+            'state_id': self.guardian_state_id.id if self.guardian_state_id else False,
+            'zip': self.guardian_zip or False,
+            'country_id': self.guardian_country_id.id if self.guardian_country_id else False,
+            'company_id': self.env.company.id,
+        })
+        guardian.write({'parent_id': household.id})
+
+        self.created_guardian_partner_id = guardian.id
+        self.created_household_id = household.id
+
+        # Guardian portal access
+        portal_credentials = []
+        if self.create_guardian_portal_login and guardian.email:
+            creds = guardian._grant_portal_access_credentials()
+            if creds:
+                line = _(
+                    '%(name)s\nUsername: %(login)s\nTemp Password: %(pw)s',
+                    name=creds['name'], login=creds['login'], pw=creds['temp_password'],
+                )
+                portal_credentials.append(line)
+                if self.send_guardian_welcome_email:
+                    user = self.env['res.users'].sudo().search(
+                        [('partner_id', '=', guardian.id)], limit=1)
+                    if user:
+                        try:
+                            user.action_reset_password()
+                        except Exception:
+                            pass
+                if self.send_guardian_welcome_sms:
+                    self._send_welcome_sms_to_partner(guardian)
+        if portal_credentials:
+            self.guardian_portal_credentials = '\n\n'.join(portal_credentials)
+
+    def _use_existing_household(self):
+        """Pre-fill wizard from an existing household selection."""
+        self.ensure_one()
         household = self.household_id
-        guardian_member = None
+        if not household:
+            raise UserError(_('Please select an existing household.'))
+        self.created_household_id = household.id
+        guardian = household.primary_guardian_id
+        if guardian:
+            self.created_guardian_partner_id = guardian.id
 
-        if self.create_new_household:
-            if self.role in ('both', 'parent'):
-                # The member IS their own guardian — create the household now
-                # and set them as primary_guardian_id after they are created below.
-                hh_name = self.new_household_name or (self.name + ' Household')
-                household = self.env['dojo.household'].create({
-                    'name': hh_name,
-                    'company_id': self.env.company.id,
-                })
-            else:
-                # Standard path: create a separate guardian member first.
-                guardian_vals = {
-                    'name': self.new_guardian_name,
-                    'email': self.new_guardian_email or False,
-                    'phone': self.new_guardian_phone or False,
-                    'role': self.new_guardian_role or 'parent',
-                    'company_id': self.env.company.id,
-                }
-                guardian_member = self.env['dojo.member'].create(guardian_vals)
+    # ── Student member creation ──────────────────────────────────────────────
+    def _create_student_member(self):
+        """Create a student res.partner + dojo.member + subscription + enrollments + portal."""
+        self.ensure_one()
+        household = self.created_household_id
 
-                hh_name = self.new_household_name or (self.new_guardian_name + ' Household')
-                household = self.env['dojo.household'].create({
-                    'name': hh_name,
-                    'primary_guardian_id': guardian_member.id,
-                    'company_id': self.env.company.id,
-                })
-                guardian_member.write({'household_id': household.id})
-
-        # ── Create new member ─────────────────────────────────────────────────
-        member_vals = {
-            'name': self.name,
-            'email': self.email or False,
-            'phone': self.phone or False,
-            'date_of_birth': self.date_of_birth or False,
-            'role': self.role,
-            'emergency_note': self.emergency_note or False,
+        # Create student partner
+        partner_vals = {
+            'name': self.student_name,
+            'email': self.student_email or False,
+            'phone': self.student_phone or False,
+            'is_student': True,
+            'is_minor': self.student_is_minor,
             'company_id': self.env.company.id,
         }
         if household:
-            member_vals['household_id'] = household.id
+            partner_vals['parent_id'] = household.id
 
-        member = self.env['dojo.member'].create(member_vals)
+        # Ensure member number sequence is past existing numbers to avoid unique constraint violations
+        self._sync_member_sequence()
 
-        # ── Set primary guardian on household (existing household path) ─────────
-        if household and not household.primary_guardian_id:
-            if self.role in ('parent', 'both'):
-                household.primary_guardian_id = member.id
+        # Create dojo.member (auto-creates res.partner if partner_id not given,
+        # but we want to set is_minor etc. so we create partner explicitly)
+        partner = self.env['res.partner'].create(partner_vals)
+        member = self.env['dojo.member'].create({
+            'partner_id': partner.id,
+            'date_of_birth': self.student_date_of_birth or False,
+            'emergency_note': self.emergency_note or False,
+            'company_id': self.env.company.id,
+        })
 
-        # ── Guardian link ─────────────────────────────────────────────────────
-        if self.create_new_household and guardian_member and household:
-            # New household: newly created guardian → new member
-            self.env['dojo.guardian.link'].create({
-                'household_id': household.id,
-                'guardian_member_id': guardian_member.id,
-                'student_member_id': member.id,
-                'relation': self.guardian_relation,
-                'is_primary': True,
-            })
-        elif self.guardian_member_id and self.guardian_relation and household:
-            # Existing household: selected guardian → new member
-            self.env['dojo.guardian.link'].create({
-                'household_id': household.id,
-                'guardian_member_id': self.guardian_member_id.id,
-                'student_member_id': member.id,
-                'relation': self.guardian_relation,
-                'is_primary': True,
-            })
-
-        # ── Subscription (required) — must be created BEFORE session/template
-        # enrollments so the subscription constraint can validate new enrolments.
-        # ─────────────────────────────────────────────────────────────────────
-        existing_hh_path = not self.create_new_household and bool(self.household_id)
+        # Subscription
         sub = None
         if self.plan_id:
             sub_start = self.subscription_start_date or fields.Date.today()
-            if existing_hh_path:
-                # Existing household: always create as pending and invoice the guardian.
-                # Subscription activates automatically when the invoice is paid.
-                sub_state = 'pending'
-            else:
-                sub_state = 'pending' if self.defer_payment else 'active'
+            sub_state = 'pending' if self.defer_payment else 'active'
             sub = self.env['dojo.member.subscription'].create({
                 'member_id': member.id,
                 'plan_id': self.plan_id.id,
                 'start_date': sub_start,
-                'next_billing_date': sub_start,  # first invoice covers sub_start → sub_start+period
+                'next_billing_date': sub_start,
                 'state': sub_state,
                 'company_id': self.env.company.id,
             })
-            if existing_hh_path:
-                # Generate an invoice for the household guardian immediately.
-                sub.action_generate_invoice()
-        # Transition membership state — immediately for new-household paths only.
-        # For existing households the payment hook activates the member when paid.
-        if not existing_hh_path and not self.defer_payment:
+        if not self.defer_payment:
             member.action_set_active()
 
-        # ── Program enrollment — access is now controlled by subscription ─────
-        # No action needed here; the subscription plan links member to program.
-
-        # ── Specific session enrollments (optional) ───────────────────────────
+        # Session enrollments
         for session in self.session_ids:
-            # Enforce capacity before enrolling
             if session.seats_taken >= session.capacity:
                 raise UserError(_(
                     'Session "%s" is at full capacity (%s/%s). '
@@ -446,14 +523,12 @@ class DojoOnboardingWizard(models.TransientModel):
                 'status': 'registered',
                 'attendance_state': 'pending',
             })
-        # ── Course roster assignment + auto-enroll preferences ───────────────────
+
+        # Course roster + auto-enroll
         if self.template_ids:
-            # Add member to each template's course roster
             for tmpl in self.template_ids:
                 if member not in tmpl.course_member_ids:
                     tmpl.write({'course_member_ids': [(4, member.id)]})
-
-            # Create auto-enroll preference (if active option was chosen)
             if self.auto_enroll_active:
                 Pref = self.env['dojo.course.auto.enroll']
                 mode = self.auto_enroll_mode or 'permanent'
@@ -476,60 +551,24 @@ class DojoOnboardingWizard(models.TransientModel):
                         pref_vals['date_to'] = self.auto_enroll_date_to
                     Pref.create(pref_vals)
 
-        # ── Issue Stripe card for new households ──────────────────────────────
-        if self.create_new_household and household:
-            try:
-                household.action_create_stripe_cardholder()
-                household.action_create_stripe_card()
-            except Exception:
-                pass  # Stripe not configured yet — admin can issue the card manually from the household form
-
-        # ── Portal login — new member ─────────────────────────────────────────
+        # Student portal access
         portal_credentials = []
-        if self.create_portal_login:
-            if not member.email:
-                raise UserError(_(
-                    'An email address is required to create a portal login. '
-                    'Please add an email in Step 1.'
-                ))
-            creds = member._grant_portal_access_credentials()
+        if self.create_portal_login and partner.email:
+            creds = partner._grant_portal_access_credentials()
             if creds:
                 portal_credentials.append(creds)
                 if self.send_welcome_email:
                     user = self.env['res.users'].sudo().search(
-                        [('partner_id', '=', member.partner_id.id)], limit=1
-                    )
+                        [('partner_id', '=', partner.id)], limit=1)
                     if user:
                         try:
                             user.action_reset_password()
                         except Exception:
-                            pass  # non-fatal — credentials are shown on screen
+                            pass
                 if self.send_welcome_sms:
-                    self._send_welcome_sms(member)
+                    self._send_welcome_sms_to_partner(partner)
 
-        # ── Portal login — guardian (new household path only) ─────────────────
-        if self.create_new_household and guardian_member and self.create_guardian_portal_login:
-            if not guardian_member.email:
-                raise UserError(_(
-                    'A guardian email address is required to create a guardian portal login. '
-                    'Please go back to Step 3 and enter the guardian\'s email.'
-                ))
-            creds = guardian_member._grant_portal_access_credentials()
-            if creds:
-                portal_credentials.append(creds)
-                if self.send_guardian_welcome_email:
-                    user = self.env['res.users'].sudo().search(
-                        [('partner_id', '=', guardian_member.partner_id.id)], limit=1
-                    )
-                    if user:
-                        try:
-                            user.action_reset_password()
-                        except Exception:
-                            pass  # non-fatal — credentials are shown on screen
-                if self.send_guardian_welcome_sms:
-                    self._send_welcome_sms(guardian_member)
-
-        # ── Onboarding record ──────────────────────────────────────────────────
+        # Onboarding record
         self.env['dojo.onboarding.record'].create({
             'member_id': member.id,
             'step_member_info': True,
@@ -541,44 +580,66 @@ class DojoOnboardingWizard(models.TransientModel):
             'company_id': self.env.company.id,
         })
 
-        # Store reference so bridge modules (e.g. dojo_onboarding_stripe) can
-        # access the newly created member after super().action_confirm() returns.
-        self.created_member_id = member.id
+        return member
 
-        # Open the newly created member form
-        member_form_action = {
-            'type': 'ir.actions.act_window',
-            'res_model': 'dojo.member',
-            'res_id': member.id,
-            'view_mode': 'form',
-            'views': [(False, 'form')],
-            'target': 'current',
-        }
+    def _sync_member_sequence(self):
+        """Advance the dojo.member sequence past any existing member numbers.
 
-        if portal_credentials:
-            lines = []
-            for c in portal_credentials:
-                lines.append(
-                    _('%(name)s\nUsername: %(login)s\nTemp Password: %(pw)s',
-                      name=c['name'], login=c['login'], pw=c['temp_password'])
-                )
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': _('Portal Access Created'),
-                    'message': '\n\n'.join(lines),
-                    'type': 'success',
-                    'sticky': True,
-                    'next': member_form_action,
-                },
-            }
+        Prevents unique constraint violations when the sequence falls behind
+        (e.g. after data imports or manual number assignments).
+        """
+        import re as _re
+        sequence = self.env['ir.sequence'].sudo().search(
+            [('code', '=', 'dojo.member')], limit=1)
+        if not sequence:
+            return
+        result = self.env['dojo.member'].sudo().search_read(
+            [('member_number', '!=', False)],
+            fields=['member_number'],
+            order='id desc', limit=100,
+        )
+        max_num = 0
+        for row in result:
+            match = _re.search(r'(\d+)$', row.get('member_number') or '')
+            if match:
+                max_num = max(max_num, int(match.group(1)))
+        if max_num >= sequence.number_next:
+            sequence.sudo().write({'number_next': max_num + 1})
 
-        return member_form_action
+    def _reset_student_fields(self):
+        """Clear student-phase fields to prepare for another student registration."""
+        self.write({
+            'student_name': False,
+            'student_email': False,
+            'student_phone': False,
+            'student_date_of_birth': False,
+            'student_is_minor': True,
+            'emergency_note': False,
+            'program_id': False,
+            'template_ids': [(5,)],
+            'session_ids': [(5,)],
+            'auto_enroll_active': True,
+            'auto_enroll_mode': 'permanent',
+            'auto_enroll_mon': False,
+            'auto_enroll_tue': False,
+            'auto_enroll_wed': False,
+            'auto_enroll_thu': False,
+            'auto_enroll_fri': False,
+            'auto_enroll_sat': False,
+            'auto_enroll_sun': False,
+            'auto_enroll_date_from': False,
+            'auto_enroll_date_to': False,
+            'plan_id': False,
+            'subscription_start_date': fields.Date.today(),
+            'defer_payment': False,
+            'create_portal_login': True,
+            'send_welcome_email': True,
+            'send_welcome_sms': False,
+            'created_member_id': False,
+        })
 
-    def _send_welcome_sms(self, member):
-        """Send a welcome SMS to the member's mobile/phone via sms.sms (Twilio)."""
-        partner = member.partner_id
+    def _send_welcome_sms_to_partner(self, partner):
+        """Send a welcome SMS to a partner's mobile/phone via sms.sms (Twilio)."""
         number = getattr(partner, 'mobile', None) or partner.phone
         if not number:
             return
@@ -589,7 +650,7 @@ class DojoOnboardingWizard(models.TransientModel):
             'Welcome to %(company)s, %(name)s! '
             'Your member portal is ready — log in at %(url)s',
             company=company_name,
-            name=member.name,
+            name=partner.name,
             url=portal_url,
         )
         try:
@@ -599,4 +660,4 @@ class DojoOnboardingWizard(models.TransientModel):
                 'partner_id': partner.id,
             }).send()
         except Exception:
-            pass  # non-fatal — welcome SMS failure should not block onboarding
+            pass

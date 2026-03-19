@@ -1,16 +1,8 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_dojo_household_user,dojo.household user,model_dojo_household,base.group_user,1,0,0,0
-access_dojo_household_admin,dojo.household admin,model_dojo_household,dojo_base.group_dojo_admin,1,1,1,1
-access_dojo_household_instructor,dojo.household instructor,model_dojo_household,dojo_base.group_dojo_instructor,1,1,1,1
-access_dojo_household_parent,dojo.household parent,model_dojo_household,dojo_base.group_dojo_parent_student,1,1,0,0
 access_dojo_member_user,dojo.member user,model_dojo_member,base.group_user,1,0,0,0
 access_dojo_member_admin,dojo.member admin,model_dojo_member,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_member_instructor,dojo.member instructor,model_dojo_member,dojo_base.group_dojo_instructor,1,1,1,1
 access_dojo_member_parent,dojo.member parent,model_dojo_member,dojo_base.group_dojo_parent_student,1,1,0,0
-access_dojo_guardian_user,dojo.guardian.link user,model_dojo_guardian_link,base.group_user,1,0,0,0
-access_dojo_guardian_admin,dojo.guardian.link admin,model_dojo_guardian_link,dojo_base.group_dojo_admin,1,1,1,1
-access_dojo_guardian_instructor,dojo.guardian.link instructor,model_dojo_guardian_link,dojo_base.group_dojo_instructor,1,1,1,1
-access_dojo_guardian_parent,dojo.guardian.link parent,model_dojo_guardian_link,dojo_base.group_dojo_parent_student,1,0,0,0
 access_dojo_instructor_profile_user,dojo.instructor.profile user,model_dojo_instructor_profile,base.group_user,1,0,0,0
 access_dojo_instructor_profile_admin,dojo.instructor.profile admin,model_dojo_instructor_profile,dojo_base.group_dojo_admin,1,1,1,1
 access_dojo_instructor_profile_instructor,dojo.instructor.profile instructor,model_dojo_instructor_profile,dojo_base.group_dojo_instructor,1,0,0,0

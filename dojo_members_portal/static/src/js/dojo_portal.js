@@ -157,7 +157,7 @@
             html += '<div class="dojo-member-avatar">' + esc((m.name || '?')[0].toUpperCase()) + '</div>';
             html += '<div class="flex-grow-1">';
             html += '<div class="fw-semibold" style="color:#202124;font-size:.9rem">' + esc(m.name) + '</div>';
-            html += '<div class="text-capitalize" style="color:#5f6368;font-size:.75rem">' + esc(m.role || '') + '</div>';
+            html += '<div class="text-capitalize" style="color:#5f6368;font-size:.75rem">' + esc(m.is_guardian ? (m.is_student ? 'Standalone' : 'Parent') : 'Student') + '</div>';
             html += '</div></div>';
             html += '<div class="p-3">';
             // ── Subscription plan ──────────────────────────────────────────────
@@ -309,26 +309,29 @@
             return '<div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div></div>';
         }
 
-        var sub = data.subscription;
+        var allSubs = data.subscriptions || [];
         var html = '';
 
-        /* ── Billing failure alert ─────────────────────────────────────── */
-        if (sub && sub.billing_failure_count > 0) {
-            if (sub.grace_period_end) {
-                html += '<div class="alert alert-danger mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
-                    '<strong>Membership suspended.</strong> Your membership will be permanently cancelled after ' +
-                    esc(fmtDate(sub.grace_period_end)) + ' if payment is not resolved.</div>';
-            } else if (sub.billing_failure_count >= 2) {
-                html += '<div class="alert alert-warning mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
-                    '<strong>Payment issue.</strong> Your membership has been paused due to a failed payment.</div>';
-            } else {
-                html += '<div class="alert alert-warning mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
-                    '<strong>Payment issue.</strong> A recent payment failed. Please ensure your payment method is up to date.</div>';
+        /* ── Billing failure alerts (check all subs) ───────────────────── */
+        allSubs.forEach(function(sub) {
+            if (sub.billing_failure_count > 0) {
+                var who = sub.member_name ? ' for ' + esc(sub.member_name) : '';
+                if (sub.grace_period_end) {
+                    html += '<div class="alert alert-danger mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
+                        '<strong>Membership suspended' + who + '.</strong> The membership will be permanently cancelled after ' +
+                        esc(fmtDate(sub.grace_period_end)) + ' if payment is not resolved.</div>';
+                } else if (sub.billing_failure_count >= 2) {
+                    html += '<div class="alert alert-warning mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
+                        '<strong>Payment issue' + who + '.</strong> The membership has been paused due to a failed payment.</div>';
+                } else {
+                    html += '<div class="alert alert-warning mb-4"><i class="fa fa-exclamation-triangle me-2"></i>' +
+                        '<strong>Payment issue' + who + '.</strong> A recent payment failed. Please ensure your payment method is up to date.</div>';
+                }
             }
-        }
+        });
 
-        /* ── No subscription ───────────────────────────────────────────── */
-        if (!sub) {
+        /* ── No subscriptions ──────────────────────────────────────────── */
+        if (!allSubs.length) {
             html += '<div class="dojo-billing-card mb-4 p-4">' +
                 '<h5 class="fw-bold mb-1" style="color:#202124">No Active Subscription</h5>' +
                 '<p style="color:#5f6368;margin-bottom:0">No subscription found for your household. Please contact us to set up your membership.</p>' +
@@ -336,48 +339,52 @@
             return html;
         }
 
-        /* ── Subscription card ─────────────────────────────────────────── */
+        /* ── Subscription cards (one per student) ──────────────────────── */
         var STATE_LABELS = { active:'Active', paused:'Paused', cancelled:'Cancelled', draft:'Draft', expired:'Expired' };
         var STATE_CHIP_CLS = { active:'dojo-chip--success', paused:'dojo-chip--warning', cancelled:'dojo-chip--neutral', draft:'dojo-chip--info', expired:'dojo-chip--danger' };
-        var stateLabel = STATE_LABELS[sub.state] || sub.state;
-        var stateCls   = STATE_CHIP_CLS[sub.state] || 'dojo-chip--neutral';
-        var periodLabel = sub.period === 'monthly' ? '/mo' : sub.period === 'yearly' ? '/yr' : '/wk';
 
-        html += '<div class="dojo-billing-card mb-4">';
-        html += '<div class="dojo-billing-card-hd d-flex justify-content-between align-items-center">' +
-            '<span>Current Plan</span>' +
-            '<span class="dojo-chip ' + stateCls + '">' + esc(stateLabel) + '</span>' +
-            '</div>';
-        html += '<div class="dojo-billing-field-row">';
-        html += '<span class="dojo-billing-field-lbl">Plan</span>';
-        html += '<span class="fw-semibold" style="color:#202124">' + esc(sub.plan_name) + '</span>';
-        html += '</div>';
-        html += '<div class="dojo-billing-field-row">';
-        html += '<span class="dojo-billing-field-lbl">Price</span>';
-        html += '<span class="fw-semibold" style="color:#1a73e8">' + esc(fmtMoney(sub.price, sub.currency)) + '<span style="color:#5f6368;font-weight:normal"> ' + esc(periodLabel) + '</span></span>';
-        html += '</div>';
-        if (sub.next_billing_date && sub.state === 'active') {
-            html += '<div class="dojo-billing-field-row">';
-            html += '<span class="dojo-billing-field-lbl"><i class="fa fa-calendar me-1"></i>Next billing</span>';
-            html += '<span>' + esc(fmtDate(sub.next_billing_date)) + '</span>';
-            html += '</div>';
-        }
-        if (sub.start_date) {
-            html += '<div class="dojo-billing-field-row">';
-            html += '<span class="dojo-billing-field-lbl"><i class="fa fa-clock-o me-1"></i>Member since</span>';
-            html += '<span>' + esc(fmtDate(sub.start_date)) + '</span>';
-            html += '</div>';
-        }
-        if (sub.state === 'paused') {
-            html += '<div class="d-flex flex-wrap gap-2 p-3">' +
-                '<button class="btn btn-outline-success btn-sm" id="dojoBillingResume">' +
-                '<i class="fa fa-play me-1"></i>Resume</button>' +
+        allSubs.forEach(function(sub) {
+            var stateLabel = STATE_LABELS[sub.state] || sub.state;
+            var stateCls   = STATE_CHIP_CLS[sub.state] || 'dojo-chip--neutral';
+            var periodLabel = sub.period === 'monthly' ? '/mo' : sub.period === 'yearly' ? '/yr' : '/wk';
+            var heading = sub.member_name ? esc(sub.member_name) + ' — Plan' : 'Current Plan';
+
+            html += '<div class="dojo-billing-card mb-4" data-sub-id="' + sub.id + '">';
+            html += '<div class="dojo-billing-card-hd d-flex justify-content-between align-items-center">' +
+                '<span>' + heading + '</span>' +
+                '<span class="dojo-chip ' + stateCls + '">' + esc(stateLabel) + '</span>' +
                 '</div>';
-        }
-        if (sub.state === 'active' || sub.state === 'paused') {
-            html += '<div class="alert alert-info mx-3 mb-3" style="font-size:.875rem"><i class="fa fa-info-circle me-2"></i>To cancel your subscription, please contact the dojo directly.</div>';
-        }
-        html += '</div>';
+            html += '<div class="dojo-billing-field-row">';
+            html += '<span class="dojo-billing-field-lbl">Plan</span>';
+            html += '<span class="fw-semibold" style="color:#202124">' + esc(sub.plan_name) + '</span>';
+            html += '</div>';
+            html += '<div class="dojo-billing-field-row">';
+            html += '<span class="dojo-billing-field-lbl">Price</span>';
+            html += '<span class="fw-semibold" style="color:#1a73e8">' + esc(fmtMoney(sub.price, sub.currency)) + '<span style="color:#5f6368;font-weight:normal"> ' + esc(periodLabel) + '</span></span>';
+            html += '</div>';
+            if (sub.next_billing_date && sub.state === 'active') {
+                html += '<div class="dojo-billing-field-row">';
+                html += '<span class="dojo-billing-field-lbl"><i class="fa fa-calendar me-1"></i>Next billing</span>';
+                html += '<span>' + esc(fmtDate(sub.next_billing_date)) + '</span>';
+                html += '</div>';
+            }
+            if (sub.start_date) {
+                html += '<div class="dojo-billing-field-row">';
+                html += '<span class="dojo-billing-field-lbl"><i class="fa fa-clock-o me-1"></i>Member since</span>';
+                html += '<span>' + esc(fmtDate(sub.start_date)) + '</span>';
+                html += '</div>';
+            }
+            if (sub.state === 'paused') {
+                html += '<div class="d-flex flex-wrap gap-2 p-3">' +
+                    '<button class="btn btn-outline-success btn-sm dojo-billing-resume" data-sub-id="' + sub.id + '">' +
+                    '<i class="fa fa-play me-1"></i>Resume</button>' +
+                    '</div>';
+            }
+            if (sub.state === 'active' || sub.state === 'paused') {
+                html += '<div class="alert alert-info mx-3 mb-3" style="font-size:.875rem"><i class="fa fa-info-circle me-2"></i>To cancel your subscription, please contact the dojo directly.</div>';
+            }
+            html += '</div>';
+        });
 
         /* ── Payment method ────────────────────────────────────────────── */
         if (data.payment_method) {
@@ -418,7 +425,7 @@
         return html;
     }
 
-    function openBillingPlanOverlay(plans, currentPlanId, onSave) {
+    function openBillingPlanOverlay(plans, currentPlanId, subscriptionId, onSave) {
         var plansHtml = (plans || []).map(function(p) {
             var active = p.id === currentPlanId;
             return '<label class="d-flex align-items-start gap-2 p-3 mb-2 rounded border ' +
@@ -453,6 +460,7 @@
             var form = new FormData();
             form.set("plan_id", checked.value);
             form.set("csrf_token", getCsrfToken());
+            if (subscriptionId) form.set("subscription_id", subscriptionId);
             fetch("/my/dojo/billing/change-plan", { method: "POST", credentials: "same-origin", body: form })
                 .then(function(r){ return r.json(); })
                 .then(function(res){
@@ -502,7 +510,7 @@
         // Filter to household students who are in this session's eligible list
         var eligibleIds = session.eligible_member_ids || [];
         var enrollable = members.filter(function(m) {
-            var isStudent = m.role === 'student' || m.role === 'both';
+            var isStudent = m.is_student;
             if (!isStudent) return false;
             if (eligibleIds.length > 0) return eligibleIds.indexOf(m.id) !== -1;
             return true;
@@ -533,7 +541,7 @@
         if (full) {
             html += '<span style="color:#5f6368;font-size:.85rem">Session is full.</span>';
         } else if (!enrollable.length) {
-            var hasStudents = members.some(function(m){ return m.role === 'student' || m.role === 'both'; });
+            var hasStudents = members.some(function(m){ return m.is_student; });
             if (hasStudents) {
                 html += '<span style="color:#5f6368;font-size:.85rem">No household students are subscribed to this program. Ask an instructor for help.</span>';
             } else {
@@ -1128,7 +1136,7 @@
             if (available.length) {
                 html += '<div class="dojo-classes-section mb-4">';
                 html += '<h6 class="dojo-classes-section-header fw-semibold mb-3"><i class="fa fa-calendar-plus-o me-2 text-primary"></i>Available Sessions</h6>';
-                var enrollableMembers = members.filter(function(m){ return m.role === 'student' || m.role === 'both'; });
+                var enrollableMembers = members.filter(function(m){ return m.is_student; });
                 html += memberCreditStripHtml(enrollableMembers, hhData);
                 html += '<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">';
                 available.forEach(function(s){ html += sessionCard(s); });
@@ -1486,15 +1494,17 @@
                 render(root, state, isParent, members, students, isStudentOnly);
             });
         }
-        var resumeBtn = document.getElementById("dojoBillingResume");
-        if (resumeBtn) {
-            resumeBtn.addEventListener("click", function(){
-                var csrfForm = new FormData(); csrfForm.set('csrf_token', getCsrfToken());
+        document.querySelectorAll(".dojo-billing-resume").forEach(function(btn) {
+            btn.addEventListener("click", function(){
+                var subId = btn.getAttribute("data-sub-id");
+                var csrfForm = new FormData();
+                csrfForm.set('csrf_token', getCsrfToken());
+                if (subId) csrfForm.set('subscription_id', subId);
                 fetch("/my/dojo/billing/resume", { method:"POST", credentials:"same-origin", body: csrfForm })
                     .then(function(r){ return r.json(); })
                     .then(function(res){ if (res.ok) refreshBilling(); });
             });
-        }
+        });
         // ── Google Wallet push provisioning ──────────────────────────────
         var walletBtn = document.getElementById("dojoAddToWallet");
         if (walletBtn) {

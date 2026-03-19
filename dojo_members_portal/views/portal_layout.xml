@@ -9,7 +9,7 @@
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <!-- Resolve member role once for conditional tile visibility -->
             <t t-set="_dojo_member" t-value="request.env['dojo.member'].sudo().search([('partner_id', '=', request.env.user.partner_id.id)], limit=1)"/>
-            <t t-set="_dojo_is_parent" t-value="_dojo_member and _dojo_member.role in ('parent', 'both')"/>
+            <t t-set="_dojo_is_parent" t-value="_dojo_member and _dojo_member.partner_id.is_guardian"/>
 
             <!-- Dojo Portal tile — rendered directly to avoid d-none count-gating -->
             <div class="o_portal_index_card col-md-6 order-2">
@@ -81,10 +81,10 @@
                         <!-- Name row -->
                         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                             <h4 class="mb-0 fw-bold lh-1" style="color:#202124;" t-out="member.name"/>
-                            <t t-if="member.role == 'parent'">
+                            <t t-if="member.partner_id.is_guardian and not member.partner_id.is_student">
                                 <span class="dojo-chip dojo-chip--accent">Parent</span>
                             </t>
-                            <t t-elif="member.role == 'both'">
+                            <t t-elif="member.partner_id.is_guardian and member.partner_id.is_student">
                                 <span class="dojo-chip dojo-chip--success">Standalone</span>
                             </t>
                             <t t-else="">
@@ -105,11 +105,11 @@
                         </div>
                         <!-- Household + member number -->
                         <div class="d-flex align-items-center gap-2 mb-3" style="color:#5f6368;font-size:.85rem;">
-                            <t t-if="member.household_id">
-                                <span t-out="member.household_id.name"/>
+                            <t t-if="member.partner_id.parent_id and member.partner_id.parent_id.is_household">
+                                <span t-out="member.partner_id.parent_id.name"/>
                             </t>
                             <t t-if="member.member_number">
-                                <t t-if="member.household_id"><span>·</span></t>
+                                <t t-if="member.partner_id.parent_id and member.partner_id.parent_id.is_household"><span>·</span></t>
                                 <span t-out="member.member_number"/>
                             </t>
                         </div>

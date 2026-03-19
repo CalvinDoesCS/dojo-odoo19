@@ -657,8 +657,16 @@ class AIProcessorIntentExt(models.AbstractModel):
     def _format_member_context(self, member):
         """Format member info for context."""
         parts = [f"- {member.name} (id: {member.id}"]
-        if hasattr(member, 'role'):
-            parts.append(f", role: {member.role}")
+        if hasattr(member, 'partner_id') and member.partner_id:
+            flags = []
+            if member.partner_id.is_student:
+                flags.append("student")
+            if member.partner_id.is_guardian:
+                flags.append("guardian")
+            if member.partner_id.is_minor:
+                flags.append("minor")
+            if flags:
+                parts.append(f", flags: {'/'.join(flags)}")
         if hasattr(member, 'membership_state'):
             parts.append(f", state: {member.membership_state}")
         if hasattr(member, 'current_rank_id') and member.current_rank_id:

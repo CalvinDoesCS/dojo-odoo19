@@ -6,79 +6,158 @@
         <field name="name">dojo.onboarding.wizard.form</field>
         <field name="model">dojo.onboarding.wizard</field>
         <field name="arch" type="xml">
-            <form string="New Member Onboarding">
+            <form string="Member Onboarding">
 
-                <!-- Progress header -->
-                <div class="alert alert-info py-2 mb-3 mx-3" role="status">
-                    <!-- Parent-only path: Member Info > Household > Payment > Portal Access -->
-                    <span invisible="step != 'member_info' or role != 'parent'">
-                        <b>Step 1:</b> Member Info  ›  Household  ›  Payment  ›  Portal Access
+                <!-- Progress header: Guardian Phase -->
+                <div class="alert alert-info py-2 mb-3 mx-3" role="status"
+                     invisible="wizard_phase != 'guardian'">
+                    <span invisible="step != 'guardian_contact'">
+                        <b>Step 1:</b> Guardian Contact  ›  Household  ›  Guardian Portal
                     </span>
-                    <span invisible="step != 'household' or role != 'parent'">
-                        ✓ Member Info  ›  <b>Step 2: Household</b>  ›  Payment  ›  Portal Access
+                    <span invisible="step != 'household'">
+                        ✓ Guardian Contact  ›  <b>Step 2: Household</b>  ›  Guardian Portal
                     </span>
-                    <span invisible="step != 'payment' or role != 'parent'">
-                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3: Payment</b>  ›  Portal Access
+                    <span invisible="step != 'guardian_portal'">
+                        ✓ Guardian Contact  ›  ✓ Household  ›  <b>Step 3: Guardian Portal</b>
                     </span>
-                    <span invisible="step != 'portal_access' or role != 'parent'">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Payment  ›  <b>Step 4: Portal Access</b>
+                </div>
+
+                <!-- Progress header: Student Phase -->
+                <div class="alert alert-primary py-2 mb-3 mx-3" role="status"
+                     invisible="wizard_phase != 'student'">
+                    <span invisible="step != 'student_contact'">
+                        <b>Step 1:</b> Student Contact  ›  Details  ›  Enrollment  ›  Subscription  ›  Portal  ›  Summary
                     </span>
-                    <!-- 6-step path: creating a new household (student / both roles) -->
-                    <span invisible="step != 'member_info' or not create_new_household or role == 'parent'">
-                        <b>Step 1:</b> Member Info  ›  Household  ›  Guardian Setup  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    <span invisible="step != 'member_details'">
+                        ✓ Student Contact  ›  <b>Step 2: Details</b>  ›  Enrollment  ›  Subscription  ›  Portal  ›  Summary
                     </span>
-                    <span invisible="step != 'household' or not create_new_household or role == 'parent'">
-                        ✓ Member Info  ›  <b>Step 2: Household</b>  ›  Guardian Setup  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    <span invisible="step != 'enrollment'">
+                        ✓ Student Contact  ›  ✓ Details  ›  <b>Step 3: Enrollment</b>  ›  Subscription  ›  Portal  ›  Summary
                     </span>
-                    <span invisible="step != 'guardian_setup'">
-                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3: Guardian Setup</b>  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    <span invisible="step != 'auto_enroll'">
+                        ✓ Student Contact  ›  ✓ Details  ›  ✓ Enrollment  ›  <b>Step 3b: Auto-Enroll</b>  ›  Subscription  ›  Portal  ›  Summary
                     </span>
-                    <span invisible="step != 'enrollment' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  <b>Step 4: Enrollment</b>  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
+                    <span invisible="step != 'subscription'">
+                        ✓ Student Contact  ›  ✓ Details  ›  ✓ Enrollment  ›  <b>Step 4: Subscription</b>  ›  Portal  ›  Summary
                     </span>
-                    <span invisible="step != 'auto_enroll' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  <b>Step 4b: Auto-Enroll</b>  ›  Subscription  ›  Portal Access
+                    <span invisible="step != 'student_portal'">
+                        ✓ Student Contact  ›  ✓ Details  ›  ✓ Enrollment  ›  ✓ Subscription  ›  <b>Step 5: Portal</b>  ›  Summary
                     </span>
-                    <span invisible="step != 'subscription' or not create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  <b>Step 5: Subscription</b>  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'portal_access' or not create_new_household or role == 'parent'">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Guardian Setup  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 6: Portal Access</b>
-                    </span>
-                    <!-- 5-step path: joining an existing household -->
-                    <span invisible="step != 'member_info' or create_new_household">
-                        <b>Step 1:</b> Member Info  ›  Household  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'household' or create_new_household">
-                        ✓ Member Info  ›  <b>Step 2: Household</b>  ›  Enrollment  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'enrollment' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  <b>Step 3: Enrollment</b>  ›  Auto-Enroll  ›  Subscription  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'auto_enroll' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  <b>Step 3b: Auto-Enroll</b>  ›  Subscription  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'subscription' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  <b>Step 4: Subscription</b>  ›  Portal Access
-                    </span>
-                    <span invisible="step != 'portal_access' or create_new_household">
-                        ✓ Member Info  ›  ✓ Household  ›  ✓ Enrollment  ›  ✓ Auto-Enroll  ›  ✓ Subscription  ›  <b>Step 5: Portal Access</b>
+                    <span invisible="step != 'summary'">
+                        ✓ Student Contact  ›  ✓ Details  ›  ✓ Enrollment  ›  ✓ Subscription  ›  ✓ Portal  ›  <b>Summary</b>
                     </span>
                 </div>
 
                 <field name="step" invisible="1"/>
+                <field name="wizard_phase" invisible="1"/>
+                <field name="created_household_id" invisible="1"/>
+                <field name="created_guardian_partner_id" invisible="1"/>
 
-                <!-- ── Step 1: Member Info ──────────────────────────────── -->
-                <group string="Member Information" invisible="step != 'member_info'">
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <!-- GUARDIAN PHASE                                           -->
+                <!-- ══════════════════════════════════════════════════════════ -->
+
+                <!-- ── Step 1: Guardian Contact ──────────────────────────── -->
+                <group string="Guardian / Account Holder" invisible="step != 'guardian_contact'">
+                    <!-- Existing household shortcut -->
+                    <group colspan="2">
+                        <field name="use_existing_household"
+                               widget="boolean_toggle"
+                               string="Join Existing Household"/>
+                    </group>
+                    <group invisible="not use_existing_household" colspan="2">
+                        <field name="household_id"
+                               string="Existing Household *"
+                               placeholder="Search for an existing household"/>
+                    </group>
+                    <div class="alert alert-info py-2 px-3" colspan="2"
+                         invisible="not use_existing_household" role="alert">
+                        <i class="fa fa-info-circle me-2" title="Info"/>
+                        The guardian from this household will be used as the account holder.
+                        You'll proceed directly to registering students.
+                    </div>
+                    <!-- New guardian fields (hidden when joining existing household) -->
+                    <group invisible="use_existing_household">
+                        <field name="guardian_name" string="Full Name *" placeholder="Full name"/>
+                        <field name="guardian_email" string="Email *" placeholder="email@example.com"/>
+                        <field name="guardian_phone" string="Phone *" placeholder="e.g. +1 555 000 0000"/>
+                    </group>
+                    <group invisible="use_existing_household">
+                        <field name="guardian_street" placeholder="Street address"/>
+                        <field name="guardian_street2" placeholder="Apt, suite, etc."/>
+                        <field name="guardian_city" placeholder="City"/>
+                        <field name="guardian_state_id" placeholder="State / Province"/>
+                        <field name="guardian_zip" placeholder="ZIP / Postal code"/>
+                        <field name="guardian_country_id" placeholder="Country"/>
+                    </group>
+                    <group colspan="2" invisible="use_existing_household">
+                        <field name="guardian_is_also_student"
+                               widget="boolean_toggle"
+                               help="Check this if the guardian also trains at the dojo — they will be registered as a student after the first student."/>
+                    </group>
+                </group>
+
+                <!-- ── Step 2: Household ────────────────────────────────── -->
+                <group string="Household" invisible="step != 'household'">
                     <group>
-                        <field name="name" string="Full Name *" placeholder="Full name"/>
-                        <field name="email" string="Email *" placeholder="email@example.com"/>
-                        <field name="phone" string="Phone *" placeholder="e.g. +1 555 000 0000"/>
+                        <field name="new_household_name"
+                               placeholder="Auto-generated from guardian name if left blank"/>
+                    </group>
+                    <div class="alert alert-info py-2 px-3" colspan="2" role="alert">
+                        <i class="fa fa-home me-2" title="Household"/>
+                        A new household will be created for <b><field name="guardian_name" readonly="1" nolabel="1"/></b>.
+                    </div>
+                </group>
+
+                <!-- ── Step 3: Guardian Portal ──────────────────────────── -->
+                <group string="Guardian Portal Access" name="group_guardian_portal" invisible="step != 'guardian_portal'">
+                    <group>
+                        <field name="create_guardian_portal_login"/>
+                        <field name="send_guardian_welcome_email"
+                               invisible="not create_guardian_portal_login"/>
+                        <field name="send_guardian_welcome_sms"
+                               invisible="not create_guardian_portal_login"/>
+                    </group>
+                    <div class="alert alert-info" invisible="not create_guardian_portal_login"
+                         colspan="2" role="alert">
+                        A portal account will be created for
+                        <b><field name="guardian_name" readonly="1" nolabel="1"/></b>
+                        using their email as the login. Guardians can view household info,
+                        track attendance, and manage billing online.
+                    </div>
+                </group>
+
+                <!-- ══════════════════════════════════════════════════════════ -->
+                <!-- STUDENT PHASE                                            -->
+                <!-- ══════════════════════════════════════════════════════════ -->
+
+                <!-- Student count badge -->
+                <div class="alert alert-light py-1 px-3 mx-3 mb-2 d-flex justify-content-between align-items-center"
+                     invisible="wizard_phase != 'student'" role="status">
+                    <span>
+                        <i class="fa fa-home me-1" title="Household"/>
+                        Household: <b><field name="created_household_id" readonly="1" nolabel="1"/></b>
+                    </span>
+                    <span class="badge bg-info">
+                        <field name="students_created_ids" widget="many2many_tags" readonly="1" nolabel="1"/>
+                    </span>
+                </div>
+
+                <!-- ── Step 4: Student Contact ──────────────────────────── -->
+                <group string="Student Contact Information" invisible="step != 'student_contact'">
+                    <group>
+                        <field name="student_name" string="Full Name *" placeholder="Full name"/>
+                        <field name="student_email" string="Email" placeholder="email@example.com"/>
+                        <field name="student_phone" string="Phone" placeholder="e.g. +1 555 000 0000"/>
                     </group>
                     <group>
-                        <field name="role"/>
-                        <field name="date_of_birth"/>
+                        <field name="student_date_of_birth"/>
+                        <field name="student_is_minor" widget="boolean_toggle"/>
                     </group>
+                </group>
+
+                <!-- ── Step 5: Member Details ───────────────────────────── -->
+                <group string="Member Details" invisible="step != 'member_details'">
                     <group colspan="2">
                         <field name="emergency_note"
                                placeholder="Allergies, medical conditions, emergency notes…"
@@ -86,75 +165,7 @@
                     </group>
                 </group>
 
-                <!-- ── Step 2: Household ────────────────────────────────── -->
-                <group string="Household Assignment" invisible="step != 'household'">
-                    <group>
-                        <field name="create_new_household"/>
-                    </group>
-
-                    <!-- Existing household path -->
-                    <group invisible="create_new_household">
-                        <field name="household_id"
-                               string="Household *"
-                               placeholder="Search for an existing household"/>
-                    </group>
-                    <group string="Guardian Link (optional)"
-                           invisible="create_new_household or role == 'parent'">
-                        <field name="guardian_member_id"
-                               domain="[('role', 'in', ['parent', 'both'])]"/>
-                    </group>
-                    <group invisible="create_new_household or not guardian_member_id">
-                        <field name="guardian_relation"/>
-                    </group>
-
-                    <!-- New household hint -->
-                    <div class="alert alert-info py-2 px-3" colspan="2"
-                         invisible="not create_new_household or role in ('both', 'parent')" role="alert">
-                        <i class="fa fa-arrow-right me-2" title="Next"/>
-                        Click <b>Next</b> to enter the guardian's details and set up the household.
-                    </div>
-                    <div class="alert alert-info py-2 px-3" colspan="2"
-                         invisible="not create_new_household or role != 'both'" role="alert">
-                        <i class="fa fa-home me-2" title="Household"/>
-                        A household will be created for you — you are your own guardian.
-                        Click <b>Next</b> to continue to program enrollment.
-                    </div>
-                    <div class="alert alert-info py-2 px-3" colspan="2"
-                         invisible="not create_new_household or role != 'parent'" role="alert">
-                        <i class="fa fa-home me-2" title="Household"/>
-                        A household will be created for you as the account holder.
-                        Click <b>Next</b> to set up a payment method.
-                    </div>
-                </group>
-
-                <!-- ── Step 3 (new household only): Guardian Setup ───────── -->
-                <group string="Guardian Details" invisible="step != 'guardian_setup'">
-                    <group>
-                        <field name="new_guardian_name"
-                               string="Full Name *"
-                               placeholder="Full name"/>
-                        <field name="new_guardian_email"
-                               string="Email *"
-                               placeholder="email@example.com"/>
-                        <field name="new_guardian_phone"
-                               string="Phone *"
-                               placeholder="e.g. +1 555 000 0000"/>
-                    </group>
-                    <group>
-                        <field name="new_guardian_role"/>
-                        <field name="new_household_name"
-                               placeholder="Auto-generated from guardian name if left blank"/>
-                    </group>
-                    <group>
-                        <field name="guardian_relation" string="Relation *"/>
-                    </group>
-                    <div class="alert alert-info py-2 px-3" colspan="2" role="alert">
-                        <i class="fa fa-credit-card me-2" title="Payment"/>
-                        A payment method will be collected in the next steps to set up recurring billing.
-                    </div>
-                </group>
-
-                <!-- ── Step 4: Program Enrollment ───────────────────────── -->
+                <!-- ── Step 6: Enrollment ───────────────────────────────── -->
                 <group string="Program Enrollment" invisible="step != 'enrollment'">
                     <group>
                         <field name="program_id"
@@ -169,31 +180,29 @@
                     <div class="alert alert-info py-2 px-3" invisible="not program_id"
                          colspan="2" role="alert">
                         <i class="fa fa-info-circle me-2" title="Info"/>
-                        Select the class rosters this member attends. Once rosters are chosen,
-                        you can optionally pre-register them in specific upcoming sessions from those rosters.
+                        Select the class rosters this student attends. Once rosters are chosen,
+                        you can optionally pre-register them in specific upcoming sessions.
                     </div>
                     <group colspan="2" invisible="not program_id">
                         <field name="template_ids" widget="many2many_tags"
                                string="Classes *"
                                domain="[('program_id', '=', program_id)]"
-                               placeholder="Add to class rosters for this program…"
-                               help="Add this member to recurring course rosters. The next step lets you choose which days to auto-enrol."/>
+                               placeholder="Add to class rosters for this program…"/>
                     </group>
                     <group colspan="2" invisible="not template_ids">
                         <field name="session_ids" widget="many2many_tags"
                                string="Specific Sessions"
                                domain="[('state', '=', 'open'), ('template_id', 'in', template_ids)]"
-                               placeholder="Optionally pick specific upcoming sessions from the selected rosters…"/>
+                               placeholder="Optionally pick specific upcoming sessions…"/>
                     </group>
                 </group>
 
-                <!-- ── Step 4b: Auto-Enroll Schedule ────────────────────── -->
+                <!-- ── Step 7: Auto-Enroll ──────────────────────────────── -->
                 <group string="Auto-Enroll Schedule" invisible="step != 'auto_enroll'">
                     <div class="alert alert-info small py-1 px-2 mb-2" colspan="2" role="alert">
                         <i class="fa fa-calendar-check-o me-1" title="Schedule"/>
-                        The system can automatically enroll this member into recurring sessions.
+                        The system can automatically enroll this student into recurring sessions.
                         Choose which days of the week they are available.
-                        Leave all days un-ticked to always enroll on every day the class runs.
                     </div>
                     <group>
                         <field name="auto_enroll_active" widget="boolean_toggle"
@@ -218,14 +227,9 @@
                         <field name="auto_enroll_date_from" string="From *"/>
                         <field name="auto_enroll_date_to" string="To *"/>
                     </group>
-                    <div class="text-muted small ps-1" invisible="auto_enroll_active" colspan="2">
-                        Auto-enroll is disabled. The member will not be automatically enrolled
-                        in recurring sessions — they can still sign up for individual sessions
-                        through the portal.
-                    </div>
                 </group>
 
-                <!-- ── Step 5: Subscription ──────────────────────────────── -->
+                <!-- ── Step 8: Subscription ─────────────────────────────── -->
                 <group string="Subscription Plan" invisible="step != 'subscription'">
                     <group>
                         <field name="plan_id"
@@ -238,7 +242,6 @@
                          colspan="2" role="alert">
                         <i class="fa fa-exclamation-circle me-2" title="Warning"/>
                         A subscription plan is required to continue.
-                        Only plans compatible with the selected program are shown.
                     </div>
                     <group string="Billing Summary" invisible="not plan_id" colspan="2">
                         <field name="plan_currency_id" invisible="1"/>
@@ -260,78 +263,91 @@
                         <field name="plan_description" readonly="1" widget="text"
                                invisible="not plan_description"/>
                     </group>
-                    <div class="alert alert-info py-2 px-3"
-                         invisible="not plan_id or not create_new_household"
-                         colspan="2" role="alert">
-                        <i class="fa fa-credit-card me-2" title="Payment"/>
-                        Payment is collected on the next step.
-                        You can enter a card to charge immediately, or choose <b>Send Invoice</b> to email the member an invoice — credits are only issued once payment is received.
-                    </div>
-                    <div class="alert alert-info py-2 px-3"
-                         invisible="not plan_id or create_new_household"
-                         colspan="2" role="alert">
-                        <i class="fa fa-envelope me-2" title="Invoice"/>
-                        An invoice will be sent to the household guardian to pay. The subscription activates automatically once payment is received.
-                    </div>
+                    <group colspan="2" invisible="not plan_id">
+                        <field name="defer_payment" widget="boolean_toggle"
+                               string="Pay Later (create as pending)"/>
+                    </group>
                 </group>
 
-                <!-- ── Step 5: Portal Access ─────────────────────────────── -->
-                <group string="Portal Access" invisible="step != 'portal_access'">
-
-                    <!-- New member account -->
-                    <group string="New Member Account">
+                <!-- ── Step 9: Student Portal ───────────────────────────── -->
+                <group string="Student Portal Access" name="group_student_portal" invisible="step != 'student_portal'">
+                    <group>
                         <field name="create_portal_login"/>
                         <field name="send_welcome_email" invisible="not create_portal_login"/>
                         <field name="send_welcome_sms" invisible="not create_portal_login"/>
                     </group>
-                    <div class="alert alert-info" invisible="not create_portal_login" role="alert">
-                        A portal account will be created for <b><field name="name" readonly="1" nolabel="1"/></b>
+                    <div class="alert alert-info" invisible="not create_portal_login"
+                         colspan="2" role="alert">
+                        A portal account will be created for
+                        <b><field name="student_name" readonly="1" nolabel="1"/></b>
                         using their email as the login.
-                        They will receive a password-reset email if "Send Welcome Email" is checked,
-                        and/or a welcome SMS if "Send Welcome SMS" is checked.
                     </div>
-                    <div class="alert alert-warning" invisible="create_portal_login" role="alert">
-                        No portal login will be created for the new member. They cannot log in until
-                        a user account is linked manually from their member profile.
+                    <div class="alert alert-warning" invisible="create_portal_login"
+                         colspan="2" role="alert">
+                        No portal login will be created. They cannot log in until
+                        a user account is linked manually.
                     </div>
+                </group>
 
-                    <!-- Guardian account (only shown when creating a new household AND member is not their own guardian AND not a parent-only registration) -->
-                    <group string="Guardian Account" invisible="not create_new_household or role in ('both', 'parent')">
-                        <field name="create_guardian_portal_login"/>
-                        <field name="send_guardian_welcome_email"
-                               invisible="not create_guardian_portal_login"/>
-                        <field name="send_guardian_welcome_sms"
-                               invisible="not create_guardian_portal_login"/>
+                <!-- ── Step 10: Summary ─────────────────────────────────── -->
+                <group string="Registration Summary" invisible="step != 'summary'">
+                    <div class="alert alert-success py-3 px-4" colspan="2" role="status">
+                        <h4><i class="fa fa-check-circle me-2" title="Success"/>Student Registered</h4>
+                        <p class="mb-1">
+                            <b><field name="student_name" readonly="1" nolabel="1"/></b>
+                            has been registered successfully.
+                        </p>
+                        <p class="mb-0 text-muted">
+                            You can register another student in this household or finish the onboarding.
+                        </p>
+                    </div>
+                    <group string="Students Registered So Far" colspan="2">
+                        <field name="students_created_ids" widget="many2many_tags"
+                               readonly="1" nolabel="1" colspan="2"/>
                     </group>
-                    <div class="alert alert-info"
-                         invisible="not create_new_household or role in ('both', 'parent') or not create_guardian_portal_login"
-                         role="alert">
-                        A portal account will also be created for the guardian
-                        <b><field name="new_guardian_name" readonly="1" nolabel="1"/></b>
-                        using their email as the login. Guardians can view household info,
-                        track their children's attendance, and manage billing online.
-                    </div>
-                    <div class="alert alert-warning"
-                         invisible="not create_new_household or role in ('both', 'parent') or create_guardian_portal_login"
-                         role="alert">
-                        No portal login will be created for the guardian. You can grant access
-                        later from the guardian's member profile.
-                    </div>
-
                 </group>
 
                 <!-- ── Footer navigation ────────────────────────────────── -->
                 <footer>
+                    <!-- Guardian contact with existing household → skip to students -->
+                    <button name="action_next" type="object"
+                            string="Continue to Students →"
+                            class="btn btn-primary"
+                            invisible="step != 'guardian_contact' or not use_existing_household"/>
+                    <!-- Guardian phase: Next (new guardian flow) -->
                     <button name="action_next" type="object" string="Next →"
                             class="btn btn-primary"
-                            invisible="step == 'portal_access'"/>
-                    <button name="action_confirm" type="object"
-                            string="Confirm &amp; Create Member"
+                            invisible="wizard_phase != 'guardian' or step in ('guardian_portal', 'payment') or use_existing_household"/>
+                    <!-- Guardian phase: Create Guardian &amp; Continue -->
+                    <button name="action_next" type="object"
+                            string="Create Guardian &amp; Continue to Students →"
                             class="btn btn-primary"
-                            invisible="step != 'portal_access'"/>
+                            invisible="step != 'guardian_portal'"/>
+
+                    <!-- Student phase: Next (not on student_portal or summary) -->
+                    <button name="action_next" type="object" string="Next →"
+                            class="btn btn-primary"
+                            invisible="wizard_phase != 'student' or step in ('student_portal', 'summary')"/>
+                    <!-- Student phase: Confirm Student (on student_portal step) -->
+                    <button name="action_confirm_student" type="object"
+                            string="Confirm &amp; Register Student"
+                            class="btn btn-primary"
+                            invisible="step != 'student_portal'"/>
+                    <!-- Summary: Add another -->
+                    <button name="action_add_another_student" type="object"
+                            string="Register Another Student"
+                            class="btn btn-primary"
+                            invisible="step != 'summary'"/>
+                    <!-- Summary: Finish -->
+                    <button name="action_finish" type="object"
+                            string="Finish Onboarding"
+                            class="btn btn-success"
+                            invisible="step != 'summary'"/>
+
+                    <!-- Back button (hidden on first step of each phase) -->
                     <button name="action_back" type="object" string="← Previous"
                             class="btn btn-secondary"
-                            invisible="step == 'member_info'"/>
+                            invisible="step in ('guardian_contact', 'summary')"/>
                     <button special="cancel" string="Cancel" class="btn btn-secondary"/>
                 </footer>
             </form>

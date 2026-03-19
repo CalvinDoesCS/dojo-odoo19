@@ -22,20 +22,6 @@
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
     </record>
 
-    <record id="rule_dojo_household_instructor_company" model="ir.rule">
-        <field name="name">Dojo Household Instructor Company</field>
-        <field name="model_id" ref="model_dojo_household"/>
-        <field name="groups" eval="[(4, ref('dojo_base.group_dojo_instructor'))]"/>
-        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
-    </record>
-
-    <record id="rule_dojo_guardian_instructor_company" model="ir.rule">
-        <field name="name">Dojo Guardian Instructor Company</field>
-        <field name="model_id" ref="model_dojo_guardian_link"/>
-        <field name="groups" eval="[(4, ref('dojo_base.group_dojo_instructor'))]"/>
-        <field name="domain_force">['|', ('household_id.company_id', '=', False), ('household_id.company_id', 'in', company_ids)]</field>
-    </record>
-
     <record id="rule_dojo_instructor_profile_instructor_company" model="ir.rule">
         <field name="name">Instructor Profile Company</field>
         <field name="model_id" ref="model_dojo_instructor_profile"/>
@@ -43,24 +29,19 @@
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
     </record>
 
+    <!-- Portal: member can see own record or records in their household -->
     <record id="rule_dojo_member_parent_self_or_household" model="ir.rule">
         <field name="name">Dojo Member Parent Self or Household</field>
         <field name="model_id" ref="model_dojo_member"/>
         <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
-        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('household_id.primary_guardian_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('partner_id.parent_id.primary_guardian_id', '=', user.partner_id.id)]</field>
     </record>
 
+    <!-- Portal: household partner visible to its primary guardian -->
     <record id="rule_dojo_household_parent_owner" model="ir.rule">
-        <field name="name">Dojo Household Parent Owner</field>
-        <field name="model_id" ref="model_dojo_household"/>
+        <field name="name">Dojo Household Partner Parent Owner</field>
+        <field name="model_id" ref="base.model_res_partner"/>
         <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
-        <field name="domain_force">[('primary_guardian_id.partner_id', '=', user.partner_id.id)]</field>
-    </record>
-
-    <record id="rule_dojo_guardian_parent_owner" model="ir.rule">
-        <field name="name">Dojo Guardian Parent Owner</field>
-        <field name="model_id" ref="model_dojo_guardian_link"/>
-        <field name="groups" eval="[(4, ref('dojo_base.group_dojo_parent_student'))]"/>
-        <field name="domain_force">[('household_id.primary_guardian_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="domain_force">['|', ('id', '=', user.partner_id.id), '|', ('is_household', '=', False), ('primary_guardian_id', '=', user.partner_id.id)]</field>
     </record>
 </odoo>

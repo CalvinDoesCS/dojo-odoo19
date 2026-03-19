@@ -60,9 +60,9 @@ class DojoSendMessageWizard(models.TransientModel):
         # Collect unique guardian partners
         partner_map = {}  # partner_id → res.partner record
         for member in self.member_ids:
-            household = member.household_id
-            if household and household.primary_guardian_id:
-                partner = household.primary_guardian_id.partner_id
+            household = member.partner_id.parent_id
+            if household.is_household and household.primary_guardian_id:
+                partner = household.primary_guardian_id
             else:
                 partner = member.partner_id
             if partner.id not in partner_map:

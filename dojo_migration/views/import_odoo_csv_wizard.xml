@@ -76,7 +76,7 @@
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
-        <field name="context">{'default_model_name': 'dojo.household'}</field>
+        <field name="context">{'default_model_name': 'res.partner'}</field>
     </record>
 
     <record id="action_import_odoo_csv_members" model="ir.actions.act_window">
@@ -92,15 +92,15 @@
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
-        <field name="context">{'default_model_name': 'dojo.household'}</field>
+        <field name="context">{'default_model_name': 'res.partner'}</field>
     </record>
 
     <record id="action_import_odoo_csv_guardian_links" model="ir.actions.act_window">
-        <field name="name">06. Import Guardian Links</field>
+        <field name="name">06. Import Guardian Partners</field>
         <field name="res_model">dojo.migration.import.odoo.csv</field>
         <field name="view_mode">form</field>
         <field name="target">main</field>
-        <field name="context">{'default_model_name': 'dojo.guardian.link'}</field>
+        <field name="context">{'default_model_name': 'res.partner'}</field>
     </record>
 
     <record id="action_import_odoo_csv_emergency_contacts" model="ir.actions.act_window">

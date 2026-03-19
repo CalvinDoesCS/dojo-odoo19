@@ -7,24 +7,17 @@ from odoo.exceptions import UserError
 class DojoOnboardingWizard(models.TransientModel):
     """Extends the onboarding wizard with an inline, blocking waiver-signing step.
 
-    This replaces the previous Odoo Enterprise ``sign`` workflow with a
-    Community-compatible approach:
-
-    1.  A ``waiver`` step is injected between ``subscription`` and
-        ``portal_access`` in the wizard step order.
-    2.  The member (or admin on their behalf) draws a signature on a canvas
-        widget (``widget="signature"``) and ticks a legal-authority checkbox.
-    3.  On ``action_confirm()`` the signature is written to the newly created
-        ``dojo.member``, a QWeb PDF is rendered with the full waiver text plus
-        the embedded signature image, and the PDF is attached to the member.
-    4.  Portal access is granted immediately — no daily cron required.
+    A ``waiver`` step is injected between ``subscription`` and
+    ``student_portal`` in the student registration phase.  Each student must
+    sign (or have a guardian sign on their behalf) before portal access is
+    granted.
     """
 
     _inherit = "dojo.onboarding.wizard"
 
     # ── Extra step ────────────────────────────────────────────────────────────
     step = fields.Selection(
-        selection_add=[("waiver", "6. Waiver")],
+        selection_add=[("waiver", "Waiver")],
         ondelete={"waiver": "set default"},
     )
 
@@ -39,15 +32,15 @@ class DojoOnboardingWizard(models.TransientModel):
     waiver_signed_by = fields.Char(
         string="Signing As",
         help=(
-            "Full name of the person signing.  Auto-filled from the member's name; "
-            "edit if a legal guardian is signing on behalf of the member."
+            "Full name of the person signing.  Auto-filled from the student's name; "
+            "edit if a legal guardian is signing on behalf of the student."
         ),
     )
     waiver_legal_authority = fields.Boolean(
         string=(
             "I confirm I have the legal authority to sign this waiver "
             "(on my own behalf, or as the legal guardian/representative of the "
-            "above member)"
+            "above student)"
         ),
         default=False,
     )
@@ -60,27 +53,21 @@ class DojoOnboardingWizard(models.TransientModel):
     # ── Step order ────────────────────────────────────────────────────────────
     # Defined as a @property so that, when dojo_onboarding_stripe is also
     # installed (detected via its sentinel field), the 'payment' step is
-    # automatically inserted between 'waiver' and 'portal_access'.
-    # This matters because dojo_sign is loaded *after* dojo_onboarding_stripe
-    # (both depend on dojo_onboarding; alphabetically s > o_s), so a static
-    # class attribute here would clobber the one set by dojo_onboarding_stripe.
+    # automatically included in the guardian phase (after guardian_portal).
+    # dojo_sign is loaded *after* dojo_onboarding_stripe (alphabetically
+    # s > o_s), so this property takes precedence.
     @property
     def _STEP_ORDER(self):
-        order = [
-            "member_info",
-            "household",
-            "guardian_setup",
-            "enrollment",
-            "auto_enroll",
-            "subscription",
-            "waiver",
-        ]
-        # Include the Stripe payment-capture step when dojo_onboarding_stripe
-        # is installed (it adds stripe_payment_method_id to the wizard fields).
-        if "stripe_payment_method_id" in self._fields:
-            order.append("payment")
-        order.append("portal_access")
-        return order
+        guardian_steps = list(self._GUARDIAN_STEPS)
+        student_steps = list(self._STUDENT_STEPS)
+        # Insert waiver after subscription
+        idx = student_steps.index('subscription') + 1
+        student_steps.insert(idx, 'waiver')
+        # Include the Stripe payment step in the guardian phase when
+        # dojo_onboarding_stripe is installed.
+        if 'stripe_payment_method_id' in self._fields:
+            guardian_steps.append('payment')
+        return guardian_steps + student_steps
 
     # ── Compute ───────────────────────────────────────────────────────────────
     def _compute_waiver_preview_html(self):
@@ -120,35 +107,36 @@ class DojoOnboardingWizard(models.TransientModel):
 
         # Auto-fill signed_by when the wizard lands on the waiver step
         if self.step == "waiver" and not self.waiver_signed_by:
-            self.waiver_signed_by = self.name
+            self.waiver_signed_by = self.student_name
 
         return result
 
-    # ── Confirm override ──────────────────────────────────────────────────────
-    def action_confirm(self):
-        """Create the member (via super), then write the signed waiver PDF."""
-        self.ensure_one()
-
-        # Ensure signed_by is set even if the user skipped back and re-confirmed
-        if not self.waiver_signed_by and self.name:
-            self.waiver_signed_by = self.name
-
-        result = super().action_confirm()
-
-        # Apply waiver data to the newly created member
-        member = self.created_member_id
+    # ── Student creation hook ─────────────────────────────────────────────────
+    def _create_student_member(self):
+        """Create the student via super, then apply the signed waiver."""
+        member = super()._create_student_member()
         if member and self.waiver_signature:
+            if not self.waiver_signed_by and self.student_name:
+                self.waiver_signed_by = self.student_name
             self._apply_waiver_to_member(member)
+        return member
 
-        return result
+    # ── Reset waiver fields between students ──────────────────────────────────
+    def _reset_student_fields(self):
+        super()._reset_student_fields()
+        self.write({
+            'waiver_signature': False,
+            'waiver_signed_by': False,
+            'waiver_legal_authority': False,
+        })
 
     # ── Waiver application helper ─────────────────────────────────────────────
     def _apply_waiver_to_member(self, member):
         """Write signature fields to *member* and generate/attach the signed PDF.
 
-        Called after ``super().action_confirm()`` has created the member record.
-        PDF generation failure is non-fatal: the signature data is already saved
-        on the member, so staff can regenerate the PDF manually if needed.
+        Called from ``_create_student_member()`` after the member record is
+        created.  PDF generation failure is non-fatal: the signature data is
+        already saved on the member, so staff can regenerate the PDF manually.
         """
         now = fields.Datetime.now()
         signed_by = self.waiver_signed_by or member.name

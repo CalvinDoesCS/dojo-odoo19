@@ -486,7 +486,7 @@ class MemberProfileCard extends Component {
                                             </div>
                                             <div class="k-hh__member-info">
                                                 <div class="k-hh__member-name" t-esc="hm.name"/>
-                                                <div class="k-hh__member-role" t-esc="hm.role || ''"/>
+                                                <div class="k-hh__member-role" t-esc="[hm.is_student &amp;&amp; 'Student', hm.is_guardian &amp;&amp; 'Guardian'].filter(x => x).join(' / ') || ''"/>
                                             </div>
                                         </div>
                                     </t>

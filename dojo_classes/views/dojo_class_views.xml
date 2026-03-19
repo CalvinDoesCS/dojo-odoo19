@@ -172,7 +172,6 @@
                             <field name="course_member_ids" widget="many2many">
                                 <list>
                                     <field name="name"/>
-                                    <field name="role"/>
                                     <field name="membership_state"/>
                                 </list>
                             </field>

@@ -68,8 +68,7 @@ env["dojo.member.rank"].search([]).unlink()
 env["dojo.belt.test.registration"].search([]).unlink()
 env["dojo.belt.test"].search([]).unlink()
 env["dojo.belt.rank"].search([]).unlink()
-env["dojo.guardian.link"].search([]).unlink()
-env["dojo.household"].search([]).unlink()
+# Households are now res.partner records — cleaned up via partner cascade
 demo_members = env["dojo.member"].search([("partner_id", "in", existing_partners.ids)])
 # Clear payment_transaction.token_id FKs to allow token deletion (RESTRICT constraint)
 if "payment.token" in env:
@@ -123,59 +122,61 @@ instr2 = env["dojo.instructor.profile"].create({
     "bio": "Assistant instructor specialising in advanced sparring and competition prep.",
 })
 
-# ── 2. Parents ────────────────────────────────────────────────────────────
+# ── 2. Parents (guardians — res.partner only, no dojo.member) ─────────────
 print("Creating parents...")
 p1_user = make_user("Mary Smith", "parent1@demo.com", [group_parent_student])
 p2_user = make_user("Bob Jones",  "parent2@demo.com", [group_parent_student])
-p1 = env["dojo.member"].create({
-    "partner_id": p1_user.partner_id.id, "role": "parent",
-    "membership_state": "active", "phone": "555-0101", "email": "parent1@demo.com",
-})
-p2 = env["dojo.member"].create({
-    "partner_id": p2_user.partner_id.id, "role": "parent",
-    "membership_state": "active", "phone": "555-0102", "email": "parent2@demo.com",
-})
+p1_partner = p1_user.partner_id
+p1_partner.write({"is_guardian": True, "phone": "555-0101"})
+p2_partner = p2_user.partner_id
+p2_partner.write({"is_guardian": True, "phone": "555-0102"})
 
 # ── 3. Students ───────────────────────────────────────────────────────────
 print("Creating students...")
 students_raw = [
-    ("Jordan Smith",  "student1@demo.com", "student", date(2014,  3, 15), "555-0111"),
-    ("Casey Smith",   "student2@demo.com", "student", date(2016,  7, 22), "555-0112"),
-    ("Taylor Jones",  "student3@demo.com", "student", date(2013, 11,  5), "555-0113"),
-    ("Morgan Jones",  "student4@demo.com", "student", date(2015,  4, 18), "555-0114"),
-    ("Riley Lee",     "student5@demo.com", "both",    date(2005,  8, 30), "555-0115"),
+    # (name, login, dob, phone, is_minor, is_guardian)
+    ("Jordan Smith",  "student1@demo.com", date(2014,  3, 15), "555-0111", True,  False),
+    ("Casey Smith",   "student2@demo.com", date(2016,  7, 22), "555-0112", True,  False),
+    ("Taylor Jones",  "student3@demo.com", date(2013, 11,  5), "555-0113", True,  False),
+    ("Morgan Jones",  "student4@demo.com", date(2015,  4, 18), "555-0114", True,  False),
+    ("Riley Lee",     "student5@demo.com", date(2005,  8, 30), "555-0115", False, True),
 ]
 student_members = []
-for name, login, role, dob, phone in students_raw:
+for name, login, dob, phone, is_minor, is_guardian in students_raw:
     u = make_user(name, login, [group_parent_student])
     m = env["dojo.member"].create({
-        "partner_id": u.partner_id.id, "role": role,
+        "partner_id": u.partner_id.id,
         "date_of_birth": dob, "membership_state": "active",
         "phone": phone, "email": login,
     })
+    u.partner_id.write({"is_minor": is_minor, "is_guardian": is_guardian})
     student_members.append(m)
 s1, s2, s3, s4, s5 = student_members
 
-# ── 4. Households & guardian links ───────────────────────────────────────
+# ── 4. Households (res.partner with is_household=True) ───────────────────
 print("Creating households...")
-smith_hh = env["dojo.household"].create({"name": "Smith Household"})
-for m in [p1, s1, s2]:
-    m.household_id = smith_hh
-smith_hh.primary_guardian_id = p1
-env["dojo.guardian.link"].create({"household_id": smith_hh.id, "guardian_member_id": p1.id, "student_member_id": s1.id, "relation": "mother", "is_primary": True})
-env["dojo.guardian.link"].create({"household_id": smith_hh.id, "guardian_member_id": p1.id, "student_member_id": s2.id, "relation": "mother", "is_primary": True})
+smith_hh = env["res.partner"].create({
+    "name": "Smith Household", "is_household": True, "is_company": True,
+    "primary_guardian_id": p1_partner.id,
+})
+for m in [s1, s2]:
+    m.partner_id.parent_id = smith_hh
+p1_partner.parent_id = smith_hh
 
-jones_hh = env["dojo.household"].create({"name": "Jones Household"})
-for m in [p2, s3, s4]:
-    m.household_id = jones_hh
-jones_hh.primary_guardian_id = p2
-env["dojo.guardian.link"].create({"household_id": jones_hh.id, "guardian_member_id": p2.id, "student_member_id": s3.id, "relation": "father", "is_primary": True})
-env["dojo.guardian.link"].create({"household_id": jones_hh.id, "guardian_member_id": p2.id, "student_member_id": s4.id, "relation": "father", "is_primary": True})
+jones_hh = env["res.partner"].create({
+    "name": "Jones Household", "is_household": True, "is_company": True,
+    "primary_guardian_id": p2_partner.id,
+})
+for m in [s3, s4]:
+    m.partner_id.parent_id = jones_hh
+p2_partner.parent_id = jones_hh
 
 # Riley Lee — solo household (every member needs one for billing)
-lee_hh = env["dojo.household"].create({"name": "Lee Household"})
-s5.household_id = lee_hh
-lee_hh.primary_guardian_id = s5
+lee_hh = env["res.partner"].create({
+    "name": "Lee Household", "is_household": True, "is_company": True,
+    "primary_guardian_id": s5.partner_id.id,
+})
+s5.partner_id.parent_id = lee_hh
 
 # ── 5. Belt ranks ─────────────────────────────────────────────────────────
 print("Creating belt ranks...")
@@ -448,14 +449,14 @@ for _cycle_num, (_inv_date, _paid) in enumerate(_billing_cycles):
         _inv_lines(plan_kids, _inv_date, include_fee=_is_first)  # s1 lines
         + _inv_lines(plan_kids, _inv_date, include_fee=False)    # s2 lines
     )
-    _make_inv(p1.partner_id, [sub_s1, sub_s2], _smith_lines, _inv_date, _paid)
+    _make_inv(p1_partner, [sub_s1, sub_s2], _smith_lines, _inv_date, _paid)
 
     # Jones Household: Bob Jones billed for Taylor (s3) + Morgan (s4)
     _jones_lines = (
         _inv_lines(plan_kids, _inv_date, include_fee=_is_first)  # s3 lines
         + _inv_lines(plan_kids, _inv_date, include_fee=False)    # s4 lines
     )
-    _make_inv(p2.partner_id, [sub_s3, sub_s4], _jones_lines, _inv_date, _paid)
+    _make_inv(p2_partner, [sub_s3, sub_s4], _jones_lines, _inv_date, _paid)
 
     # Riley Lee: standalone (Adult BJJ)
     _riley_lines = _inv_lines(plan_adult, _inv_date, include_fee=_is_first)

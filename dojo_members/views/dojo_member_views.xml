@@ -8,14 +8,10 @@
 
     <record id="action_dojo_households" model="ir.actions.act_window">
         <field name="name">Households</field>
-        <field name="res_model">dojo.household</field>
+        <field name="res_model">res.partner</field>
         <field name="view_mode">list,form</field>
-    </record>
-
-    <record id="action_dojo_guardian_links" model="ir.actions.act_window">
-        <field name="name">Guardian Links</field>
-        <field name="res_model">dojo.guardian.link</field>
-        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_household', '=', True)]</field>
+        <field name="context">{'default_is_household': True, 'default_is_company': True}</field>
     </record>
 
     <record id="action_dojo_emergency_contacts" model="ir.actions.act_window">
@@ -45,18 +41,11 @@
         sequence="20"
     />
     <menuitem
-        id="menu_dojo_guardian_links"
-        name="Guardian Links"
-        parent="menu_dojo_members_root"
-        action="action_dojo_guardian_links"
-        sequence="30"
-    />
-    <menuitem
         id="menu_dojo_emergency_contacts"
         name="Emergency Contacts"
         parent="menu_dojo_members_root"
         action="action_dojo_emergency_contacts"
-        sequence="40"
+        sequence="30"
     />
 
     <record id="view_dojo_member_form_inherit_member_number" model="ir.ui.view">

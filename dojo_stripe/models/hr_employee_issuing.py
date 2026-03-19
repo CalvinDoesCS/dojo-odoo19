@@ -39,26 +39,11 @@ class HrEmployeeIssuing(models.Model):
     )
 
     # ── Internal helper ────────────────────────────────────────────────────
-    @staticmethod
-    def _read_docker_secret(name):
-        """Read a Docker secrets file at /run/secrets/<name>.
-
-        Returns the stripped file content, or an empty string if the file
-        does not exist (e.g. outside Docker or secret not mounted).
-        """
-        import os
-        try:
-            with open(f'/run/secrets/{name}', 'r') as fh:
-                return fh.read().strip()
-        except (IOError, OSError):
-            return ''
-
     def _get_stripe_api(self):
         """Return (stripe_module, secret_key). Never sets the global api_key.
 
-        Key resolution order:
-          1. Docker secret file  /run/secrets/stripe_secret_key
-          2. Odoo system parameter  stripe.secret_key  (fallback / dev)
+        Reads the secret key from the Stripe payment provider configured in
+        Invoicing → Configuration → Payment Providers → Stripe.
         """
         try:
             import stripe as stripe_lib
@@ -67,16 +52,16 @@ class HrEmployeeIssuing(models.Model):
                 'The stripe Python package is not installed. '
                 'Add "stripe" to requirements.txt and rebuild the container.'
             ))
-        secret_key = self._read_docker_secret('stripe_secret_key')
-        if not secret_key:
-            ICP = self.env['ir.config_parameter'].sudo()
-            secret_key = ICP.get_param('stripe.secret_key', '')
+        provider = self.env['payment.provider'].sudo().search(
+            [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
+            limit=1,
+        )
+        secret_key = provider.stripe_secret_key if provider else ''
         if not secret_key:
             raise UserError(_(
                 'Stripe secret key is not configured. '
-                'Add it to the stripe_secret_key Docker secret file, or go to '
-                'Settings → Technical → System Parameters and set '
-                '"stripe.secret_key".'
+                'Go to Invoicing → Configuration → Payment Providers → Stripe '
+                'and enter your secret key.'
             ))
         return stripe_lib, secret_key
 
@@ -141,15 +126,18 @@ class HrEmployeeIssuing(models.Model):
             raise UserError(_('No Stripe card exists for this employee yet.'))
         stripe, api_key = self._get_stripe_api()
         eph = stripe.EphemeralKey.create(
-            {'issuing_card': self.stripe_card_id},
+            issuing_card=self.stripe_card_id,
             stripe_version='2024-06-20',
             api_key=api_key,
         )
-        ICP = self.env['ir.config_parameter'].sudo()
+        provider = self.env['payment.provider'].sudo().search(
+            [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
+            limit=1,
+        )
         return {
             'ephemeral_key_secret': eph['secret'],
             'stripe_card_id': self.stripe_card_id,
-            'publishable_key': ICP.get_param('stripe.publishable_key', ''),
+            'publishable_key': provider.stripe_publishable_key if provider else '',
         }
 
     def action_issue_card_button(self):
@@ -167,5 +155,55 @@ class HrEmployeeIssuing(models.Model):
                 ) % (self.issuing_card_last4 or ''),
                 'type': 'success',
                 'sticky': False,
+            },
+        }
+
+    def action_reveal_card_details(self):
+        """Open the Stripe Issuing Elements card reveal dialog.
+
+        Returns an ir.actions.client that triggers the JS-side reveal flow.
+        The JS uses the /dojo/stripe/issuing/reveal endpoint to securely
+        render the full card number, CVC, and expiry via Stripe Elements.
+        """
+        self.ensure_one()
+        if not self.stripe_card_id:
+            raise UserError(_('No Stripe Issuing card exists for this employee.'))
+
+        provider = self.env['payment.provider'].sudo().search(
+            [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
+            limit=1,
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'dojo_stripe_issuing_reveal',
+            'params': {
+                'employee_id': self.id,
+                'stripe_card_id': self.stripe_card_id,
+                'publishable_key': provider.stripe_publishable_key if provider else '',
+                'card_brand': self.issuing_card_brand or '',
+                'card_last4': self.issuing_card_last4 or '',
+                'card_expiry': self.issuing_card_expiry or '',
+            },
+        }
+
+    def action_add_to_wallet(self):
+        """Start the Apple Pay / Google Pay push provisioning flow.
+
+        Returns an ir.actions.client that triggers the JS-side wallet
+        provisioning using the ephemeral key from action_get_wallet_ephemeral_key.
+        """
+        self.ensure_one()
+        if not self.stripe_card_id:
+            raise UserError(_('No Stripe Issuing card exists for this employee.'))
+
+        data = self.action_get_wallet_ephemeral_key()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'dojo_stripe_issuing_wallet',
+            'params': {
+                'employee_id': self.id,
+                'ephemeral_key_secret': data['ephemeral_key_secret'],
+                'stripe_card_id': data['stripe_card_id'],
+                'publishable_key': data['publishable_key'],
             },
         }

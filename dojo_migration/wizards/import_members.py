@@ -10,7 +10,7 @@ Expected CSV columns (case-insensitive after strip):
   mobile
   date_of_birth      — YYYY-MM-DD or MM/DD/YYYY
   role               — student | parent | both  (default: student)
-  family_account     — shared value groups members into one dojo.household
+  family_account     — shared value groups members into one household (res.partner)
   membership_state   — lead | trial | active | paused | cancelled
   member_number      — SparkMembership external ID (stored as billing_reference)
   emergency_contact_name
@@ -132,15 +132,14 @@ class DojoMigrationImportMembers(models.TransientModel):
         success = skip = error = 0
 
         Member = self.env["dojo.member"]
-        Household = self.env["dojo.household"]
-        GuardianLink = self.env["dojo.guardian.link"]
+        Partner = self.env["res.partner"]
         Emergency = self.env["dojo.emergency.contact"]
 
         # ── Group rows by family_account for household creation ────────────
         # We process households in two passes:
         #   Pass 1: resolve/create all dojo.member records
         #   Pass 2: link members to households (to handle forward references)
-        household_map = {}   # family_account_name → dojo.household record
+        household_map = {}   # family_account_name → res.partner (household) record
         member_results = {}  # row_index → {"member": record, "row": row_dict}
 
         for idx, row in enumerate(rows, start=2):
@@ -152,39 +151,55 @@ class DojoMigrationImportMembers(models.TransientModel):
 
                 email = (row.get("email") or "").strip().lower() or None
 
-                # Dedup check
-                existing = None
+                # Dedup check — search dojo.member first, then res.partner for parent-only
+                existing_member = None
+                existing_partner = None
                 if email:
-                    existing = Member.search([("email", "=", email)], limit=1)
-                if not existing and full_name:
+                    existing_member = Member.search([("email", "=", email)], limit=1)
+                    if not existing_member:
+                        existing_partner = Partner.search([("email", "=", email)], limit=1)
+                if not existing_member and not existing_partner and full_name:
                     dob = _parse_date(row.get("date_of_birth"))
                     if dob:
-                        existing = Member.search([
+                        existing_member = Member.search([
                             ("name", "=ilike", full_name),
                             ("date_of_birth", "=", dob),
                         ], limit=1)
 
-                if existing:
+                if existing_member or existing_partner:
+                    eid = existing_member.id if existing_member else existing_partner.id
+                    etype = "Member" if existing_member else "Partner"
                     log_lines.append((0, 0, {
                         "row_number": idx,
                         "status": "skip",
-                        "message": f"Member '{full_name}' already exists (id={existing.id})",
+                        "message": f"{etype} '{full_name}' already exists (id={eid})",
                         "raw_data": raw,
                     }))
                     skip += 1
-                    member_results[idx] = {"member": existing, "row": row, "skipped": True}
+                    member_results[idx] = {
+                        "member": existing_member,
+                        "partner": existing_member.partner_id if existing_member else existing_partner,
+                        "row": row, "skipped": True,
+                    }
                     continue
 
-                # Determine role
+                # Determine role flags
                 role_raw = (row.get("role") or "student").strip().lower()
-                role = role_raw if role_raw in ("student", "parent", "both") else "student"
+                if role_raw not in ("student", "parent", "both"):
+                    role_raw = "student"
+                is_student = role_raw in ("student", "both")
+                is_guardian = role_raw in ("parent", "both")
 
                 # Membership state
                 ms_raw = (row.get("membership_state") or "").strip().lower()
                 valid_states = ("lead", "trial", "active", "paused", "cancelled")
                 membership_state = ms_raw if ms_raw in valid_states else "lead"
 
-                partner_vals = {"name": full_name}
+                partner_vals = {
+                    "name": full_name,
+                    "is_student": is_student,
+                    "is_guardian": is_guardian,
+                }
                 if email:
                     partner_vals["email"] = email
                 phone = (row.get("phone") or "").strip()
@@ -194,27 +209,35 @@ class DojoMigrationImportMembers(models.TransientModel):
                 if mobile:
                     partner_vals["mobile"] = mobile
 
+                dob = _parse_date(row.get("date_of_birth"))
+                if dob:
+                    today = date.today()
+                    age = (today - dob).days // 365
+                    if age < 18:
+                        partner_vals["is_minor"] = True
+
                 member_vals = {
-                    "role": role,
                     "membership_state": membership_state,
                 }
-                dob = _parse_date(row.get("date_of_birth"))
                 if dob:
                     member_vals["date_of_birth"] = dob
 
-                member = Member.create({**partner_vals, **member_vals})
+                # Parent-only role: create res.partner without dojo.member
+                if role_raw == "parent":
+                    partner = Partner.create(partner_vals)
+                    member = None
+                else:
+                    member = Member.create({**partner_vals, **member_vals})
+                    partner = member.partner_id
 
                 # Store billing_reference (member_number from Spark)
                 member_num = (row.get("member_number") or "").strip()
                 if member_num:
-                    # billing_reference lives on dojo.member.subscription; we store it
-                    # as an external ref note on the member for reference during sub import.
-                    # We add it to the member's comment field for traceability.
-                    member.comment = f"SparkMembership ID: {member_num}"
+                    partner.comment = f"SparkMembership ID: {member_num}"
 
                 # Emergency contact
                 ec_name = (row.get("emergency_contact_name") or "").strip()
-                if ec_name:
+                if ec_name and member:
                     Emergency.create({
                         "member_id": member.id,
                         "name": ec_name,
@@ -224,14 +247,18 @@ class DojoMigrationImportMembers(models.TransientModel):
                         "is_primary": True,
                     })
 
+                entity_label = "member" if member else "guardian partner"
                 log_lines.append((0, 0, {
                     "row_number": idx,
                     "status": "success",
-                    "message": f"Created member '{full_name}'",
+                    "message": f"Created {entity_label} '{full_name}'",
                     "raw_data": raw,
                 }))
                 success += 1
-                member_results[idx] = {"member": member, "row": row, "skipped": False}
+                member_results[idx] = {
+                    "member": member, "partner": partner,
+                    "row": row, "skipped": False,
+                }
 
             except Exception as exc:
                 log_lines.append((0, 0, {
@@ -253,9 +280,16 @@ class DojoMigrationImportMembers(models.TransientModel):
 
         for fa_name, group in family_groups.items():
             try:
-                household = Household.search([("name", "=ilike", fa_name)], limit=1)
+                household = Partner.search([
+                    ("name", "=ilike", fa_name),
+                    ("is_household", "=", True),
+                ], limit=1)
                 if not household:
-                    household = Household.create({"name": fa_name})
+                    household = Partner.create({
+                        "name": fa_name,
+                        "is_household": True,
+                        "is_company": True,
+                    })
                     household_map[fa_name] = household
 
                 # Find primary guardian: first parent/both in group
@@ -263,35 +297,17 @@ class DojoMigrationImportMembers(models.TransientModel):
                     g for g in group
                     if (g["row"].get("role") or "student").strip().lower() in ("parent", "both")
                 ]
-                students = [
-                    g for g in group
-                    if (g["row"].get("role") or "student").strip().lower() in ("student", "both")
-                ]
 
-                primary_guardian = parents[0]["member"] if parents else None
-                if primary_guardian and not household.primary_guardian_id:
-                    household.primary_guardian_id = primary_guardian
+                primary_guardian_partner = parents[0]["partner"] if parents else None
+                if primary_guardian_partner and not household.primary_guardian_id:
+                    household.primary_guardian_id = primary_guardian_partner
 
-                # Assign all members to household
+                # Assign all partners to household via parent_id
                 for g in group:
-                    if not g["member"].household_id:
-                        g["member"].household_id = household
+                    partner = g["partner"]
+                    if not partner.parent_id:
+                        partner.parent_id = household
 
-                # Create guardian links: each parent ↔ each student
-                for parent_g in parents:
-                    for student_g in students:
-                        existing_link = GuardianLink.search([
-                            ("guardian_member_id", "=", parent_g["member"].id),
-                            ("student_member_id", "=", student_g["member"].id),
-                        ], limit=1)
-                        if not existing_link:
-                            role_raw = (parent_g["row"].get("role") or "parent").strip().lower()
-                            GuardianLink.create({
-                                "household_id": household.id,
-                                "guardian_member_id": parent_g["member"].id,
-                                "student_member_id": student_g["member"].id,
-                                "relation": "guardian",
-                            })
             except Exception as exc:
                 _logger.warning(
                     "Household linking failed for family_account='%s': %s", fa_name, exc

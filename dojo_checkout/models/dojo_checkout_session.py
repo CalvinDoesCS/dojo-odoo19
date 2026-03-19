@@ -153,7 +153,7 @@ class DojoCheckoutSession(models.Model):
                     p.sudo().write(wv)
             return p
 
-        def _find_or_create_member(partner, role, dob=None):
+        def _find_or_create_member(partner, dob=None):
             m = env["dojo.member"].sudo().search(
                 [("partner_id", "=", partner.id)], limit=1
             )
@@ -161,7 +161,6 @@ class DojoCheckoutSession(models.Model):
                 return m
             return env["dojo.member"].sudo().create({
                 "partner_id": partner.id,
-                "role": role,
                 "date_of_birth": dob or False,
                 "membership_state": "lead",
             })
@@ -297,7 +296,16 @@ class DojoCheckoutSession(models.Model):
             partner = _find_or_create_partner(
                 self.member_name, self.member_email, self.member_phone
             )
-            member = _find_or_create_member(partner, "student", self.date_of_birth)
+            member = _find_or_create_member(partner, self.date_of_birth)
+            # Create a solo household for consistency
+            household = env["res.partner"].sudo().create({
+                "name": f"{self.member_name}'s Household",
+                "is_household": True,
+                "is_company": True,
+                "primary_guardian_id": partner.id,
+                "company_id": env.company.id,
+            })
+            partner.sudo().write({"parent_id": household.id, "is_student": True})
             subscription = _create_subscription(member.id)
             member.sudo().action_set_active()
             _auto_enroll(member)
@@ -314,49 +322,46 @@ class DojoCheckoutSession(models.Model):
         #  FAMILY PATH — parent + child, household, subscription on child
         # ════════════════════════════════════════════════════════════════
 
-        # 1. Parent partner + member
+        # 1. Parent partner (guardian, optionally also trains)
         parent_partner = _find_or_create_partner(
             self.member_name, self.member_email, self.member_phone
         )
-        parent_role = "both" if self.parent_also_trains else "parent"
-        parent_member = _find_or_create_member(parent_partner, parent_role, self.date_of_birth)
+        parent_partner.sudo().write({"is_guardian": True})
+        if self.parent_also_trains:
+            parent_partner.sudo().write({"is_student": True})
+        # Always create a dojo.member for the parent so they can access
+        # the portal to manage their students.
+        parent_member = _find_or_create_member(parent_partner, self.date_of_birth)
 
         # 2. Child partner + member
         child_display_name = self.child_name or f"{self.member_name}'s Child"
         child_partner = _find_or_create_partner(
             child_display_name, self.child_email or None, self.child_phone or None
         )
-        child_member = _find_or_create_member(child_partner, "student", self.child_dob)
+        child_partner.sudo().write({"is_student": True})
+        child_member = _find_or_create_member(child_partner, self.child_dob)
 
         # 3. Household — reuse existing if both already share one, else create
-        household = parent_member.household_id or child_member.household_id
+        household = parent_partner.parent_id if parent_partner.parent_id.is_household else (
+            child_partner.parent_id if child_partner.parent_id.is_household else
+            env["res.partner"].browse()
+        )
         if not household:
             last_name = (self.member_name or "").split()[-1] if self.member_name else "Family"
-            household = env["dojo.household"].sudo().create({
+            household = env["res.partner"].sudo().create({
                 "name": f"{last_name} Household",
+                "is_household": True,
+                "is_company": True,
                 "company_id": env.company.id,
             })
-        if not parent_member.household_id:
-            parent_member.sudo().write({"household_id": household.id})
-        if not child_member.household_id:
-            child_member.sudo().write({"household_id": household.id})
+        if not parent_partner.parent_id:
+            parent_partner.sudo().write({"parent_id": household.id})
+        if not child_partner.parent_id:
+            child_partner.sudo().write({"parent_id": household.id})
         if not household.primary_guardian_id:
-            household.sudo().write({"primary_guardian_id": parent_member.id})
+            household.sudo().write({"primary_guardian_id": parent_partner.id})
 
-        # 4. Guardian link (skip if it already exists)
-        existing_link = env["dojo.guardian.link"].sudo().search([
-            ("household_id", "=", household.id),
-            ("guardian_member_id", "=", parent_member.id),
-            ("student_member_id", "=", child_member.id),
-        ], limit=1)
-        if not existing_link:
-            env["dojo.guardian.link"].sudo().create({
-                "household_id": household.id,
-                "guardian_member_id": parent_member.id,
-                "student_member_id": child_member.id,
-                "relation": "guardian",
-                "is_primary": True,
-            })
+        # (Guardian relationship implicit via shared parent_id — no link needed)
 
         # 5. Subscription, activation, and auto-enroll — all on the CHILD
         subscription = _create_subscription(child_member.id)
@@ -367,18 +372,23 @@ class DojoCheckoutSession(models.Model):
         _build_invoice(parent_partner, subscription)
 
         # 7. Portal access: parent always; child only if opted-in and has email
-        _grant_portal(parent_member)
+        try:
+            parent_partner.sudo()._grant_portal_access_credentials()
+        except Exception:
+            _logger.warning(
+                "Checkout: portal access failed for partner %s", parent_partner.id, exc_info=True
+            )
         if self.child_portal_access and self.child_email:
             _grant_portal(child_member)
 
         # 8. Finalize
         self.sudo().write({
-            "resulting_member_id": parent_member.id,
+            "resulting_member_id": parent_member.id if parent_member else False,
             "resulting_child_member_id": child_member.id,
             "resulting_subscription_id": subscription.id,
             "state": "completed",
         })
-        return parent_member
+        return parent_member or child_member
 
     # ── Cleanup cron ──────────────────────────────────────────────────────
     @api.model
