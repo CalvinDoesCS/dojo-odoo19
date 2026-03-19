@@ -11,19 +11,26 @@ Leverages Model.load() internally, which handles all external ID
 tracking and creation in ir.model.data automatically.
 
 Covered CSV files (import in order):
+  01_dojo_belt_rank.csv           → model: dojo.belt.rank
   02_res_partner.csv              → model: res.partner
-  03_res_partner_household.csv    → model: res.partner  (is_household=True)
-  04_dojo_member.csv              → model: dojo.member
-  05_res_partner_household_update.csv → model: res.partner  (household guardian update)
-  07_dojo_emergency_contact.csv   → model: dojo.emergency.contact
-  08_dojo_member_rank.csv         → model: dojo.member.rank
-  10_dojo_program.csv             → model: dojo.program
-  10_dojo_subscription_plan.csv   → model: dojo.subscription.plan
-  11_dojo_class_template.csv      → model: dojo.class.template
-  12_dojo_subscription_plan.csv   → model: dojo.subscription.plan
-                                     (remap: template_ids → allowed_template_ids)
-  13_dojo_member_subscription.csv → model: dojo.member.subscription
+                                     (remap: household_id → parent_id)
+  03_dojo_member.csv              → model: dojo.member
+                                     (skip: current_rank_id, current_stripe_count)
+  04_dojo_household.csv           → model: res.partner  (is_household=True injected)
+  05_dojo_emergency_contact.csv   → model: dojo.emergency.contact
+  06_dojo_member_rank.csv         → model: dojo.member.rank
+  07_dojo_program.csv             → model: dojo.program
+  08_dojo_class_template.csv      → model: dojo.class.template
+  09_dojo_subscription_plan.csv   → model: dojo.subscription.plan
+                                     (remap: template_ids → allowed_template_ids,
+                                      value: plan_type recurring → program)
+  10_dojo_member_subscription.csv → model: dojo.member.subscription
                                      (skip: program_id — readonly related field)
+
+Import order note for households:
+  - Run 02_res_partner.csv first (creates all student/guardian partners).
+  - Run 04_dojo_household.csv second (creates household records, references guardians).
+  - Re-run 02_res_partner.csv to update partner→household links via parent_id.
 """
 import base64
 import csv
@@ -36,20 +43,24 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 MODEL_CHOICES = [
-    ("res.partner", "02 / 03 / 05. Partners & Households (res.partner)"),
-    ("dojo.member", "04. Members (dojo.member)"),
-    ("dojo.emergency.contact", "07. Emergency Contacts (dojo.emergency.contact)"),
-    ("dojo.member.rank", "08. Member Belt Ranks (dojo.member.rank)"),
-    ("dojo.program", "10. Programs (dojo.program)"),
-    ("dojo.class.template", "11. Class Templates (dojo.class.template)"),
-    ("dojo.subscription.plan", "12. Subscription Plans (dojo.subscription.plan)"),
-    ("dojo.member.subscription", "13. Member Subscriptions (dojo.member.subscription)"),
+    ("dojo.belt.rank",          "01. Belt Ranks (dojo.belt.rank)"),
+    ("res.partner",             "02. Partners – Students & Guardians (res.partner)"),
+    ("dojo.member",             "03. Members (dojo.member)"),
+    ("res.partner+household",   "04. Household Partners (res.partner, is_household=True)"),
+    ("dojo.emergency.contact",  "05. Emergency Contacts (dojo.emergency.contact)"),
+    ("dojo.member.rank",        "06. Member Belt Ranks (dojo.member.rank)"),
+    ("dojo.program",            "07. Programs (dojo.program)"),
+    ("dojo.class.template",     "08. Class Templates (dojo.class.template)"),
+    ("dojo.subscription.plan",  "09. Subscription Plans (dojo.subscription.plan)"),
+    ("dojo.member.subscription","10. Member Subscriptions (dojo.member.subscription)"),
 ]
 
 # Map model name → migration log import_type
 MODEL_IMPORT_TYPE = {
+    "dojo.belt.rank":           "belt_rank_defs",
     "res.partner":              "partners",
     "dojo.member":              "members",
+    "res.partner+household":    "partners",
     "dojo.emergency.contact":   "emergency_contacts",
     "dojo.member.rank":         "ranks",
     "dojo.program":             "programs",
@@ -58,9 +69,28 @@ MODEL_IMPORT_TYPE = {
     "dojo.member.subscription": "member_subscriptions",
 }
 
+# Virtual model names → real Odoo model names (for pseudo-choices)
+MODEL_REAL_NAME = {
+    "res.partner+household": "res.partner",
+}
+
+# Per-model constant column values to inject before import
+MODEL_INJECT_COLUMNS = {
+    # 04_dojo_household.csv doesn't include is_household;  inject it here
+    "res.partner+household": {"is_household": "True"},
+}
+
 # Remap CSV column prefixes → actual Odoo field names (per model)
 MODEL_FIELD_REMAP = {
-    # CSV 12 uses 'template_ids/id' but the field is 'allowed_template_ids'
+    # 02_res_partner.csv uses 'household_id/id' but the field is 'parent_id'
+    "res.partner": {
+        "household_id": "parent_id",
+    },
+    # 04_dojo_household.csv inherits the same partner remap
+    "res.partner+household": {
+        "household_id": "parent_id",
+    },
+    # 09_dojo_subscription_plan.csv uses 'template_ids/id' but the field is 'allowed_template_ids'
     "dojo.subscription.plan": {
         "template_ids": "allowed_template_ids",
     },
@@ -70,9 +100,10 @@ MODEL_FIELD_REMAP = {
 MODEL_SKIP_COLUMNS = {
     # 'program_id' on dojo.member.subscription is a readonly related field
     "dojo.member.subscription": {"program_id"},
-    # 'current_rank_id' on dojo.member is a stored computed field (recomputes
-    # automatically after belt rank history is imported in step 08)
-    "dojo.member": {"current_rank_id"},
+    # 'current_rank_id' and 'current_stripe_count' on dojo.member are stored
+    # computed fields that recompute automatically after belt rank history is
+    # imported in step 06
+    "dojo.member": {"current_rank_id", "current_stripe_count"},
 }
 
 # Per-model, per-field value substitutions applied before load()
@@ -127,12 +158,15 @@ class DojoMigrationImportOdooCsv(models.TransientModel):
         if not data:
             raise UserError("CSV contains no data rows.")
 
+        # Pre-process: inject constant columns (e.g. is_household=True)
+        headers, data = self._inject_default_columns(headers, data)
         # Pre-process: resolve field/name columns to field/.id
         headers, data = self._resolve_name_columns(headers, data)
         # Pre-process: remap column names and drop readonly/computed columns
         headers, data = self._remap_and_skip_columns(headers, data)
 
-        Model = self.env[self.model_name].with_context(
+        real_model = MODEL_REAL_NAME.get(self.model_name, self.model_name)
+        Model = self.env[real_model].with_context(
             tracking_disable=True,
             import_compat=True,
         )
@@ -222,6 +256,17 @@ class DojoMigrationImportOdooCsv(models.TransientModel):
         data = [row for row in rows[1:] if any(cell.strip() for cell in row)]
         return headers, data
 
+    def _inject_default_columns(self, headers, data):
+        """Append constant-value columns for this model choice before import."""
+        inject = MODEL_INJECT_COLUMNS.get(self.model_name, {})
+        if not inject:
+            return headers, data
+        extra_headers = list(inject.keys())
+        extra_values = list(inject.values())
+        new_headers = list(headers) + extra_headers
+        new_data = [list(row) + extra_values for row in data]
+        return new_headers, new_data
+
     def _resolve_name_columns(self, headers, data):
         """
         Resolve any 'field/subfield' column (where subfield is NOT 'id' or
@@ -239,10 +284,11 @@ class DojoMigrationImportOdooCsv(models.TransientModel):
         (database ID). Any other field/subfield causes "Can not create
         Many-To-One records indirectly" errors.
         """
-        if not self.model_name or self.model_name not in self.env:
+        real_model = MODEL_REAL_NAME.get(self.model_name, self.model_name)
+        if not real_model or real_model not in self.env:
             return headers, data
 
-        ModelClass = self.env[self.model_name]
+        ModelClass = self.env[real_model]
         new_headers = list(headers)
         # col_index → (db_id_header, related_model_name, lookup_field)
         converters = {}
