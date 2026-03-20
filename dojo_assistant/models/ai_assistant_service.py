@@ -66,6 +66,256 @@ _KNOWN_INTENT_TYPES = {
     "social_post_create", "social_post_schedule",
 }
 
+# ─── Intent Handler Configuration (for generic read handler) ──────────────────
+# Maps intent_type → handler config for read-only operations
+# Structure: {
+#     "model": "model_name",
+#     "domain_builder": "method_name" | static domain list,
+#     "fields": [list of field names to return],
+#     "limit": max records,
+#     "limit_from_params": "parameter_name" (optional, if limit comes from intent params)
+# }
+_INTENT_HANDLER_CONFIG = {
+    "member_lookup": {
+        "model": "dojo.member",
+        "domain_builder": "_domain_member_lookup",
+        "fields": ["id", "name", "email", "phone", "current_rank_id", "membership_state"],
+        "limit": 5,
+    },
+    "class_list": {
+        "model": "dojo.class.session",
+        "domain_builder": "_domain_class_list",
+        "fields": ["id", "template_id", "start_datetime", "capacity", "state", "seats_taken"],
+        "limit": 20,
+    },
+    "belt_lookup": {
+        "model": "dojo.belt.rank",
+        "domain": [("active", "=", True)],
+        "fields": ["id", "name", "sequence"],
+        "limit": 15,
+    },
+    "subscription_lookup": {
+        "model": "dojo.subscription",
+        "domain_builder": "_domain_subscription_lookup",
+        "fields": ["id", "member_id", "plan_id", "state", "start_date", "end_date"],
+        "limit": 1,
+    },
+    "attendance_history": {
+        "model": "dojo.attendance.log",
+        "domain_builder": "_domain_attendance_history",
+        "fields": ["id", "member_id", "checkin_datetime", "checkout_datetime", "session_id"],
+        "limit": 10,
+        "limit_from_params": "limit",
+    },
+    "schedule_today": {
+        "model": "dojo.class.session",
+        "domain_builder": "_domain_schedule_today",
+        "fields": ["id", "template_id", "start_datetime", "capacity", "state", "seats_taken"],
+        "limit": 20,
+    },
+}
+
+# ─── CRUD Handler Configuration (for generic create/update/delete) ──────────────
+# Maps intent_type → CRUD config for mutating operations
+# Structure: {
+#     "model": "model_name",
+#     "operation": "create" | "update" | "delete",
+#     "fields": {
+#         "field_name": {
+#             "type": "char|many2one|datetime|...",
+#             "required": True|False,
+#             "resolver": "method_name" | None (for field lookups),
+#         }
+#     },
+#     "target_domain_builder": "_domain_method" (for update/delete targeting),
+#     "allow_undo": True|False,
+# }
+_CRUD_HANDLER_CONFIG = {
+    "member_create": {
+        "model": "dojo.member",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "email": {"required": False, "type": "char"},
+            "phone": {"required": False, "type": "char"},
+            "role": {"required": False, "type": "selection", "default": "student"},
+            "membership_state": {"required": False, "type": "selection", "default": "pending"},
+        },
+        "allow_undo": True,
+    },
+    "member_update": {
+        "model": "dojo.member",
+        "operation": "update",
+        "target_domain_builder": "_domain_crud_member",
+        "fields": {
+            "name": {"required": False, "type": "char"},
+            "email": {"required": False, "type": "char"},
+            "phone": {"required": False, "type": "char"},
+            "role": {"required": False, "type": "selection"},
+        },
+        "allow_undo": True,
+    },
+    "class_create": {
+        "model": "dojo.class.session",
+        "operation": "create",
+        "fields": {
+            "template_id": {"required": True, "type": "many2one", "resolver": "_resolve_class_template"},
+            "start_datetime": {"required": True, "type": "datetime"},
+            "state": {"required": False, "type": "selection", "default": "scheduled"},
+        },
+        "allow_undo": True,
+    },
+    "class_cancel": {
+        "model": "dojo.class.session",
+        "operation": "delete",
+        "target_domain_builder": "_domain_crud_session",
+        "allow_undo": True,
+    },
+    "subscription_create": {
+        "model": "dojo.subscription",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "plan_id": {"required": True, "type": "many2one", "resolver": "_resolve_subscription_plan"},
+            "start_date": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "state": {"required": False, "type": "selection", "default": "active"},
+        },
+        "allow_undo": True,
+    },
+    "subscription_cancel": {
+        "model": "dojo.subscription",
+        "operation": "delete",
+        "target_domain_builder": "_domain_crud_subscription",
+        "allow_undo": True,
+    },
+    "program_create": {
+        "model": "dojo.program",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "description": {"required": False, "type": "text"},
+            "active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "belt_test_register_crud": {
+        "model": "dojo.member.rank",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "test_rank_id": {"required": True, "type": "many2one"},
+            "test_date": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "state": {"required": False, "type": "selection", "default": "registered"},
+        },
+        "allow_undo": True,
+    },
+    "class_template_create": {
+        "model": "dojo.class.template",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "program_id": {"required": True, "type": "many2one", "resolver": "_resolve_program"},
+            "capacity": {"required": False, "type": "integer", "default": 20},
+            "active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "class_enrollment_create": {
+        "model": "dojo.class.enrollment",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "session_id": {"required": True, "type": "many2one"},
+            "state": {"required": False, "type": "selection", "default": "confirmed"},
+        },
+        "allow_undo": True,
+    },
+    "class_enrollment_cancel": {
+        "model": "dojo.class.enrollment",
+        "operation": "delete",
+        "target_domain_builder": "_domain_crud_enrollment",
+        "allow_undo": True,
+    },
+    # ─── NEW: Extended Model CRUD Operations ───────────────────────────────
+    "belt_test_create": {
+        "model": "dojo.belt.test",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "test_rank_id": {"required": True, "type": "many2one"},
+            "test_date": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "location": {"required": False, "type": "char"},
+        },
+        "allow_undo": True,
+    },
+    "attendance_log_create": {
+        "model": "dojo.attendance.log",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "session_id": {"required": False, "type": "many2one"},
+            "checkin_datetime": {"required": True, "type": "datetime"},
+            "checkout_datetime": {"required": False, "type": "datetime"},
+        },
+        "allow_undo": True,
+    },
+    "credit_transaction_create": {
+        "model": "dojo.credit.transaction",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "amount": {"required": True, "type": "float"},
+            "transaction_type": {"required": True, "type": "selection"},
+            "description": {"required": False, "type": "text"},
+        },
+        "allow_undo": True,
+    },
+    "marketing_campaign_create": {
+        "model": "dojo.marketing.campaign",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "campaign_type": {"required": True, "type": "selection"},
+            "target_audience": {"required": False, "type": "char"},
+            "send_date": {"required": False, "type": "date"},
+        },
+        "allow_undo": True,
+    },
+    "social_post_create": {
+        "model": "dojo.social.post",
+        "operation": "create",
+        "fields": {
+            "content": {"required": True, "type": "text"},
+            "account_id": {"required": True, "type": "many2one"},
+            "post_date": {"required": False, "type": "datetime"},
+            "published": {"required": False, "type": "boolean", "default": False},
+        },
+        "allow_undo": True,
+    },
+    "instructor_profile_update": {
+        "model": "dojo.instructor.profile",
+        "operation": "update",
+        "fields": {
+            "user_id": {"required": False, "type": "many2one"},
+            "speciality": {"required": False, "type": "char"},
+            "bio": {"required": False, "type": "text"},
+            "years_experience": {"required": False, "type": "integer"},
+        },
+        "allow_undo": True,
+    },
+    "emergency_contact_create": {
+        "model": "dojo.emergency.contact",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "contact_name": {"required": True, "type": "char"},
+            "phone": {"required": True, "type": "char"},
+            "relationship": {"required": False, "type": "char"},
+        },
+        "allow_undo": True,
+    },
+}
+
 
 class AiAssistantService(models.AbstractModel):
     """
@@ -1013,30 +1263,38 @@ class AiAssistantService(models.AbstractModel):
         """
         Route intent to appropriate handler and execute.
         
+        Supports config-driven generic handlers (read & CRUD) and custom handler fallbacks.
         For undoable actions, creates snapshots before execution.
         """
+        # Priority 1: Check if this intent uses the generic read handler
+        read_config = _INTENT_HANDLER_CONFIG.get(intent_type)
+        if read_config:
+            try:
+                return self._handle_generic_read(intent_type, intent_data, resolved_data, read_config)
+            except Exception as e:
+                _logger.error("Generic read handler for %s failed: %s", intent_type, e, exc_info=True)
+                return {"success": False, "error": f"Handler error: {e}"}
+        
+        # Priority 2: Check if this intent uses the generic CRUD handler
+        crud_config = _CRUD_HANDLER_CONFIG.get(intent_type)
+        if crud_config:
+            try:
+                return self._handle_generic_crud(intent_type, intent_data, resolved_data, action_log, crud_config)
+            except UserError as e:
+                return {"success": False, "error": str(e)}
+            except Exception as e:
+                _logger.error("Generic CRUD handler for %s failed: %s", intent_type, e, exc_info=True)
+                return {"success": False, "error": f"Handler error: {e}"}
+        
+        # Priority 3: Fall back to custom handlers for special intents
         handlers = {
-            # Read-only intents
-            "member_lookup": self._handle_member_lookup,
-            "class_list": self._handle_class_list,
-            "belt_lookup": self._handle_belt_lookup,
-            "subscription_lookup": self._handle_subscription_lookup,
-            "attendance_history": self._handle_attendance_history,
-            "schedule_today": self._handle_schedule_today,
-
-            # Mutating intents
+            # Mutating intents (complex business logic - cannot be generalized)
             "member_enroll": self._handle_member_enroll,
             "member_unenroll": self._handle_member_unenroll,
             "belt_promote": self._handle_belt_promote,
-            "subscription_create": self._handle_subscription_create,
-            "subscription_cancel": self._handle_subscription_cancel,
             "contact_parent": self._handle_contact_parent,
             "attendance_checkin": self._handle_attendance_checkin,
             "attendance_checkout": self._handle_attendance_checkout,
-            "member_create": self._handle_member_create,
-            "member_update": self._handle_member_update,
-            "class_create": self._handle_class_create,
-            "class_cancel": self._handle_class_cancel,
             "course_enroll": self._handle_course_enroll,
             "belt_test_register": self._handle_belt_test_register,
 
@@ -1044,7 +1302,7 @@ class AiAssistantService(models.AbstractModel):
             "undo_action": self._handle_undo_action,
             "unknown": self._handle_unknown,
 
-            # Extended intents
+            # Extended intents (with complex business logic)
             "subscription_pause": self._handle_subscription_pause,
             "subscription_resume": self._handle_subscription_resume,
             "at_risk_members": self._handle_at_risk_members,
@@ -1067,195 +1325,473 @@ class AiAssistantService(models.AbstractModel):
             return {"success": False, "error": f"Handler error: {e}"}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Intent Handlers: Read-Only (Auto-Execute)
+    # Generic Read Handler (Config-Driven)
     # ═══════════════════════════════════════════════════════════════════════════
 
     @api.model
-    def _handle_member_lookup(self, intent_data, resolved_data, action_log):
-        """Look up member information."""
-        member_id = resolved_data.get("member_id")
-        if not member_id:
-            params = intent_data.get("parameters", {}) if intent_data else {}
-            name = params.get("member_name", "")
-            return {"success": False, "error": f"Could not find member '{name}'."}
-
-        member = self.env["dojo.member"].browse(member_id)
-
-        # Gather member details
-        data = {
-            "id": member.id,
-            "name": member.name,
-            "role": getattr(member, 'role', None),
-            "state": getattr(member, 'membership_state', None),
-            "rank": member.current_rank_id.name if hasattr(member, 'current_rank_id') and member.current_rank_id else None,
-            "subscription": None,
-            "guardian": resolved_data.get("guardian_name"),
-            "guardian_phone": resolved_data.get("guardian_phone"),
-            "guardian_email": resolved_data.get("guardian_email"),
-        }
-
-        if hasattr(member, 'active_subscription_id') and member.active_subscription_id:
-            sub = member.active_subscription_id
-            data["subscription"] = {
-                "plan": sub.plan_id.name if sub.plan_id else None,
-                "status": sub.state,
-                "end_date": sub.end_date.isoformat() if sub.end_date else None,
-            }
-
-        # Get recent attendance
+    def _handle_generic_read(self, intent_type, intent_data, resolved_data, config):
+        """
+        Generic handler for all read-only intent operations.
+        
+        Replaces individual intent handlers for data retrieval.
+        Supports dynamic field selection, filtering, and formatting.
+        
+        Args:
+            intent_type: Type of intent (for logging)
+            intent_data: Parsed intent with parameters
+            resolved_data: Pre-resolved entity IDs
+            config: Handler config from _INTENT_HANDLER_CONFIG
+        
+        Returns:
+            dict: {success, message, data}
+        """
+        model_name = config.get("model")
+        if not model_name:
+            return {"success": False, "error": f"No model configured for {intent_type}"}
+        
         try:
-            AttLog = self.env["dojo.attendance.log"]
-            recent = AttLog.search([("member_id", "=", member.id)], order="checkin_datetime desc", limit=5)
-            if recent:
-                data["recent_attendance"] = [
-                    {"date": r.checkin_datetime.date().isoformat() if r.checkin_datetime else None}
-                    for r in recent
-                ]
-        except Exception:
-            pass
-
+            Model = self.env[model_name]
+        except KeyError:
+            return {"success": False, "error": f"Model '{model_name}' does not exist"}
+        
+        # Step 1: Build domain (static or dynamic)
+        domain = config.get("domain", [])
+        if "domain_builder" in config:
+            builder_method_name = config["domain_builder"]
+            builder_method = getattr(self, builder_method_name, None)
+            if builder_method:
+                domain = builder_method(intent_data, resolved_data) or domain
+        
+        # Step 2: Determine limit (static or from intent parameters)
+        limit = config.get("limit", 20)
+        if "limit_from_params" in config:
+            param_name = config["limit_from_params"]
+            params = intent_data.get("parameters", {}) if intent_data else {}
+            limit = params.get(param_name, limit)
+        
+        # Step 3: Get readable fields (respect model field restrictions)
+        requested_fields = config.get("fields", [])
+        model_fields = Model._fields
+        readable_fields = [
+            f for f in requested_fields
+            if f in model_fields and not model_fields[f].groups
+        ]
+        
+        if not readable_fields:
+            readable_fields = list(model_fields.keys())[:10]  # Safety fallback
+        
+        # Step 4: Search records
+        records = Model.search(domain, limit=limit, order="name asc")
+        
+        if not records:
+            return {
+                "success": True,
+                "message": f"No records found in {model_name}",
+                "data": []
+            }
+        
+        # Step 5: Format results by field type
+        raw_data = records.read(readable_fields)
+        formatted_data = []
+        
+        for record in raw_data:
+            formatted_record = {}
+            for field_name in readable_fields:
+                value = record.get(field_name)
+                field_obj = model_fields[field_name]
+                
+                # Auto-format based on field type
+                if field_obj.type == "many2one" and isinstance(value, (list, tuple)):
+                    formatted_record[field_name] = value[1] if value else None
+                elif field_obj.type in ("datetime", "date") and value:
+                    formatted_record[field_name] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+                elif field_obj.type == "many2many" and isinstance(value, list):
+                    formatted_record[field_name] = value  # Already IDs
+                elif field_obj.type == "selection" and value:
+                    # Try to get human-readable label
+                    if hasattr(field_obj, "selection"):
+                        selection_dict = dict(field_obj.selection if callable(field_obj.selection) else field_obj.selection)
+                        formatted_record[field_name] = selection_dict.get(value, value)
+                    else:
+                        formatted_record[field_name] = value
+                else:
+                    formatted_record[field_name] = value
+            
+            formatted_data.append(formatted_record)
+        
         return {
             "success": True,
-            "message": f"Found {member.name} — {data.get('state', 'unknown')}",
-            "data": data,
+            "message": f"Found {len(formatted_data)} records in {model_name}",
+            "data": formatted_data
         }
 
+    # ─── Domain Builders for config-driven intents ────────────────────────────
+    
     @api.model
-    def _handle_class_list(self, intent_data, resolved_data, action_log):
-        """List classes/sessions for a date range."""
+    def _domain_member_lookup(self, intent_data, resolved_data):
+        """
+        Build domain for member lookup.
+        Supports lookup by member_id or member_name.
+        """
+        member_id = resolved_data.get("member_id")
+        if member_id:
+            return [("id", "=", member_id)]
+        
         params = intent_data.get("parameters", {}) if intent_data else {}
-
-        # Default to today
-        from datetime import date, timedelta
-        target_date = params.get("date") or date.today().isoformat()
-
-        sessions = self.env["dojo.class.session"].search([
-            ("start_datetime", ">=", target_date + " 00:00:00"),
-            ("start_datetime", "<=", target_date + " 23:59:59"),
-        ], order="start_datetime asc", limit=20)
-
-        data = []
-        for s in sessions:
-            data.append({
-                "id": s.id,
-                "name": s.template_id.name if s.template_id else f"Session #{s.id}",
-                "time": s.start_datetime.strftime("%H:%M") if s.start_datetime else None,
-                "enrolled": s.seats_taken,
-                "capacity": s.capacity,
-                "state": s.state,
-            })
-
-        return {
-            "success": True,
-            "message": f"Found {len(data)} sessions for {target_date}.",
-            "data": data,
-        }
-
+        name = params.get("member_name", "")
+        if name:
+            return [("name", "ilike", name)]
+        
+        return []
+    
     @api.model
-    def _handle_belt_lookup(self, intent_data, resolved_data, action_log):
-        """Look up belt rank information."""
-        # If a member name was resolved, return that member's current rank
-        if resolved_data.get("member_id"):
-            member = self.env["dojo.member"].browse(resolved_data["member_id"])
-            rank = member.current_rank_id if hasattr(member, "current_rank_id") and member.current_rank_id else None
-            return {
-                "success": True,
-                "message": f"{member.name}'s current belt rank: {rank.name if rank else 'No rank assigned'}",
-                "data": {"member": member.name, "rank": rank.name if rank else None},
-            }
-
-        # If looking up a specific rank
-        if resolved_data.get("new_rank_id"):
-            rank = self.env["dojo.belt.rank"].browse(resolved_data["new_rank_id"])
-            return {
-                "success": True,
-                "message": f"Belt: {rank.name}",
-                "data": {
-                    "id": rank.id,
-                    "name": rank.name,
-                    "sequence": rank.sequence if hasattr(rank, "sequence") else None,
-                },
-            }
-
-        # List all belt ranks
-        ranks = self.env["dojo.belt.rank"].search([], order="sequence asc")
-        data = [{"id": r.id, "name": r.name, "sequence": r.sequence if hasattr(r, "sequence") else i}
-                for i, r in enumerate(ranks)]
-
-        return {
-            "success": True,
-            "message": f"Found {len(data)} belt ranks.",
-            "data": data,
-        }
-
+    def _domain_class_list(self, intent_data, resolved_data):
+        """
+        Build domain for class session list.
+        Filters by date if provided in intent parameters.
+        """
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        target_date = params.get("date") or fields.Date.today().isoformat()
+        
+        return [
+            ("start_datetime", ">=", f"{target_date} 00:00:00"),
+            ("start_datetime", "<=", f"{target_date} 23:59:59"),
+        ]
+    
     @api.model
-    def _handle_subscription_lookup(self, intent_data, resolved_data, action_log):
-        """Look up subscription information for a member."""
+    def _domain_schedule_today(self, intent_data, resolved_data):
+        """
+        Build domain for today's schedule (same as class_list for today).
+        """
+        today = fields.Date.today().isoformat()
+        return [
+            ("start_datetime", ">=", f"{today} 00:00:00"),
+            ("start_datetime", "<=", f"{today} 23:59:59"),
+        ]
+    
+    @api.model
+    def _domain_subscription_lookup(self, intent_data, resolved_data):
+        """
+        Build domain for subscription lookup.
+        Returns active subscriptions for a member.
+        """
         member_id = resolved_data.get("member_id")
         if not member_id:
-            return {"success": False, "error": "No member specified."}
-
-        member = self.env["dojo.member"].browse(member_id)
-        sub = member.active_subscription_id if hasattr(member, 'active_subscription_id') else None
-
-        if not sub:
-            return {
-                "success": True,
-                "message": f"{member.name} has no active subscription.",
-                "data": None,
-            }
-
-        data = {
-            "id": sub.id,
-            "member_name": member.name,
-            "plan": sub.plan_id.name if sub.plan_id else None,
-            "status": sub.status,
-            "start_date": sub.start_date.isoformat() if sub.start_date else None,
-            "end_date": sub.end_date.isoformat() if sub.end_date else None,
-        }
-
-        return {
-            "success": True,
-            "message": f"{member.name} has {data['plan']} subscription ({data['status']}).",
-            "data": data,
-        }
-
+            return [("id", "=", -1)]  # Return nothing
+        
+        return [
+            ("member_id", "=", member_id),
+            ("state", "=", "active"),
+        ]
+    
     @api.model
-    def _handle_attendance_history(self, intent_data, resolved_data, action_log):
-        """Get attendance history for a member."""
+    def _domain_attendance_history(self, intent_data, resolved_data):
+        """
+        Build domain for attendance history.
+        Returns recent attendance logs for a member.
+        """
         member_id = resolved_data.get("member_id")
         if not member_id:
-            return {"success": False, "error": "No member specified."}
+            return [("id", "=", -1)]  # Return nothing
+        
+        return [("member_id", "=", member_id)]
 
-        params = intent_data.get("parameters", {}) if intent_data else {}
-        limit = params.get("limit", 10)
-
-        member = self.env["dojo.member"].browse(member_id)
-        logs = self.env["dojo.attendance.log"].search(
-            [("member_id", "=", member.id)],
-            order="checkin_datetime desc",
-            limit=limit
-        )
-
-        data = []
-        for log in logs:
-            data.append({
-                "date": log.checkin_datetime.date().isoformat() if log.checkin_datetime else None,
-                "check_in": log.checkin_datetime.isoformat() if log.checkin_datetime else None,
-                "check_out": log.checkout_datetime.isoformat() if log.checkout_datetime else None,
-                "session": log.session_id.template_id.name if log.session_id and log.session_id.template_id else None,
-            })
-
-        return {
-            "success": True,
-            "message": f"Found {len(data)} attendance records for {member.name}.",
-            "data": data,
-        }
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Generic CRUD Handler (Config-Driven)
+    # ═══════════════════════════════════════════════════════════════════════════
 
     @api.model
-    def _handle_schedule_today(self, intent_data, resolved_data, action_log):
-        """Get today's schedule."""
-        return self._handle_class_list(intent_data, resolved_data, action_log)
+    def _handle_generic_crud(self, intent_type, intent_data, resolved_data, action_log, config):
+        """
+        Generic CRUD handler for create, update, delete operations.
+        
+        Supports:
+        - Field validation (required, type checking)
+        - Relationship resolution (many2one lookups)
+        - Default values and builders
+        - Audit trail via mail.thread
+        - Undo snapshots
+        
+        Args:
+            intent_type: Type of intent (for logging)
+            intent_data: Parsed intent with parameters
+            resolved_data: Pre-resolved entity IDs
+            action_log: Action log record
+            config: CRUD config from _CRUD_HANDLER_CONFIG
+        
+        Returns:
+            dict: {success, message, data}
+        """
+        model_name = config.get("model")
+        operation = config.get("operation", "create")
+        
+        try:
+            Model = self.env[model_name]
+        except KeyError:
+            return {"success": False, "error": f"Model '{model_name}' does not exist"}
+        
+        # ─── CREATE Operation ─────────────────────────────────────────────────
+        if operation == "create":
+            return self._crud_create(Model, model_name, intent_data, config, action_log)
+        
+        # ─── UPDATE Operation ─────────────────────────────────────────────────
+        elif operation == "update":
+            domain = config.get("domain", [])
+            if "target_domain_builder" in config:
+                builder_method = getattr(self, config["target_domain_builder"], None)
+                if builder_method:
+                    domain = builder_method(intent_data, resolved_data) or domain
+            return self._crud_update(Model, model_name, intent_data, domain, config, action_log)
+        
+        # ─── DELETE Operation ─────────────────────────────────────────────────
+        elif operation == "delete":
+            domain = config.get("domain", [])
+            if "target_domain_builder" in config:
+                builder_method = getattr(self, config["target_domain_builder"], None)
+                if builder_method:
+                    domain = builder_method(intent_data, resolved_data) or domain
+            return self._crud_delete(Model, model_name, domain, config, action_log)
+        
+        return {"success": False, "error": f"Unknown CRUD operation: {operation}"}
+
+    @api.model
+    def _crud_create(self, Model, model_name, intent_data, config, action_log):
+        """Create a new record."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        fields_config = config.get("fields", {})
+        
+        # ─── Validate required fields ─────────────────────────────────────────
+        values = {}
+        for field_name, field_cfg in fields_config.items():
+            if field_cfg.get("required") and field_name not in params:
+                return {"success": False, "error": f"Required field '{field_name}' not provided"}
+            
+            if field_name in params:
+                value = params[field_name]
+                
+                # Resolve relationships (many2one)
+                if field_cfg.get("type") == "many2one" and field_cfg.get("resolver"):
+                    resolver = getattr(self, field_cfg["resolver"], None)
+                    if resolver:
+                        resolved_id = resolver(value, Model)
+                        if not resolved_id:
+                            return {"success": False, "error": f"Could not resolve {field_name}: {value}"}
+                        values[field_name] = resolved_id
+                    else:
+                        values[field_name] = value
+                else:
+                    values[field_name] = value
+            elif "default" in field_cfg:
+                values[field_name] = field_cfg["default"]
+            elif "default_builder" in field_cfg:
+                builder = getattr(self, field_cfg["default_builder"], None)
+                if builder:
+                    values[field_name] = builder()
+        
+        # ─── Create record ────────────────────────────────────────────────────
+        try:
+            record = Model.create(values)
+            
+            # Create undo snapshot if enabled
+            if config.get("allow_undo", True):
+                Snapshot = self.env["dojo.ai.undo.snapshot"]
+                Snapshot.create_snapshot(action_log.id, model_name, record.id, "create")
+            
+            return {
+                "success": True,
+                "message": f"Created {record._rec_name or model_name}",
+                "data": {"id": record.id, "record": record.name_get()[0][1] if hasattr(record, 'name_get') else str(record)},
+            }
+        except Exception as e:
+            _logger.error("CRUD create failed: %s", e, exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    @api.model
+    def _crud_update(self, Model, model_name, intent_data, domain, config, action_log):
+        """Update existing records."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        fields_config = config.get("fields", {})
+        
+        # ─── Find target record ───────────────────────────────────────────────
+        records = Model.search(domain, limit=1)
+        if not records:
+            return {"success": False, "error": f"No {model_name} found to update"}
+        
+        record = records[0]
+        
+        # ─── Build update values ──────────────────────────────────────────────
+        values = {}
+        for field_name, value in params.items():
+            if field_name in fields_config:
+                field_cfg = fields_config[field_name]
+                
+                # Resolve relationships (many2one)
+                if field_cfg.get("type") == "many2one" and field_cfg.get("resolver"):
+                    resolver = getattr(self, field_cfg["resolver"], None)
+                    if resolver:
+                        resolved_id = resolver(value, Model)
+                        values[field_name] = resolved_id
+                    else:
+                        values[field_name] = value
+                else:
+                    values[field_name] = value
+        
+        if not values:
+            return {"success": False, "error": "No fields to update"}
+        
+        # ─── Create snapshot of old values ────────────────────────────────────
+        try:
+            if config.get("allow_undo", True):
+                Snapshot = self.env["dojo.ai.undo.snapshot"]
+                old_values = {k: getattr(record, k, None) for k in values.keys()}
+                Snapshot.create_snapshot(
+                    action_log.id, model_name, record.id, "write",
+                    snapshot_data=old_values
+                )
+            
+            # Update record
+            record.write(values)
+            
+            return {
+                "success": True,
+                "message": f"Updated {record._rec_name or model_name}",
+                "data": {"id": record.id, "updated_fields": list(values.keys())},
+            }
+        except Exception as e:
+            _logger.error("CRUD update failed: %s", e, exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    @api.model
+    def _crud_delete(self, Model, model_name, domain, config, action_log):
+        """Delete records."""
+        # ─── Find target record ───────────────────────────────────────────────
+        records = Model.search(domain, limit=1)
+        if not records:
+            return {"success": False, "error": f"No {model_name} found to delete"}
+        
+        record = records[0]
+        record_display = record.name_get()[0][1] if hasattr(record, 'name_get') else str(record)
+        
+        # ─── Create snapshot of record ────────────────────────────────────────
+        try:
+            if config.get("allow_undo", True):
+                Snapshot = self.env["dojo.ai.undo.snapshot"]
+                # Store full record data for potential restoration
+                record_data = record.read()[0] if record else {}
+                Snapshot.create_snapshot(
+                    action_log.id, model_name, record.id, "unlink",
+                    snapshot_data=record_data
+                )
+            
+            # Delete record
+            record.unlink()
+            
+            return {
+                "success": True,
+                "message": f"Deleted {record_display}",
+                "data": {"id": record.id},
+            }
+        except Exception as e:
+            _logger.error("CRUD delete failed: %s", e, exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    # ─── CRUD Helper: Resolvers for relationships ──────────────────────────────
+    
+    @api.model
+    def _resolve_member(self, value, model=None):
+        """Resolve member by name or ID."""
+        if isinstance(value, int):
+            return value
+        Member = self.env["dojo.member"]
+        members = Member.search([("name", "ilike", value)], limit=1)
+        return members[0].id if members else None
+    
+    @api.model
+    def _resolve_class_template(self, value, model=None):
+        """Resolve class template by name or ID."""
+        if isinstance(value, int):
+            return value
+        Template = self.env["dojo.class.template"]
+        templates = Template.search([("name", "ilike", value), ("active", "=", True)], limit=1)
+        return templates[0].id if templates else None
+    
+    @api.model
+    def _resolve_subscription_plan(self, value, model=None):
+        """Resolve subscription plan by name or ID."""
+        if isinstance(value, int):
+            return value
+        Plan = self.env["dojo.subscription.plan"]
+        plans = Plan.search([("name", "ilike", value), ("active", "=", True)], limit=1)
+        return plans[0].id if plans else None
+    
+    @api.model
+    def _resolve_program(self, value, model=None):
+        """Resolve program by name or ID."""
+        if isinstance(value, int):
+            return value
+        Program = self.env["dojo.program"]
+        programs = Program.search([("name", "ilike", value), ("active", "=", True)], limit=1)
+        return programs[0].id if programs else None
+    
+    @api.model
+    def _resolve_belt_rank(self, value, model=None):
+        """Resolve belt rank by name or ID."""
+        if isinstance(value, int):
+            return value
+        Rank = self.env["dojo.belt.rank"]
+        ranks = Rank.search([("name", "ilike", value), ("active", "=", True)], limit=1)
+        return ranks[0].id if ranks else None
+    
+    # ─── CRUD Helper: Default value builders ───────────────────────────────────
+    
+    @api.model
+    def _default_today(self):
+        """Return today's date."""
+        return fields.Date.today()
+
+    # ─── CRUD Helper: Target domain builders ───────────────────────────────────
+    
+    @api.model
+    def _domain_crud_member(self, intent_data, resolved_data):
+        """Domain for update/delete on members."""
+        member_id = resolved_data.get("member_id")
+        if member_id:
+            return [("id", "=", member_id)]
+        
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        name = params.get("member_name")
+        if name:
+            return [("name", "ilike", name)]
+        
+        return [("id", "=", -1)]  # Return nothing
+    
+    @api.model
+    def _domain_crud_session(self, intent_data, resolved_data):
+        """Domain for update/delete on class sessions."""
+        session_id = resolved_data.get("session_id")
+        return [("id", "=", session_id)] if session_id else [("id", "=", -1)]
+    
+    @api.model
+    def _domain_crud_subscription(self, intent_data, resolved_data):
+        """Domain for update/delete on subscriptions."""
+        member_id = resolved_data.get("member_id")
+        if member_id:
+            return [("member_id", "=", member_id), ("state", "=", "active")]
+        return [("id", "=", -1)]
+    
+    @api.model
+    def _domain_crud_enrollment(self, intent_data, resolved_data):
+        """Domain for update/delete on class enrollments."""
+        member_id = resolved_data.get("member_id")
+        session_id = resolved_data.get("session_id")
+        
+        if member_id and session_id:
+            return [("member_id", "=", member_id), ("session_id", "=", session_id)]
+        elif member_id:
+            return [("member_id", "=", member_id)]
+        elif session_id:
+            return [("session_id", "=", session_id)]
+        return [("id", "=", -1)]
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Intent Handlers: Mutating (Require Confirmation)
@@ -1390,76 +1926,6 @@ class AiAssistantService(models.AbstractModel):
         }
 
     @api.model
-    def _handle_subscription_create(self, intent_data, resolved_data, action_log):
-        """Create a new subscription for a member."""
-        member_id = resolved_data.get("member_id")
-        plan_id = resolved_data.get("plan_id")
-
-        if not member_id:
-            return {"success": False, "error": "Member not found."}
-        if not plan_id:
-            return {"success": False, "error": "Subscription plan not specified."}
-
-        member = self.env["dojo.member"].browse(member_id)
-        plan = self.env["dojo.subscription.plan"].browse(plan_id)
-
-        # Check if member already has active subscription
-        if hasattr(member, 'active_subscription_id') and member.active_subscription_id:
-            return {
-                "success": False,
-                "error": f"{member.name} already has an active subscription.",
-            }
-
-        # Create subscription
-        Subscription = self.env["dojo.member.subscription"]
-        subscription = Subscription.create({
-            "member_id": member.id,
-            "plan_id": plan.id,
-            "state": "active",
-            "start_date": fields.Date.today(),
-        })
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        Snapshot.create_snapshot(action_log.id, Subscription._name, subscription.id, "create")
-
-        return {
-            "success": True,
-            "message": f"Created {plan.name} subscription for {member.name}.",
-            "data": {"subscription_id": subscription.id},
-        }
-
-    @api.model
-    def _handle_subscription_cancel(self, intent_data, resolved_data, action_log):
-        """Cancel a member's subscription."""
-        member_id = resolved_data.get("member_id")
-
-        if not member_id:
-            return {"success": False, "error": "Member not found."}
-
-        member = self.env["dojo.member"].browse(member_id)
-        sub = member.active_subscription_id if hasattr(member, 'active_subscription_id') else None
-
-        if not sub:
-            return {"success": False, "error": f"{member.name} has no active subscription."}
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        Snapshot.create_snapshot(
-            action_log.id, sub._name, sub.id, "write",
-            snapshot_data={"state": sub.state}
-        )
-
-        old_status = sub.state
-        sub.state = "cancelled"
-
-        return {
-            "success": True,
-            "message": f"Cancelled {member.name}'s subscription.",
-            "data": {"subscription_id": sub.id, "old_status": old_status},
-        }
-
-    @api.model
     def _handle_contact_parent(self, intent_data, resolved_data, action_log):
         """Send a message to a member's guardian."""
         member_id = resolved_data.get("member_id")
@@ -1569,148 +2035,6 @@ class AiAssistantService(models.AbstractModel):
             "success": True,
             "message": f"Checked out {member.name}.",
             "data": {"attendance_log_id": log.id},
-        }
-
-    @api.model
-    def _handle_member_create(self, intent_data, resolved_data, action_log):
-        """Create a new member record."""
-        params = intent_data.get("parameters", {}) if intent_data else {}
-
-        name = params.get("name")
-        if not name:
-            return {"success": False, "error": "Member name is required."}
-
-        values = {
-            "name": name,
-            "role": params.get("role", "student"),
-            "membership_state": "pending",
-        }
-
-        if params.get("email"):
-            values["email"] = params["email"]
-        if params.get("phone"):
-            values["phone"] = params["phone"]
-
-        Member = self.env["dojo.member"]
-        member = Member.create(values)
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        Snapshot.create_snapshot(action_log.id, Member._name, member.id, "create")
-
-        return {
-            "success": True,
-            "message": f"Created member {member.name}.",
-            "data": {"member_id": member.id},
-        }
-
-    @api.model
-    def _handle_member_update(self, intent_data, resolved_data, action_log):
-        """Update an existing member record."""
-        member_id = resolved_data.get("member_id")
-
-        if not member_id:
-            return {"success": False, "error": "Member not found."}
-
-        params = intent_data.get("parameters", {}) if intent_data else {}
-        member = self.env["dojo.member"].browse(member_id)
-
-        # Build update values from params (excluding system fields)
-        allowed_fields = {"name", "email", "phone", "role"}
-        values = {k: v for k, v in params.items() if k in allowed_fields and v is not None}
-
-        if not values:
-            return {"success": False, "error": "No update values specified."}
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        old_values = {k: getattr(member, k, None) for k in values.keys()}
-        Snapshot.create_snapshot(
-            action_log.id, "dojo.member", member.id, "write",
-            snapshot_data=old_values
-        )
-
-        member.write(values)
-
-        return {
-            "success": True,
-            "message": f"Updated {member.name}.",
-            "data": {"member_id": member.id, "updated_fields": list(values.keys())},
-        }
-
-    @api.model
-    def _handle_class_create(self, intent_data, resolved_data, action_log):
-        """Create a new class session."""
-        params = intent_data.get("parameters", {}) if intent_data else {}
-
-        template_id = params.get("template_id")
-        if not template_id:
-            # Try to find template by name
-            template_name = params.get("class_name")
-            if template_name:
-                templates = self.env["dojo.class.template"].search([
-                    ("name", "ilike", template_name)
-                ], limit=1)
-                if templates:
-                    template_id = templates[0].id
-
-        if not template_id:
-            return {"success": False, "error": "Class template not found."}
-
-        from datetime import datetime
-        start_str = params.get("start_datetime")
-        if start_str:
-            try:
-                start_dt = datetime.fromisoformat(start_str)
-            except ValueError:
-                return {"success": False, "error": "Invalid datetime format."}
-        else:
-            start_dt = datetime.now()
-
-        Session = self.env["dojo.class.session"]
-        session = Session.create({
-            "template_id": template_id,
-            "start_datetime": start_dt,
-            "state": "scheduled",
-        })
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        Snapshot.create_snapshot(action_log.id, Session._name, session.id, "create")
-
-        return {
-            "success": True,
-            "message": f"Created session for {session.template_id.name}.",
-            "data": {"session_id": session.id},
-        }
-
-    @api.model
-    def _handle_class_cancel(self, intent_data, resolved_data, action_log):
-        """Cancel a class session."""
-        session_id = resolved_data.get("session_id")
-
-        if not session_id:
-            return {"success": False, "error": "Session not found."}
-
-        session = self.env["dojo.class.session"].browse(session_id)
-
-        if session.state == "cancelled":
-            return {"success": False, "error": "Session is already cancelled."}
-
-        # Create snapshot for undo
-        Snapshot = self.env["dojo.ai.undo.snapshot"]
-        Snapshot.create_snapshot(
-            action_log.id, "dojo.class.session", session.id, "write",
-            snapshot_data={"state": session.state}
-        )
-
-        old_state = session.state
-        session.state = "cancelled"
-
-        return {
-            "success": True,
-            "message": f"Cancelled {session.template_id.name}.",
-            "data": {"session_id": session.id, "old_state": old_state},
         }
 
     @api.model

@@ -819,4 +819,325 @@ Schedule our promotion post for Saturday morning</field>
         <field name="active">True</field>
     </record>
 
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- NEW CRUD Intents (Generic Create/Update/Delete Operations)          -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_program_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">program_create</field>
+        <field name="name">Create Program</field>
+        <field name="description">Create a new dojo program (e.g., Kids Karate Gold, Adult BJJ)</field>
+        <field name="category">class</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Name of the new program"},
+        "description": {"type": "string", "description": "Program description (optional)"},
+        "active": {"type": "boolean", "description": "Whether the program is active", "default": true}
+    },
+    "required": ["name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a new program called Adult Kickboxing
+Add a program for Competition Team
+Create the Tiny Titans program for toddlers</field>
+        <field name="confirmation_template">Create new program "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_belt_test_register_crud" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_test_register_crud</field>
+        <field name="name">Register for Belt Test (CRUD)</field>
+        <field name="description">Register a member for a belt test by creating a member.rank record</field>
+        <field name="category">belt</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member testing"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "test_rank_id": {"type": "integer", "description": "ID of the belt rank being tested for"},
+        "test_date": {"type": "string", "format": "date", "description": "Date of the test (YYYY-MM-DD)"},
+        "state": {"type": "string", "description": "State of the registration", "default": "registered"}
+    },
+    "required": ["member_name", "test_rank_id"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Register John for a blue belt test
+Sign Sarah up to test for green stripe
+Add Test8 to the purple belt test</field>
+        <field name="confirmation_template">Register {member_name} for belt test?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_class_template_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_template_create</field>
+        <field name="name">Create Class Template</field>
+        <field name="description">Create a new class template (e.g., Fundamentals, Advanced Sparring)</field>
+        <field name="category">class</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Name of the class template"},
+        "program_name": {"type": "string", "description": "Name of the program this class belongs to"},
+        "program_id": {"type": "integer", "description": "ID of the program"},
+        "capacity": {"type": "integer", "description": "Max students per session", "default": 20},
+        "active": {"type": "boolean", "description": "Whether the template is active", "default": true}
+    },
+    "required": ["name", "program_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a class template called Fundamentals for the Kids Program
+Add a new Sparring class to Adult BJJ
+Create the Advanced Forms class template</field>
+        <field name="confirmation_template">Create class template "{name}" under {program_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_class_enrollment_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_enrollment_create</field>
+        <field name="name">Enroll in Class Session</field>
+        <field name="description">Enroll a member in a specific class session</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "session_id": {"type": "integer", "description": "ID of the class session"},
+        "state": {"type": "string", "description": "State of the enrollment", "default": "confirmed"}
+    },
+    "required": ["member_name", "session_id"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Enroll John in today's class
+Add Sarah to the 6pm session
+Sign up Test8 for this morning's class
+Put Mike in the Friday evening session</field>
+        <field name="confirmation_template">Enroll {member_name} in the session?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_class_enrollment_cancel" model="dojo.ai.intent.schema">
+        <field name="intent_type">class_enrollment_cancel</field>
+        <field name="name">Cancel Class Enrollment</field>
+        <field name="description">Remove a member from a specific class session</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "member_id": {"type": "integer", "description": "ID of the member"},
+        "session_id": {"type": "integer", "description": "ID of the class session"}
+    },
+    "required": ["member_name"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Remove John from today's class
+Cancel Sarah's enrollment in the 6pm session
+Drop Test8 from this morning's class
+Unenroll Mike from Friday's session</field>
+        <field name="confirmation_template">Cancel {member_name}'s enrollment?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- EXTENDED CRUD Intents (Belt Tests, Attendance, Credits, Marketing)   -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_belt_test_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_test_create</field>
+        <field name="name">Create Belt Test Event</field>
+        <field name="description">Create a new belt test event/session</field>
+        <field name="category">belt</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Name of the test event"},
+        "test_rank": {"type": "string", "description": "Belt rank being tested for"},
+        "test_date": {"type": "string", "format": "date", "description": "Date of the test"},
+        "location": {"type": "string", "description": "Location of the test"}
+    },
+    "required": ["name", "test_rank"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a new belt test for blue belts
+Schedule a test event for Saturday
+Create a belt test on March 30th</field>
+        <field name="confirmation_template">Create new belt test "{name}" for {test_rank}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_attendance_log_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">attendance_log_create</field>
+        <field name="name">Create Attendance Entry</field>
+        <field name="description">Manually create an attendance log entry</field>
+        <field name="category">attendance</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "checkin_datetime": {"type": "string", "format": "date-time", "description": "Check-in time"},
+        "checkout_datetime": {"type": "string", "format": "date-time", "description": "Check-out time (optional)"}
+    },
+    "required": ["member_name", "checkin_datetime"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Log attendance for John at 5pm
+Create an attendance entry for Sarah
+Record Test8's check-in at 3:30pm</field>
+        <field name="confirmation_template">Create attendance entry for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_credit_transaction_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">credit_transaction_create</field>
+        <field name="name">Create Credit Transaction</field>
+        <field name="description">Record a credit transaction (add, use, or adjust credits)</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "amount": {"type": "number", "description": "Number of credits"},
+        "transaction_type": {"type": "string", "enum": ["add", "use", "adjust"], "description": "Type of transaction"},
+        "description": {"type": "string", "description": "Reason or description"}
+    },
+    "required": ["member_name", "amount", "transaction_type"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Add 5 credits to John's account
+Deduct 2 credits from Sarah
+Adjust Test8's credits for makeup class</field>
+        <field name="confirmation_template">{transaction_type} {amount} credits for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_marketing_campaign_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">marketing_campaign_create</field>
+        <field name="name">Create Marketing Campaign</field>
+        <field name="description">Create a new marketing campaign</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Campaign name"},
+        "campaign_type": {"type": "string", "enum": ["email", "sms", "social"], "description": "Type of campaign"},
+        "target_audience": {"type": "string", "description": "Who to target (e.g., all members, kids only)"},
+        "send_date": {"type": "string", "format": "date", "description": "When to send"}
+    },
+    "required": ["name", "campaign_type"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create an email campaign for summer camp
+Start a social media campaign
+Create an SMS blast for active members</field>
+        <field name="confirmation_template">Create {campaign_type} campaign "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_social_post_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">social_post_create</field>
+        <field name="name">Create Social Media Post</field>
+        <field name="description">Create a post for social media</field>
+        <field name="category">social</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "content": {"type": "string", "description": "Post content/message"},
+        "platform": {"type": "string", "enum": ["facebook", "instagram", "both"], "description": "Platform to post on"},
+        "post_date": {"type": "string", "format": "date-time", "description": "When to post (optional - now if not specified)"},
+        "published": {"type": "boolean", "description": "Post immediately or create as draft"}
+    },
+    "required": ["content", "platform"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Post about our new program on Facebook
+Create an Instagram post about belt testing
+Post a message to social media now</field>
+        <field name="confirmation_template">Post to {platform}: "{content}"?</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_instructor_profile_update" model="dojo.ai.intent.schema">
+        <field name="intent_type">instructor_profile_update</field>
+        <field name="name">Update Instructor Profile</field>
+        <field name="description">Update an instructor's profile information</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "instructor_name": {"type": "string", "description": "Name of the instructor"},
+        "speciality": {"type": "string", "description": "Area of expertise (e.g., BJJ, Karate)"},
+        "bio": {"type": "string", "description": "Short biography"},
+        "years_experience": {"type": "integer", "description": "Years of teaching experience"}
+    },
+    "required": ["instructor_name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Update John's instructor profile
+Set Sarah's speciality to karate
+Update Mike's bio to highlight his BJJ experience</field>
+        <field name="confirmation_template">Update profile for instructor {instructor_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_emergency_contact_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">emergency_contact_create</field>
+        <field name="name">Add Emergency Contact</field>
+        <field name="description">Add an emergency contact for a member</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "contact_name": {"type": "string", "description": "Name of the emergency contact"},
+        "phone": {"type": "string", "description": "Phone number"},
+        "relationship": {"type": "string", "description": "Relationship (parent, sibling, etc.)"}
+    },
+    "required": ["member_name", "contact_name", "phone"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Add Jane Smith as emergency contact for John
+Record his mother's phone number as backup contact
+Add Sarah's guardian contact information</field>
+        <field name="confirmation_template">Add {contact_name} as emergency contact for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
 </odoo>
