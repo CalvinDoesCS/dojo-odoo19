@@ -9,7 +9,8 @@
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <!-- Resolve member role once for conditional tile visibility -->
             <t t-set="_dojo_member" t-value="request.env['dojo.member'].sudo().search([('partner_id', '=', request.env.user.partner_id.id)], limit=1)"/>
-            <t t-set="_dojo_is_parent" t-value="_dojo_member and _dojo_member.partner_id.is_guardian"/>
+            <!-- Guardian-only users have no dojo.member record; check the partner flag as fallback -->
+            <t t-set="_dojo_is_parent" t-value="(_dojo_member and _dojo_member.partner_id.is_guardian) or request.env.user.partner_id.is_guardian"/>
 
             <!-- Dojo Portal tile — rendered directly to avoid d-none count-gating -->
             <div class="o_portal_index_card col-md-6 order-2">
@@ -63,6 +64,12 @@
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="False"/>
 
+            <!-- Resolve display values: member may be False for guardian-only accounts -->
+            <t t-set="_display_partner" t-value="member.partner_id if member else portal_partner"/>
+            <t t-set="_display_name" t-value="member.name if member else (portal_partner.name or '?')"/>
+            <t t-set="_member_number" t-value="member.member_number if member else False"/>
+            <t t-set="_member_id" t-value="member.id if member else 0"/>
+
             <!-- ── Banner ────────────────────────────────────────────────── -->
             <div class="dojo-portal-banner mt-3"/>
 
@@ -73,18 +80,18 @@
                     <!-- Avatar: belt colour if ranked, else role colour -->
                     <t t-set="_avatar_bg" t-value="current_rank.color if current_rank and current_rank.color else ('#1a73e8' if is_parent else '#188038')"/>
                     <div class="dojo-hero-avatar-md3" t-attf-style="background:#{_avatar_bg};">
-                        <t t-out="(member.name or '?')[0].upper()"/>
+                        <t t-out="(_display_name or '?')[0].upper()"/>
                     </div>
 
                     <!-- Name + meta + stat chips -->
                     <div class="flex-grow-1 min-w-0">
                         <!-- Name row -->
                         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-                            <h4 class="mb-0 fw-bold lh-1" style="color:#202124;" t-out="member.name"/>
-                            <t t-if="member.partner_id.is_guardian and not member.partner_id.is_student">
+                            <h4 class="mb-0 fw-bold lh-1" style="color:#202124;" t-out="_display_name"/>
+                            <t t-if="_display_partner.is_guardian and not _display_partner.is_student">
                                 <span class="dojo-chip dojo-chip--accent">Parent</span>
                             </t>
-                            <t t-elif="member.partner_id.is_guardian and member.partner_id.is_student">
+                            <t t-elif="_display_partner.is_guardian and _display_partner.is_student">
                                 <span class="dojo-chip dojo-chip--success">Standalone</span>
                             </t>
                             <t t-else="">
@@ -105,12 +112,12 @@
                         </div>
                         <!-- Household + member number -->
                         <div class="d-flex align-items-center gap-2 mb-3" style="color:#5f6368;font-size:.85rem;">
-                            <t t-if="member.partner_id.parent_id and member.partner_id.parent_id.is_household">
-                                <span t-out="member.partner_id.parent_id.name"/>
+                            <t t-if="_display_partner.parent_id and _display_partner.parent_id.is_household">
+                                <span t-out="_display_partner.parent_id.name"/>
                             </t>
-                            <t t-if="member.member_number">
-                                <t t-if="member.partner_id.parent_id and member.partner_id.parent_id.is_household"><span>·</span></t>
-                                <span t-out="member.member_number"/>
+                            <t t-if="_member_number">
+                                <t t-if="_display_partner.parent_id and _display_partner.parent_id.is_household"><span>·</span></t>
+                                <span t-out="_member_number"/>
                             </t>
                         </div>
                         <!-- Stat chips row -->
@@ -135,7 +142,7 @@
                                     <span class="dojo-stat-chip__lbl">Billing</span>
                                 </a>
                             </t>
-                            <t t-if="member.member_number">
+                            <t t-if="_member_number">
                                 <a href="/my/dojo/badge/print" target="_blank" class="dojo-stat-chip" title="View &amp; Print Badge">
                                     <span class="dojo-stat-chip__val"><i class="fa fa-id-card"/></span>
                                     <span class="dojo-stat-chip__lbl">Badge</span>
@@ -176,7 +183,7 @@
                  t-att-data-is-student-only="'true' if is_student_only else 'false'"
                  t-att-data-members="members_json"
                  t-att-data-students="students_json"
-                 t-att-data-member-id="member.id"
+                 t-att-data-member-id="_member_id"
                  t-att-data-csrf="request.csrf_token()"
                  class="dojo-portal-root mt-3"/>
         </t>

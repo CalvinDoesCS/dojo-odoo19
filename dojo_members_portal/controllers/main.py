@@ -50,30 +50,32 @@ class DojoMemberPortal(CustomerPortal):
         """Return member IDs scoped to the current user's access level.
 
         Students (non-guardians) are strictly limited to their own record.
-        Guardians see all members in the household.
+        Guardians (including guardian-only users with no dojo.member record)
+        see all members in the household.
         """
         member = self._get_current_member()
-        if not member:
-            return []
-        partner = member.partner_id
-        # Non-guardians may only ever see their own data
-        if not partner.is_guardian:
-            return [member.id]
-        household = partner.parent_id
+        # Use the member's partner when available, otherwise fall back to the
+        # logged-in user's partner (guardian-only accounts have no dojo.member).
+        effective_partner = member.partner_id if member else request.env.user.partner_id
+        if not effective_partner.is_guardian:
+            return [member.id] if member else []
+        household = effective_partner.parent_id
         if household and household.is_household:
             hh_members = request.env['dojo.member'].sudo().search([
                 ('partner_id.parent_id', '=', household.id),
             ])
             return hh_members.ids
-        return [member.id]
+        return [member.id] if member else []
 
     def _get_student_members(self):
         """Return dojo.member records that are students in the current household.
 
         Only meaningful for guardians; returns an empty RecordSet for students.
+        Supports guardian-only users who have no dojo.member record of their own.
         """
         member = self._get_current_member()
-        if not member or not member.partner_id.is_guardian:
+        effective_partner = member.partner_id if member else request.env.user.partner_id
+        if not effective_partner.is_guardian:
             return request.env['dojo.member'].sudo().browse([])
         all_members = request.env['dojo.member'].sudo().browse(
             self._get_household_member_ids()
@@ -86,12 +88,12 @@ class DojoMemberPortal(CustomerPortal):
         If ``member_id`` is provided and the caller is a parent, validate that
         the requested member belongs to their household and return [member_id].
         Students always get only their own ID regardless of params.
+        Supports guardian-only users who have no dojo.member record.
         """
         member = self._get_current_member()
-        if not member:
-            return []
-        if not member.partner_id.is_guardian:
-            return [member.id]
+        effective_partner = member.partner_id if member else request.env.user.partner_id
+        if not effective_partner.is_guardian:
+            return [member.id] if member else []
         if member_id:
             try:
                 mid = int(member_id)
@@ -149,11 +151,15 @@ class DojoMemberPortal(CustomerPortal):
     @http.route('/my/dojo', type='http', auth='user', website=True)
     def portal_dojo_home(self, tab='programs', saved=None, upgraded=None, invoice_warning=None, **kwargs):
         member = self._get_current_member()
-        if not member:
+        portal_partner = request.env.user.partner_id
+        # Guardian-only users (no dojo.member record) are allowed through.
+        # Only fall back to the "no member" page for non-guardian orphans.
+        if not member and not portal_partner.is_guardian:
             return request.render('dojo_members_portal.portal_no_member', {})
         env = request.env
-        is_parent = member.partner_id.is_guardian
-        is_student_only = not member.partner_id.is_guardian
+        effective_partner = member.partner_id if member else portal_partner
+        is_parent = effective_partner.is_guardian
+        is_student_only = not is_parent
         household_member_ids = self._get_household_member_ids()
 
         attendance_count = env['dojo.attendance.log'].sudo().search_count([
@@ -172,15 +178,16 @@ class DojoMemberPortal(CustomerPortal):
         student_members = self._get_student_members() if is_parent else env['dojo.member'].sudo().browse([])
         students_json = json.dumps([{'id': m.id, 'name': m.name} for m in student_members])
 
-        belt = self._get_belt_context(member)
+        belt = self._get_belt_context(member)  # member may be None for guardian-only
 
-        # Credit balance for the portal hero chip
-        active_sub = member.sudo().active_subscription_id
+        # Credit balance for the portal hero chip (not applicable for guardian-only)
+        active_sub = member.sudo().active_subscription_id if member else False
         is_credit_plan = bool(getattr(getattr(active_sub, 'plan_id', None), 'credits_per_period', 0))
         credit_balance = getattr(active_sub, 'credit_balance', 0) if active_sub else 0
 
         return request.render('dojo_members_portal.portal_dojo_home', {
             'member': member,
+            'portal_partner': portal_partner,  # fallback for guardian-only (member=False)
             'is_parent': is_parent,
             'is_student_only': is_student_only,
             'initial_tab': tab,
@@ -219,9 +226,18 @@ class DojoMemberPortal(CustomerPortal):
     def portal_json_belt(self, member_id=None, **kwargs):
         """Return belt rank context for a member. Parents can request any household member."""
         current = self._get_current_member()
-        if not current:
+        portal_partner = request.env.user.partner_id
+        if not current and not portal_partner.is_guardian:
             return request.make_response(
                 json.dumps({'error': 'not found'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+        # Guardian-only users have no rank of their own; return empty belt
+        if not current:
+            return request.make_response(
+                json.dumps({'member_id': 0, 'member_name': portal_partner.name or '',
+                            'current_rank': None, 'next_rank': None,
+                            'rank_pct': 0, 'current_stripes': 0, 'max_stripes': 0}),
                 headers=[('Content-Type', 'application/json')],
             )
         # Resolve target member
@@ -598,13 +614,17 @@ class DojoMemberPortal(CustomerPortal):
     @http.route('/my/dojo/json/household', type='http', auth='user')
     def portal_json_household(self, **kwargs):
         member = self._get_current_member()
-        if not member:
+        portal_partner = request.env.user.partner_id
+        is_guardian = (member.partner_id.is_guardian if member else portal_partner.is_guardian)
+        if not member and not is_guardian:
             return request.make_response(
                 json.dumps({'error': 'No member found'}),
                 headers=[('Content-Type', 'application/json')],
             )
-        is_parent = member.partner_id.is_guardian
-        household = member.sudo().partner_id.parent_id
+        is_parent = is_guardian
+        # For guardian-only accounts, resolve household via the portal partner directly
+        household = (member.sudo().partner_id.parent_id
+                     if member else portal_partner.parent_id)
         hm_records = request.env['dojo.member'].sudo().browse(
             self._get_household_member_ids()
         )
@@ -919,9 +939,13 @@ class DojoMemberPortal(CustomerPortal):
 
         For parent users without a member_id, returns all household students'
         programs grouped: {programs: [], students: [{id, name, programs, belt_history}]}
+        Supports guardian-only users who have no dojo.member record.
         """
         current = self._get_current_member()
-        if not current:
+        portal_partner = request.env.user.partner_id
+        # Guardian-only accounts have no dojo.member record; check partner flag.
+        is_guardian = (current.partner_id.is_guardian if current else portal_partner.is_guardian)
+        if not current and not is_guardian:
             return request.make_response(
                 json.dumps({'programs': [], 'students': []}),
                 headers=[('Content-Type', 'application/json')],
@@ -931,7 +955,7 @@ class DojoMemberPortal(CustomerPortal):
                 json.dumps(d), headers=[('Content-Type', 'application/json')]
             )
         # Parent without a specific student selected → return all students' data
-        if not member_id and current.partner_id.is_guardian:
+        if not member_id and is_guardian:
             hm_ids = self._get_household_member_ids()
             students_data = []
             for mid in hm_ids:
@@ -947,7 +971,7 @@ class DojoMemberPortal(CustomerPortal):
             return _json({'programs': [], 'students': students_data})
         # Specific member or student self-view
         target = current
-        if member_id and current.partner_id.is_guardian:
+        if member_id and is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -955,6 +979,8 @@ class DojoMemberPortal(CustomerPortal):
                     target = request.env['dojo.member'].sudo().browse(mid)
             except (TypeError, ValueError):
                 pass
+        if not target:
+            return _json({'programs': [], 'students': []})
         return _json({'programs': self._build_programs_for_member(target), 'students': []})
 
     # ── /my/dojo/json/belt-history ──────────────────────────────────────────
@@ -962,13 +988,21 @@ class DojoMemberPortal(CustomerPortal):
     def portal_json_belt_history(self, member_id=None, **kwargs):
         """Return rank award history for a member."""
         current = self._get_current_member()
+        portal_partner = request.env.user.partner_id
+        is_guardian = (current.partner_id.is_guardian if current else portal_partner.is_guardian)
+        if not current and not is_guardian:
+            return request.make_response(
+                json.dumps({'history': []}),
+                headers=[('Content-Type', 'application/json')],
+            )
+        # Guardian-only with no member record: belt history is empty (they don't train)
         if not current:
             return request.make_response(
                 json.dumps({'history': []}),
                 headers=[('Content-Type', 'application/json')],
             )
         target = current
-        if member_id and current.partner_id.is_guardian:
+        if member_id and is_guardian:
             try:
                 mid = int(member_id)
                 hm_ids = self._get_household_member_ids()
@@ -1106,7 +1140,9 @@ class DojoMemberPortal(CustomerPortal):
     @http.route('/my/dojo/json/billing', type='http', auth='user')
     def portal_json_billing(self, **kwargs):
         member = self._get_current_member()
-        if not member or not member.partner_id.is_guardian:
+        portal_partner = request.env.user.partner_id
+        is_guardian = (member.partner_id.is_guardian if member else portal_partner.is_guardian)
+        if not is_guardian:
             return request.make_response(
                 json.dumps({'error': 'Not authorised'}),
                 headers=[('Content-Type', 'application/json')],
@@ -1180,7 +1216,8 @@ class DojoMemberPortal(CustomerPortal):
 
         # Saved payment method (card-on-file) for the household
         payment_method_data = None
-        household = member.partner_id.parent_id
+        effective_partner = member.partner_id if member else portal_partner
+        household = effective_partner.parent_id
         if household and household.is_household and household.primary_guardian_id:
             guardian = household.primary_guardian_id
             provider = env['payment.provider'].sudo().search(
@@ -1212,9 +1249,12 @@ class DojoMemberPortal(CustomerPortal):
 
         If *sub_id* is provided, validate it belongs to the household and
         return it.  Otherwise fall back to the first active/paused sub.
+        Supports guardian-only users who have no dojo.member record.
         """
         member = self._get_current_member()
-        if not member or not member.partner_id.is_guardian:
+        portal_partner = request.env.user.partner_id
+        is_guardian = (member.partner_id.is_guardian if member else portal_partner.is_guardian)
+        if not is_guardian:
             return None
         member_ids = self._get_household_member_ids()
         if sub_id:
@@ -1294,6 +1334,223 @@ class DojoMemberPortal(CustomerPortal):
         sub.sudo().write({'state': 'cancelled', 'end_date': fields.Date.today()})
         return request.make_response(
             json.dumps({'ok': True}),
+            headers=[('Content-Type', 'application/json')],
+        )
+
+    # ── /my/dojo/billing/setup-intent  (guardian only) ────────────────────
+    @http.route('/my/dojo/billing/setup-intent', type='http', auth='user', methods=['POST'])
+    def portal_billing_setup_intent(self, **kwargs):
+        """Create (or reuse) a Stripe Customer + SetupIntent for the household guardian.
+
+        Returns JSON: {client_secret, publishable_key} or {error}.
+        """
+        import logging as _log
+        _logger = _log.getLogger(__name__)
+
+        member = self._get_current_member()
+        portal_partner = request.env.user.partner_id
+        is_guardian = (member.partner_id.is_guardian if member else portal_partner.is_guardian)
+        if not is_guardian:
+            return request.make_response(
+                json.dumps({'error': 'Not authorised'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        effective_partner = member.partner_id if member else portal_partner
+        household = effective_partner.parent_id
+        guardian = (household.primary_guardian_id
+                    if household and household.is_household
+                    else effective_partner)
+
+        provider = request.env['payment.provider'].sudo().search(
+            [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
+            limit=1,
+        )
+        if not provider:
+            return request.make_response(
+                json.dumps({'error': 'No active Stripe provider configured.'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        # Reuse existing Stripe Customer (from any existing payment.token)
+        existing_token = request.env['payment.token'].sudo().search([
+            ('provider_id', '=', provider.id),
+            ('partner_id', '=', guardian.id),
+            ('active', '=', True),
+        ], limit=1)
+        cus_id = existing_token.provider_ref if existing_token else None
+
+        if not cus_id:
+            try:
+                customer = provider._send_api_request(
+                    'POST', 'customers',
+                    data={
+                        'name': guardian.name or '',
+                        'email': guardian.email or '',
+                        'phone': guardian.phone or '',
+                        'metadata[odoo_partner_id]': str(guardian.id),
+                    },
+                )
+                cus_id = customer['id']
+            except Exception as exc:
+                _logger.error("Portal update-card: failed to create Stripe Customer: %s", exc)
+                return request.make_response(
+                    json.dumps({'error': str(exc)}),
+                    headers=[('Content-Type', 'application/json')],
+                )
+
+        try:
+            setup_intent = provider._send_api_request(
+                'POST', 'setup_intents',
+                data={
+                    'customer': cus_id,
+                    'usage': 'off_session',
+                    'payment_method_types[]': 'card',
+                },
+            )
+        except Exception as exc:
+            _logger.error("Portal update-card: failed to create SetupIntent: %s", exc)
+            return request.make_response(
+                json.dumps({'error': str(exc)}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        # Stash cus_id on the session so save-card can retrieve it
+        request.session['_portal_stripe_cus_id'] = cus_id
+        request.session['_portal_stripe_guardian_id'] = guardian.id
+
+        return request.make_response(
+            json.dumps({
+                'client_secret': setup_intent.get('client_secret', ''),
+                'publishable_key': provider.stripe_publishable_key or '',
+            }),
+            headers=[('Content-Type', 'application/json')],
+        )
+
+    # ── /my/dojo/billing/save-card  (guardian only) ───────────────────────
+    @http.route('/my/dojo/billing/save-card', type='http', auth='user', methods=['POST'])
+    def portal_billing_save_card(self, payment_method_id=None, **kwargs):
+        """Confirm a Stripe PaymentMethod and create/replace the payment.token.
+
+        Called after stripe.confirmSetup() succeeds in the browser.
+        Returns JSON: {ok, display} or {ok: false, error}.
+        """
+        import logging as _log
+        _logger = _log.getLogger(__name__)
+
+        member = self._get_current_member()
+        portal_partner = request.env.user.partner_id
+        is_guardian = (member.partner_id.is_guardian if member else portal_partner.is_guardian)
+        if not is_guardian or not payment_method_id:
+            return request.make_response(
+                json.dumps({'ok': False, 'error': 'Not authorised'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        cus_id = request.session.get('_portal_stripe_cus_id')
+        guardian_id = request.session.get('_portal_stripe_guardian_id')
+
+        # Fall back to looking up the existing token's customer reference
+        provider = request.env['payment.provider'].sudo().search(
+            [('code', '=', 'stripe'), ('state', 'in', ('enabled', 'test'))],
+            limit=1,
+        )
+        if not provider:
+            return request.make_response(
+                json.dumps({'ok': False, 'error': 'Stripe not configured'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        effective_partner = member.partner_id if member else portal_partner
+        household = effective_partner.parent_id
+        guardian_partner = (household.primary_guardian_id
+                            if household and household.is_household
+                            else effective_partner)
+        if guardian_id and guardian_id != guardian_partner.id:
+            # Safety: session guardian must match current user's household
+            return request.make_response(
+                json.dumps({'ok': False, 'error': 'Session mismatch — please retry.'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        if not cus_id:
+            existing_token = request.env['payment.token'].sudo().search([
+                ('provider_id', '=', provider.id),
+                ('partner_id', '=', guardian_partner.id),
+            ], limit=1)
+            cus_id = existing_token.provider_ref if existing_token else None
+
+        if not cus_id:
+            return request.make_response(
+                json.dumps({'ok': False, 'error': 'No Stripe customer found — please retry from Setup Intent.'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        # Retrieve card details from Stripe for a friendly display
+        brand, last4, exp_month, exp_year = 'Card', '••••', '', ''
+        try:
+            pm_data = provider._send_api_request(
+                'GET', f'payment_methods/{payment_method_id}',
+            )
+            card = pm_data.get('card', {})
+            brand = card.get('brand', 'card').title()
+            last4 = card.get('last4', '••••')
+            exp_month = str(card.get('exp_month', '')).zfill(2)
+            exp_year = str(card.get('exp_year', ''))[-2:]
+        except Exception as exc:
+            _logger.warning("Portal update-card: could not fetch PM details: %s", exc)
+
+        display = f"{brand} •••• {last4} {exp_month}/{exp_year}".strip()
+
+        # Update Stripe Customer default PM
+        try:
+            provider._send_api_request(
+                'POST', f'customers/{cus_id}',
+                data={
+                    'invoice_settings[default_payment_method]': payment_method_id,
+                    'metadata[odoo_partner_id]': str(guardian_partner.id),
+                },
+            )
+        except Exception as exc:
+            _logger.warning("Portal update-card: could not set default PM on customer: %s", exc)
+
+        # Deactivate old tokens for this guardian, create a fresh one
+        old_tokens = request.env['payment.token'].sudo().search([
+            ('provider_id', '=', provider.id),
+            ('partner_id', '=', guardian_partner.id),
+        ])
+        if old_tokens:
+            old_tokens.sudo().write({'active': False})
+
+        try:
+            payment_method = request.env['payment.method'].sudo().search(
+                [('code', '=', 'card'), ('provider_ids', 'in', [provider.id])],
+                limit=1,
+            )
+            token_vals = {
+                'provider_id': provider.id,
+                'partner_id': guardian_partner.id,
+                'provider_ref': cus_id,
+                'stripe_payment_method': payment_method_id,
+                'payment_details': display,
+                'active': True,
+            }
+            if payment_method:
+                token_vals['payment_method_id'] = payment_method.id
+            request.env['payment.token'].sudo().create(token_vals)
+        except Exception as exc:
+            _logger.error("Portal update-card: failed to create payment.token: %s", exc)
+            return request.make_response(
+                json.dumps({'ok': False, 'error': 'Card saved with Stripe but could not update local record.'}),
+                headers=[('Content-Type', 'application/json')],
+            )
+
+        # Clear session stash
+        request.session.pop('_portal_stripe_cus_id', None)
+        request.session.pop('_portal_stripe_guardian_id', None)
+
+        return request.make_response(
+            json.dumps({'ok': True, 'display': display}),
             headers=[('Content-Type', 'application/json')],
         )
 

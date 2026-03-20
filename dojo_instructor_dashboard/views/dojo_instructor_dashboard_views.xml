@@ -309,12 +309,35 @@
         <field name="tag">dojo_admin_dashboard</field>
     </record>
 
-    <!-- ── Admin: single top-level entry, no submenus ───────────── -->
+    <!-- ── Admin: top-level entry with submenus ─────────────────── -->
     <menuitem id="menu_dojo_admin_dashboard_root"
               name="Admin Dashboard"
               sequence="2"
-              action="action_admin_dashboard_client"
               groups="dojo_base.group_dojo_admin"
               web_icon="dojo_instructor_dashboard,static/description/icon.png"/>
+
+    <menuitem id="menu_dojo_admin_dashboard"
+              name="Dashboard"
+              parent="menu_dojo_admin_dashboard_root"
+              action="action_admin_dashboard_client"
+              sequence="1"
+              groups="dojo_base.group_dojo_admin"/>
+
+    <!-- Action to create/manage instructor profiles (admin only) -->
+    <record id="action_dojo_instructor_profiles" model="ir.actions.act_window">
+        <field name="name">Instructor Profiles</field>
+        <field name="res_model">dojo.instructor.profile</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first instructor profile.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_dojo_instructor_profiles"
+              name="Instructors"
+              parent="menu_dojo_admin_dashboard_root"
+              action="action_dojo_instructor_profiles"
+              sequence="10"
+              groups="dojo_base.group_dojo_admin"/>
 
 </odoo>
