@@ -31,7 +31,17 @@
                 />
             </xpath>
 
-            <!-- Add Dojang tab to the form -->
+            <!-- Lead score badge near the top of the form -->
+            <xpath expr="//div[hasclass('oe_title')]" position="after">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <label for="dojo_lead_score" string="Lead Score"/>
+                    <field name="dojo_lead_score" widget="progressbar"
+                           options="{'editable': false, 'max_value': 100}"
+                           class="w-25"/>
+                </div>
+            </xpath>
+
+            <!-- Add Dojang tabs to the form -->
             <xpath expr="//notebook" position="inside">
                 <page string="Dojang Trial" name="dojo_trial">
                     <group>
@@ -48,6 +58,33 @@
                         <group string="Conversion">
                             <field name="dojo_member_id" readonly="1"/>
                             <field name="is_converted" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+
+                <page string="Booking &amp; Tokens" name="dojo_tokens">
+                    <group>
+                        <group string="Booking Links">
+                            <field name="trial_booking_url" widget="url" readonly="1"/>
+                            <field name="trial_manage_url" widget="url" readonly="1"/>
+                            <field name="booking_link_clicked" readonly="1"/>
+                        </group>
+                        <group string="Token Details">
+                            <field name="trial_booking_token" readonly="1"/>
+                            <field name="trial_cancel_token" readonly="1"/>
+                            <field name="trial_token_expires" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+
+                <page string="Engagement &amp; AI" name="dojo_engagement">
+                    <group>
+                        <group string="Engagement">
+                            <field name="last_engagement_date" readonly="1"/>
+                        </group>
+                        <group string="AI Summary">
+                            <field name="ai_summary" readonly="1" nolabel="1"
+                                   placeholder="AI-generated summary will appear here after analysis."/>
                         </group>
                     </group>
                 </page>

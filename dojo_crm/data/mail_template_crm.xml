@@ -1,7 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- ================================================================
-         Trial Booked — confirmation email
+         Qualified — invitation to book a trial with unique link
+         ================================================================ -->
+    <record id="mail_template_qualified" model="mail.template">
+        <field name="name">Dojang CRM: Qualified — Book Your Free Trial (Email)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="subject">Book Your Free Trial Class — {{ object.company_id.name }}</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html"><![CDATA[
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #2c3e50;">You're Invited — Try a Class for Free!</h2>
+    <p>Hi {{ object.contact_name or object.partner_name or 'there' }},</p>
+    <p>
+        Thank you for your interest in {{ object.company_id.name }}! We'd love to
+        have you try a class before you commit.
+    </p>
+    <p>
+        Click below to pick a session that suits your schedule:
+    </p>
+    <div style="text-align: center; margin: 24px 0;">
+        <a href="{{ object.trial_booking_url }}"
+           style="background: #3498db; color: #fff; padding: 14px 28px;
+                  text-decoration: none; border-radius: 6px; font-size: 16px;
+                  display: inline-block;">
+            Book My Free Trial
+        </a>
+    </div>
+    <p style="color: #7f8c8d; font-size: 12px;">
+        This link is unique to you and expires in 7 days.
+    </p>
+    <p style="color: #7f8c8d; font-size: 12px;">
+        — {{ object.company_id.name }}
+    </p>
+</div>
+        ]]></field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <!-- ================================================================
+         Trial Booked — confirmation email with .ics + manage link
          ================================================================ -->
     <record id="mail_template_trial_booked" model="mail.template">
         <field name="name">Dojang CRM: Trial Booked Confirmation (Email)</field>
@@ -35,6 +73,13 @@
     </table>
     {% endif %}
     <p>Please arrive 10 minutes early. Wear comfortable workout clothes.</p>
+    <p>A calendar invitation (.ics) is attached to this email.</p>
+    {% if object.trial_manage_url %}
+    <div style="margin: 16px 0; padding: 12px; background: #f9f9f9; border-radius: 4px;">
+        Need to <strong>cancel or reschedule</strong>?
+        <a href="{{ object.trial_manage_url }}">Click here to manage your booking</a>.
+    </div>
+    {% endif %}
     <p>We look forward to meeting you!</p>
     <p style="color: #7f8c8d; font-size: 12px;">
         — {{ object.company_id.name }}
@@ -45,10 +90,10 @@
     </record>
 
     <!-- ================================================================
-         Trial Attended — post-trial offer email
+         Trial-in-progress — post-trial offer email
          ================================================================ -->
     <record id="mail_template_trial_attended" model="mail.template">
-        <field name="name">Dojang CRM: Post-Trial Membership Offer (Email)</field>
+        <field name="name">Dojang CRM: Trial-in-progress — Post-Trial Offer (Email)</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="subject">Great Class Today — Here's a Special Offer for You 🥋</field>
         <field name="email_to">{{ object.email_from }}</field>
@@ -79,6 +124,80 @@
     </record>
 
     <!-- ================================================================
+         Missed trial (no-show) — re-engagement email to lead
+         ================================================================ -->
+    <record id="mail_template_trial_expired" model="mail.template">
+        <field name="name">Dojang CRM: Missed Trial — Re-engage Lead (Email)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="subject">We Missed You — Book a New Trial Class</field>
+        <field name="email_to">{{ object.email_from }}</field>
+        <field name="body_html"><![CDATA[
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #2c3e50;">Your Trial Has Expired</h2>
+    <p>Hi {{ object.contact_name or object.partner_name or 'there' }},</p>
+    <p>
+        It looks like the trial class you booked has passed. No worries — we'd love to give
+        you another chance to experience a class at {{ object.company_id.name }}.
+    </p>
+    {% if object.trial_booking_url %}
+    <div style="text-align: center; margin: 24px 0;">
+        <a href="{{ object.trial_booking_url }}"
+           style="background: #3498db; color: #fff; padding: 14px 28px;
+                  text-decoration: none; border-radius: 6px; font-size: 16px;
+                  display: inline-block;">
+            Book a New Trial
+        </a>
+    </div>
+    {% endif %}
+    <p>
+        Or simply reply to this email and we'll find a time that works for you.
+    </p>
+    <p style="color: #7f8c8d; font-size: 12px;">
+        — {{ object.company_id.name }}
+    </p>
+</div>
+        ]]></field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <!-- ================================================================
+         Missed trial (no-show) — internal notification to salesperson
+         ================================================================ -->
+    <record id="mail_template_trial_expired_owner" model="mail.template">
+        <field name="name">Dojang CRM: Missed Trial — Internal Alert (Email)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="subject">[CRM] Missed Trial: {{ object.contact_name or object.partner_name }}</field>
+        <field name="email_to">{{ object.user_id.email if object.user_id else '' }}</field>
+        <field name="body_html"><![CDATA[
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #e74c3c;">Missed Trial — Action Needed</h2>
+    <p>
+        The trial for lead <strong>{{ object.contact_name or object.partner_name or 'Unknown' }}</strong>
+        has passed without attendance.
+    </p>
+    <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">Lead</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ object.name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">Phone</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ object.phone or 'N/A' }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">Score</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ object.dojo_lead_score }}/100</td>
+        </tr>
+    </table>
+    <p>
+        Please follow up manually to re-engage this prospect.
+    </p>
+</div>
+        ]]></field>
+        <field name="auto_delete" eval="True"/>
+    </record>
+
+    <!-- ================================================================
          No-Show — reschedule follow-up email
          ================================================================ -->
     <record id="mail_template_no_show" model="mail.template">
@@ -94,12 +213,18 @@
         It looks like you weren't able to make it to your free trial class.
         No worries — life happens!
     </p>
+    {% if object.trial_booking_url %}
+    <div style="text-align: center; margin: 24px 0;">
+        <a href="{{ object.trial_booking_url }}"
+           style="background: #3498db; color: #fff; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; font-size: 15px;
+                  display: inline-block;">
+            Reschedule My Trial
+        </a>
+    </div>
+    {% endif %}
     <p>
-        We'd still love to have you try us out. Reply to this email or call us
-        and we'll get you into another trial class at a time that works for you.
-    </p>
-    <p>
-        Your spot is waiting for you!
+        Or reply to this email and we'll find a new time for you.
     </p>
     <p style="color: #7f8c8d; font-size: 12px;">
         — {{ object.company_id.name }}
@@ -143,7 +268,12 @@
     </table>
     {% endif %}
     <p>Please arrive 10 minutes early. Wear comfortable workout clothes.</p>
-    <p>If you need to reschedule, reply to this email and we'll find a new time.</p>
+    {% if object.trial_manage_url %}
+    <p>
+        Need to cancel or reschedule?
+        <a href="{{ object.trial_manage_url }}">Manage your booking here</a>.
+    </p>
+    {% endif %}
     <p style="color: #7f8c8d; font-size: 12px;">
         — {{ object.company_id.name }}
     </p>
@@ -153,10 +283,10 @@
     </record>
 
     <!-- ================================================================
-         Offer Made — membership plan details + CTA
+         Evaluation — membership plan details + CTA
          ================================================================ -->
     <record id="mail_template_offer_made_details" model="mail.template">
-        <field name="name">Dojang CRM: Offer Made — Membership Plan Details (Email)</field>
+        <field name="name">Dojang CRM: Evaluation — Membership Plan Details (Email)</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="subject">Your Personalised Membership Offer is Ready 🥋</field>
         <field name="email_to">{{ object.email_from }}</field>
@@ -242,10 +372,16 @@
         We have classes running throughout the week at multiple times,
         so there's sure to be a slot that suits you.
     </p>
-    <p>
-        If you're still interested in giving us a try, we'd love to set up
-        a new trial class for you — just reply to this email or give us a quick call.
-    </p>
+    {% if object.trial_booking_url %}
+    <div style="text-align: center; margin: 24px 0;">
+        <a href="{{ object.trial_booking_url }}"
+           style="background: #27ae60; color: #fff; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; font-size: 15px;
+                  display: inline-block;">
+            Book a New Trial
+        </a>
+    </div>
+    {% endif %}
     <p>
         No pressure at all. We'll be here whenever you're ready!
     </p>

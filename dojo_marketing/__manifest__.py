@@ -9,7 +9,7 @@
         "dojo_kiosk",
         "dojo_members",
         "dojo_members_portal",
-        "dojo_appointments",
+
         "mail",
         "sms",
     ],

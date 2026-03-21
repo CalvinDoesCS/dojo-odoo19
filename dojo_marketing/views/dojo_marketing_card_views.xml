@@ -47,15 +47,11 @@
                         <field name="body" nolabel="1" widget="text" placeholder="Optional longer description shown on the card…"/>
                     </group>
 
-                    <!-- URL group: hidden for badge (personal QR, URL n/a) and book_trial (auto) -->
+                    <!-- URL group: hidden for badge (personal QR, URL n/a) -->
                     <group string="Target URL"
-                           invisible="card_type in ['book_trial', 'badge']">
+                           invisible="card_type == 'badge'">
                         <field name="custom_url" string="URL"
                                placeholder="https://example.com/donate"/>
-                        <field name="target_url" string="Resolved URL" readonly="1"/>
-                    </group>
-                    <group string="Target URL (auto-generated)"
-                           invisible="card_type != 'book_trial'">
                         <field name="target_url" string="Resolved URL" readonly="1"/>
                     </group>
 
@@ -109,8 +105,7 @@
             </p>
             <p>
                 Marketing cards appear in the kiosk idle carousel and the member portal.
-                Each card can carry a QR code pointing to a custom URL, the trial booking
-                page, or a member's personal check-in barcode.
+                Each card can carry a QR code pointing to a custom URL or a member's personal check-in barcode.
             </p>
         </field>
     </record>

@@ -64,6 +64,14 @@ _KNOWN_INTENT_TYPES = {
     "at_risk_members", "campaign_lookup", "marketing_card_lookup",
     "campaign_create", "campaign_activate",
     "social_post_create", "social_post_schedule",
+    # CRUD intents
+    "program_create", "belt_test_register_crud", "class_template_create",
+    "class_enrollment_create", "class_enrollment_cancel",
+    "belt_test_create", "attendance_log_create", "credit_transaction_create",
+    "marketing_campaign_create", "instructor_profile_update", "emergency_contact_create",
+    "martial_art_style_create", "subscription_plan_create", "program_enrollment_create",
+    "belt_test_registration_create", "marketing_card_create",
+    "kiosk_announcement_create", "course_auto_enroll_create",
 }
 
 # ─── Intent Handler Configuration (for generic read handler) ──────────────────
@@ -95,7 +103,7 @@ _INTENT_HANDLER_CONFIG = {
         "limit": 15,
     },
     "subscription_lookup": {
-        "model": "dojo.subscription",
+        "model": "dojo.member.subscription",
         "domain_builder": "_domain_subscription_lookup",
         "fields": ["id", "member_id", "plan_id", "state", "start_date", "end_date"],
         "limit": 1,
@@ -138,7 +146,6 @@ _CRUD_HANDLER_CONFIG = {
             "name": {"required": True, "type": "char"},
             "email": {"required": False, "type": "char"},
             "phone": {"required": False, "type": "char"},
-            "role": {"required": False, "type": "selection", "default": "student"},
             "membership_state": {"required": False, "type": "selection", "default": "pending"},
         },
         "allow_undo": True,
@@ -151,7 +158,6 @@ _CRUD_HANDLER_CONFIG = {
             "name": {"required": False, "type": "char"},
             "email": {"required": False, "type": "char"},
             "phone": {"required": False, "type": "char"},
-            "role": {"required": False, "type": "selection"},
         },
         "allow_undo": True,
     },
@@ -172,18 +178,20 @@ _CRUD_HANDLER_CONFIG = {
         "allow_undo": True,
     },
     "subscription_create": {
-        "model": "dojo.subscription",
+        "model": "dojo.member.subscription",
         "operation": "create",
         "fields": {
             "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
             "plan_id": {"required": True, "type": "many2one", "resolver": "_resolve_subscription_plan"},
             "start_date": {"required": False, "type": "date", "default_builder": "_default_today"},
-            "state": {"required": False, "type": "selection", "default": "active"},
+            "end_date": {"required": False, "type": "date"},
+            "note": {"required": False, "type": "text"},
+            "state": {"required": False, "type": "selection", "default": "draft"},
         },
         "allow_undo": True,
     },
     "subscription_cancel": {
-        "model": "dojo.subscription",
+        "model": "dojo.member.subscription",
         "operation": "delete",
         "target_domain_builder": "_domain_crud_subscription",
         "allow_undo": True,
@@ -203,9 +211,10 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
-            "test_rank_id": {"required": True, "type": "many2one"},
-            "test_date": {"required": False, "type": "date", "default_builder": "_default_today"},
-            "state": {"required": False, "type": "selection", "default": "registered"},
+            "rank_id": {"required": True, "type": "many2one", "resolver": "_resolve_belt_rank"},
+            "date_awarded": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "program_id": {"required": False, "type": "many2one", "resolver": "_resolve_program"},
+            "notes": {"required": False, "type": "text"},
         },
         "allow_undo": True,
     },
@@ -214,8 +223,10 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "name": {"required": True, "type": "char"},
-            "program_id": {"required": True, "type": "many2one", "resolver": "_resolve_program"},
-            "capacity": {"required": False, "type": "integer", "default": 20},
+            "program_id": {"required": False, "type": "many2one", "resolver": "_resolve_program"},
+            "level": {"required": False, "type": "selection", "default": "all"},
+            "max_capacity": {"required": False, "type": "integer", "default": 20},
+            "duration_minutes": {"required": False, "type": "integer", "default": 60},
             "active": {"required": False, "type": "boolean", "default": True},
         },
         "allow_undo": True,
@@ -226,7 +237,7 @@ _CRUD_HANDLER_CONFIG = {
         "fields": {
             "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
             "session_id": {"required": True, "type": "many2one"},
-            "state": {"required": False, "type": "selection", "default": "confirmed"},
+            "status": {"required": False, "type": "selection", "default": "registered"},
         },
         "allow_undo": True,
     },
@@ -242,9 +253,11 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "name": {"required": True, "type": "char"},
-            "test_rank_id": {"required": True, "type": "many2one"},
-            "test_date": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "test_date": {"required": True, "type": "date"},
             "location": {"required": False, "type": "char"},
+            "program_id": {"required": False, "type": "many2one", "resolver": "_resolve_program"},
+            "max_participants": {"required": False, "type": "integer", "default": 20},
+            "state": {"required": False, "type": "selection", "default": "scheduled"},
         },
         "allow_undo": True,
     },
@@ -253,9 +266,10 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
-            "session_id": {"required": False, "type": "many2one"},
-            "checkin_datetime": {"required": True, "type": "datetime"},
-            "checkout_datetime": {"required": False, "type": "datetime"},
+            "session_id": {"required": True, "type": "many2one"},
+            "status": {"required": False, "type": "selection", "default": "present"},
+            "checkin_datetime": {"required": False, "type": "datetime"},
+            "note": {"required": False, "type": "text"},
         },
         "allow_undo": True,
     },
@@ -263,10 +277,10 @@ _CRUD_HANDLER_CONFIG = {
         "model": "dojo.credit.transaction",
         "operation": "create",
         "fields": {
-            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
-            "amount": {"required": True, "type": "float"},
+            "subscription_id": {"required": True, "type": "many2one"},
+            "amount": {"required": True, "type": "integer"},
             "transaction_type": {"required": True, "type": "selection"},
-            "description": {"required": False, "type": "text"},
+            "status": {"required": False, "type": "selection", "default": "confirmed"},
         },
         "allow_undo": True,
     },
@@ -275,9 +289,12 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "name": {"required": True, "type": "char"},
-            "campaign_type": {"required": True, "type": "selection"},
-            "target_audience": {"required": False, "type": "char"},
-            "send_date": {"required": False, "type": "date"},
+            "subject": {"required": False, "type": "char"},
+            "schedule_type": {"required": False, "type": "selection", "default": "one_time"},
+            "scheduled_date": {"required": False, "type": "date"},
+            "send_email": {"required": False, "type": "boolean", "default": True},
+            "send_sms": {"required": False, "type": "boolean", "default": False},
+            "state": {"required": False, "type": "selection", "default": "draft"},
         },
         "allow_undo": True,
     },
@@ -285,21 +302,21 @@ _CRUD_HANDLER_CONFIG = {
         "model": "dojo.social.post",
         "operation": "create",
         "fields": {
-            "content": {"required": True, "type": "text"},
+            "message": {"required": True, "type": "text"},
             "account_id": {"required": True, "type": "many2one"},
-            "post_date": {"required": False, "type": "datetime"},
-            "published": {"required": False, "type": "boolean", "default": False},
+            "scheduled_date": {"required": False, "type": "datetime"},
+            "state": {"required": False, "type": "selection", "default": "draft"},
         },
         "allow_undo": True,
     },
     "instructor_profile_update": {
         "model": "dojo.instructor.profile",
         "operation": "update",
+        "target_domain_builder": "_domain_crud_instructor",
         "fields": {
-            "user_id": {"required": False, "type": "many2one"},
-            "speciality": {"required": False, "type": "char"},
+            "name": {"required": False, "type": "char"},
             "bio": {"required": False, "type": "text"},
-            "years_experience": {"required": False, "type": "integer"},
+            "active": {"required": False, "type": "boolean"},
         },
         "allow_undo": True,
     },
@@ -308,9 +325,97 @@ _CRUD_HANDLER_CONFIG = {
         "operation": "create",
         "fields": {
             "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
-            "contact_name": {"required": True, "type": "char"},
+            "name": {"required": True, "type": "char"},
             "phone": {"required": True, "type": "char"},
-            "relationship": {"required": False, "type": "char"},
+            "relationship": {"required": True, "type": "char"},
+            "email": {"required": False, "type": "char"},
+            "is_primary": {"required": False, "type": "boolean", "default": False},
+        },
+        "allow_undo": True,
+    },
+    # ─── NEW: Additional Model CRUD Operations ─────────────────────────────
+    "martial_art_style_create": {
+        "model": "dojo.martial.art.style",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "code": {"required": False, "type": "char"},
+            "description": {"required": False, "type": "text"},
+            "active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "subscription_plan_create": {
+        "model": "dojo.subscription.plan",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "plan_type": {"required": True, "type": "selection"},
+            "program_id": {"required": False, "type": "many2one", "resolver": "_resolve_program"},
+            "price": {"required": True, "type": "float"},
+            "billing_period": {"required": True, "type": "selection"},
+            "description": {"required": False, "type": "text"},
+            "active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "program_enrollment_create": {
+        "model": "dojo.program.enrollment",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "program_id": {"required": True, "type": "many2one", "resolver": "_resolve_program"},
+            "enrolled_date": {"required": False, "type": "date", "default_builder": "_default_today"},
+            "notes": {"required": False, "type": "text"},
+            "is_active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "belt_test_registration_create": {
+        "model": "dojo.belt.test.registration",
+        "operation": "create",
+        "fields": {
+            "test_id": {"required": True, "type": "many2one"},
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "target_rank_id": {"required": True, "type": "many2one", "resolver": "_resolve_belt_rank"},
+            "program_id": {"required": False, "type": "many2one", "resolver": "_resolve_program"},
+            "result": {"required": False, "type": "selection", "default": "pending"},
+            "notes": {"required": False, "type": "text"},
+        },
+        "allow_undo": True,
+    },
+    "marketing_card_create": {
+        "model": "dojo.marketing.card",
+        "operation": "create",
+        "fields": {
+            "name": {"required": True, "type": "char"},
+            "card_type": {"required": True, "type": "selection"},
+            "subtitle": {"required": False, "type": "char"},
+            "body": {"required": False, "type": "text"},
+            "active": {"required": False, "type": "boolean", "default": True},
+            "publish_kiosk": {"required": False, "type": "boolean", "default": True},
+            "publish_portal": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "kiosk_announcement_create": {
+        "model": "dojo.kiosk.announcement",
+        "operation": "create",
+        "fields": {
+            "title": {"required": True, "type": "char"},
+            "body": {"required": False, "type": "text"},
+            "active": {"required": False, "type": "boolean", "default": True},
+        },
+        "allow_undo": True,
+    },
+    "course_auto_enroll_create": {
+        "model": "dojo.course.auto.enroll",
+        "operation": "create",
+        "fields": {
+            "member_id": {"required": True, "type": "many2one", "resolver": "_resolve_member"},
+            "template_id": {"required": True, "type": "many2one", "resolver": "_resolve_class_template"},
+            "mode": {"required": False, "type": "selection", "default": "permanent"},
+            "active": {"required": False, "type": "boolean", "default": True},
         },
         "allow_undo": True,
     },
@@ -1791,6 +1896,15 @@ class AiAssistantService(models.AbstractModel):
             return [("member_id", "=", member_id)]
         elif session_id:
             return [("session_id", "=", session_id)]
+        return [("id", "=", -1)]
+
+    @api.model
+    def _domain_crud_instructor(self, intent_data, resolved_data):
+        """Domain for update on instructor profiles."""
+        params = intent_data.get("parameters", {}) if intent_data else {}
+        name = params.get("instructor_name")
+        if name:
+            return [("name", "ilike", name)]
         return [("id", "=", -1)]
 
     # ═══════════════════════════════════════════════════════════════════════════

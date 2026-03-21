@@ -1,32 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        Rule 1: When lead moves to "Trial Booked" stage →
-                send booking confirmation email + SMS
+        Rule 1: When lead moves to "Qualified" stage →
+                generate trial tokens, send booking invitation email + SMS
     -->
-    <record id="automation_trial_booked_email" model="base.automation">
-        <field name="name">Dojang CRM: Trial Booked — Send Confirmation</field>
+    <record id="automation_qualified_invite" model="base.automation">
+        <field name="name">Dojang CRM: Qualified — Send Booking Invitation</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
-        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
-        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_qualified'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_qualified'))]"/>
         <field name="active" eval="True"/>
         <field name="action_server_ids">
-            <record model="ir.actions.server" id="automation_trial_booked_email_action">
-                <field name="name">Send Trial Booked Confirmation</field>
+            <record model="ir.actions.server" id="automation_qualified_invite_action">
+                <field name="name">Generate Tokens + Send Booking Invite</field>
                 <field name="model_id" ref="crm.model_crm_lead"/>
                 <field name="state">code</field>
                 <field name="code"><![CDATA[
-template = env.ref('dojo_crm.mail_template_trial_booked', raise_if_not_found=False)
+template = env.ref('dojo_crm.mail_template_qualified', raise_if_not_found=False)
 for rec in records:
+    # Generate trial booking tokens if missing
+    if not rec.trial_booking_token:
+        rec._generate_trial_tokens()
+    # Send invitation email
     if template and rec.email_from:
         template.send_mail(rec.id, force_send=True)
-    mobile = rec.mobile or (rec.partner_id.mobile if rec.partner_id else False)
-    if mobile:
-        session_info = ''
-        if rec.trial_session_id:
-            session_info = f' on {rec.trial_session_id.start_datetime}'
-        body = f"Your trial class at {rec.company_id.name or 'the Dojang'} is confirmed{session_info}. See you there!"
+    # SMS with booking link
+    mobile = rec.phone or (rec.partner_id.mobile or rec.partner_id.phone if rec.partner_id else False)
+    if mobile and rec.trial_booking_url:
+        body = f"Hi {rec.contact_name or 'there'}! Book your free trial at {rec.company_id.name or 'the Dojang'}: {rec.trial_booking_url}"
         env['sms.sms'].create({
             'number': mobile,
             'body': body,
@@ -38,11 +40,81 @@ for rec in records:
     </record>
 
     <!--
-        Rule 2: When lead moves to "Trial Attended" stage →
+        Rule 2: When lead moves to "Trial Booked" stage →
+                send booking confirmation email (with .ics) + SMS with manage link
+    -->
+    <record id="automation_trial_booked_email" model="base.automation">
+        <field name="name">Dojang CRM: Trial Booked — Send Confirmation</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="trigger">on_write</field>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="active" eval="True"/>
+        <field name="action_server_ids">
+            <record model="ir.actions.server" id="automation_trial_booked_email_action">
+                <field name="name">Send Trial Booked Confirmation + .ics</field>
+                <field name="model_id" ref="crm.model_crm_lead"/>
+                <field name="state">code</field>
+                <field name="code"><![CDATA[
+template = env.ref('dojo_crm.mail_template_trial_booked', raise_if_not_found=False)
+for rec in records:
+    # Attach .ics and send email
+    if template and rec.email_from:
+        ics_attach = rec._get_ics_attachment()
+        attachment_ids = [ics_attach.id] if ics_attach else []
+        template.send_mail(rec.id, force_send=True, email_values={
+            'attachment_ids': [(6, 0, attachment_ids)],
+        })
+    # SMS with manage link
+    mobile = rec.phone or (rec.partner_id.mobile or rec.partner_id.phone if rec.partner_id else False)
+    if mobile:
+        session_info = ''
+        if rec.trial_session_id:
+            session_info = f' on {rec.trial_session_id.start_datetime}'
+        manage_info = ''
+        if rec.trial_manage_url:
+            manage_info = f' Cancel/reschedule: {rec.trial_manage_url}'
+        body = f"Your trial class at {rec.company_id.name or 'the Dojang'} is confirmed{session_info}. See you there!{manage_info}"
+        env['sms.sms'].create({
+            'number': mobile,
+            'body': body,
+            'partner_id': rec.partner_id.id if rec.partner_id else False,
+        }).send()
+                ]]></field>
+            </record>
+        </field>
+    </record>
+
+    <!--
+        Rule 3: When lead moves to "Trial Booked" →
+                create a Call activity for salesperson (due in 2h)
+    -->
+    <record id="automation_trial_booked_call" model="base.automation">
+        <field name="name">Dojang CRM: Trial Booked — Create Call Activity</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="trigger">on_write</field>
+        <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="filter_domain" eval="[('stage_id', '=', ref('dojo_crm.crm_stage_trial_booked'))]"/>
+        <field name="active" eval="True"/>
+        <field name="action_server_ids">
+            <record model="ir.actions.server" id="automation_trial_booked_call_action">
+                <field name="name">Schedule Call Activity</field>
+                <field name="model_id" ref="crm.model_crm_lead"/>
+                <field name="state">code</field>
+                <field name="code"><![CDATA[
+for rec in records:
+    rec._create_call_activity()
+                ]]></field>
+            </record>
+        </field>
+    </record>
+
+    <!--
+        Rule 4: When lead moves to "Trial-in-progress" stage →
                 send post-trial offer email; set offer_sent_date
     -->
     <record id="automation_trial_attended_offer" model="base.automation">
-        <field name="name">Dojang CRM: Trial Attended — Send Offer</field>
+        <field name="name">Dojang CRM: Trial-in-progress — Send Offer</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
         <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_trial_attended'))]"/>
@@ -59,17 +131,18 @@ for rec in records:
     if template and rec.email_from:
         template.send_mail(rec.id, force_send=True)
     rec.write({'offer_sent_date': fields.Date.today(), 'trial_attended': True})
+    rec._schedule_post_trial_followups()
                 ]]></field>
             </record>
         </field>
     </record>
 
     <!--
-        Rule 3: When lead moves to "Offer Made" stage →
+        Rule 5: When lead moves to "Evaluation" stage →
                 send full membership plan details + CTA email
     -->
     <record id="automation_offer_made_details" model="base.automation">
-        <field name="name">Dojang CRM: Offer Made — Send Plan Details</field>
+        <field name="name">Dojang CRM: Evaluation — Send Plan Details</field>
         <field name="model_id" ref="crm.model_crm_lead"/>
         <field name="trigger">on_write</field>
         <field name="filter_pre_domain" eval="[('stage_id', '!=', ref('dojo_crm.crm_stage_offer_made'))]"/>

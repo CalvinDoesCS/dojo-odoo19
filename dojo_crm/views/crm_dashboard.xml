@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================================================
+         CRM Pipeline Dashboard — Kanban enhancements
+         ================================================================ -->
+
+    <!-- Add lead score + trial status to kanban cards -->
+    <record id="view_crm_lead_kanban_dojo_inherit" model="ir.ui.view">
+        <field name="name">crm.lead.kanban.dojo.inherit</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_case_kanban_view_leads"/>
+        <field name="arch" type="xml">
+            <!-- Declare extra fields so they are fetched for the kanban view -->
+            <xpath expr="//kanban" position="inside">
+                <field name="dojo_lead_score"/>
+                <field name="trial_attended"/>
+                <field name="no_show"/>
+                <field name="is_converted"/>
+            </xpath>
+            <xpath expr="//kanban//templates//t[@t-name='card']" position="inside">
+                <div class="d-flex align-items-center gap-1 mt-1">
+                    <t t-if="record.dojo_lead_score.raw_value">
+                        <span t-attf-class="badge #{record.dojo_lead_score.raw_value >= 60 ? 'text-bg-success' : (record.dojo_lead_score.raw_value >= 30 ? 'text-bg-warning' : 'text-bg-secondary')}">
+                            Score: <t t-esc="record.dojo_lead_score.raw_value"/>
+                        </span>
+                    </t>
+                    <t t-if="record.trial_attended.raw_value">
+                        <span class="badge text-bg-info">Attended</span>
+                    </t>
+                    <t t-if="record.no_show.raw_value">
+                        <span class="badge text-bg-danger">No-Show</span>
+                    </t>
+                    <t t-if="record.is_converted.raw_value">
+                        <span class="badge text-bg-success">Converted</span>
+                    </t>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Pipeline search view — add dojo-specific filters -->
+    <record id="view_crm_lead_search_dojo_inherit" model="ir.ui.view">
+        <field name="name">crm.lead.search.dojo.inherit</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.view_crm_case_opportunities_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter string="High Score (≥60)" name="high_score"
+                        domain="[('dojo_lead_score', '>=', 60)]"/>
+                <filter string="Trial Attended" name="trial_attended"
+                        domain="[('trial_attended', '=', True)]"/>
+                <filter string="No-Show" name="no_show"
+                        domain="[('no_show', '=', True)]"/>
+                <filter string="Converted" name="converted"
+                        domain="[('is_converted', '=', True)]"/>
+                <filter string="Has Booking Link" name="has_booking_link"
+                        domain="[('trial_booking_token', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

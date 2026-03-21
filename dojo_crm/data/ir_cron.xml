@@ -43,4 +43,48 @@
         <field name="interval_type">days</field>
         <field name="active" eval="True"/>
     </record>
+
+    <!-- Daily: move missed-trial leads (Trial Booked, session passed) to Evaluation -->
+    <record id="ir_cron_crm_trial_expiry" model="ir.cron">
+        <field name="name">Dojang CRM: Missed Trials — Move to Evaluation</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_trial_expiry()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Every 2h: auto-qualify leads with score >= 60 -->
+    <record id="ir_cron_crm_auto_qualify" model="ir.cron">
+        <field name="name">Dojang CRM: Auto-Qualify (score ≥ 60)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_auto_qualify()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Weekly: win-back no-show Evaluation leads (7–30d re-engage, 30d+ auto-lost) -->
+    <record id="ir_cron_crm_winback" model="ir.cron">
+        <field name="name">Dojang CRM: Win-Back — Re-engage No-Show Evaluation Leads</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_winback()</field>
+        <field name="interval_number">7</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Weekly: stale New-stage lead cleanup (14d nudge, 30d auto-lost) -->
+    <record id="ir_cron_crm_stale_leads" model="ir.cron">
+        <field name="name">Dojang CRM: Stale Lead Cleanup (14d nudge + 30d archive)</field>
+        <field name="model_id" ref="crm.model_crm_lead"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_stale_leads()</field>
+        <field name="interval_number">7</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
 </odoo>

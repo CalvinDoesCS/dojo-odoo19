@@ -309,7 +309,10 @@ Promote Jane to her next belt level</field>
         "member_name": {"type": "string", "description": "Name of the member"},
         "member_id": {"type": "integer", "description": "ID of the member"},
         "plan_name": {"type": "string", "description": "Name of the subscription plan"},
-        "plan_id": {"type": "integer", "description": "ID of the subscription plan"}
+        "plan_id": {"type": "integer", "description": "ID of the subscription plan"},
+        "start_date": {"type": "string", "format": "date", "description": "Start date (YYYY-MM-DD)"},
+        "end_date": {"type": "string", "format": "date", "description": "End date (YYYY-MM-DD, optional)"},
+        "note": {"type": "string", "description": "Optional notes"}
     },
     "required": ["member_name", "plan_name"]
 }</field>
@@ -401,8 +404,7 @@ Let Jane's guardian know about the schedule change</field>
     "properties": {
         "name": {"type": "string", "description": "Full name of the new member"},
         "email": {"type": "string", "format": "email", "description": "Email address"},
-        "phone": {"type": "string", "description": "Phone number"},
-        "role": {"type": "string", "enum": ["student", "instructor"], "default": "student"}
+        "phone": {"type": "string", "description": "Phone number"}
     },
     "required": ["name"]
 }</field>
@@ -770,30 +772,6 @@ Launch our back to school campaign</field>
         <field name="active">True</field>
     </record>
 
-    <record id="intent_social_post_create" model="dojo.ai.intent.schema">
-        <field name="intent_type">social_post_create</field>
-        <field name="name">Create Social Post</field>
-        <field name="description">Publish a post immediately to a connected Facebook or Instagram account</field>
-        <field name="category">social</field>
-        <field name="parameters_schema">{
-    "type": "object",
-    "properties": {
-        "message": {"type": "string", "description": "The post message text"},
-        "platform": {"type": "string", "enum": ["facebook", "instagram"], "description": "Platform to post to"}
-    },
-    "required": ["message"]
-}</field>
-        <field name="example_phrases">Post our summer announcement on Facebook
-Publish a post about belt testing
-Share our new schedule on social media</field>
-        <field name="allowed_roles">admin</field>
-        <field name="requires_confirmation">True</field>
-        <field name="confirmation_template">Post '{message}' to social media now?</field>
-        <field name="is_undoable">False</field>
-        <field name="supports_bulk">False</field>
-        <field name="active">True</field>
-    </record>
-
     <record id="intent_social_post_schedule" model="dojo.ai.intent.schema">
         <field name="intent_type">social_post_schedule</field>
         <field name="name">Schedule Social Post</field>
@@ -858,11 +836,12 @@ Create the Tiny Titans program for toddlers</field>
     "properties": {
         "member_name": {"type": "string", "description": "Name of the member testing"},
         "member_id": {"type": "integer", "description": "ID of the member"},
-        "test_rank_id": {"type": "integer", "description": "ID of the belt rank being tested for"},
-        "test_date": {"type": "string", "format": "date", "description": "Date of the test (YYYY-MM-DD)"},
-        "state": {"type": "string", "description": "State of the registration", "default": "registered"}
+        "rank_name": {"type": "string", "description": "Name of the belt rank being tested for"},
+        "program_name": {"type": "string", "description": "Name of the program"},
+        "date_awarded": {"type": "string", "format": "date", "description": "Date awarded (YYYY-MM-DD)"},
+        "notes": {"type": "string", "description": "Optional notes"}
     },
-    "required": ["member_name", "test_rank_id"]
+    "required": ["member_name", "rank_name"]
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
@@ -885,11 +864,12 @@ Add Test8 to the purple belt test</field>
     "properties": {
         "name": {"type": "string", "description": "Name of the class template"},
         "program_name": {"type": "string", "description": "Name of the program this class belongs to"},
-        "program_id": {"type": "integer", "description": "ID of the program"},
-        "capacity": {"type": "integer", "description": "Max students per session", "default": 20},
+        "max_capacity": {"type": "integer", "description": "Max students per session", "default": 20},
+        "level": {"type": "string", "description": "Class difficulty level"},
+        "duration_minutes": {"type": "integer", "description": "Duration in minutes", "default": 60},
         "active": {"type": "boolean", "description": "Whether the template is active", "default": true}
     },
-    "required": ["name", "program_name"]
+    "required": ["name"]
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
@@ -913,7 +893,7 @@ Create the Advanced Forms class template</field>
         "member_name": {"type": "string", "description": "Name of the member"},
         "member_id": {"type": "integer", "description": "ID of the member"},
         "session_id": {"type": "integer", "description": "ID of the class session"},
-        "state": {"type": "string", "description": "State of the enrollment", "default": "confirmed"}
+        "status": {"type": "string", "description": "Status of the enrollment", "default": "registered"}
     },
     "required": ["member_name", "session_id"]
 }</field>
@@ -968,18 +948,19 @@ Unenroll Mike from Friday's session</field>
     "type": "object",
     "properties": {
         "name": {"type": "string", "description": "Name of the test event"},
-        "test_rank": {"type": "string", "description": "Belt rank being tested for"},
-        "test_date": {"type": "string", "format": "date", "description": "Date of the test"},
-        "location": {"type": "string", "description": "Location of the test"}
+        "test_date": {"type": "string", "format": "date", "description": "Date of the test (YYYY-MM-DD)"},
+        "location": {"type": "string", "description": "Location of the test"},
+        "program_name": {"type": "string", "description": "Program this test is for"},
+        "max_participants": {"type": "integer", "description": "Maximum number of participants", "default": 20}
     },
-    "required": ["name", "test_rank"]
+    "required": ["name", "test_date"]
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
-        <field name="example_phrases">Create a new belt test for blue belts
+        <field name="example_phrases">Create a belt test for March 30th
 Schedule a test event for Saturday
-Create a belt test on March 30th</field>
-        <field name="confirmation_template">Create new belt test "{name}" for {test_rank}?</field>
+Create a new belt test called Spring Grading</field>
+        <field name="confirmation_template">Create new belt test "{name}" on {test_date}?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
         <field name="active">True</field>
@@ -994,10 +975,11 @@ Create a belt test on March 30th</field>
     "type": "object",
     "properties": {
         "member_name": {"type": "string", "description": "Name of the member"},
-        "checkin_datetime": {"type": "string", "format": "date-time", "description": "Check-in time"},
-        "checkout_datetime": {"type": "string", "format": "date-time", "description": "Check-out time (optional)"}
+        "session_id": {"type": "integer", "description": "ID of the class session"},
+        "checkin_datetime": {"type": "string", "format": "date-time", "description": "Check-in time (defaults to now)"},
+        "note": {"type": "string", "description": "Optional note"}
     },
-    "required": ["member_name", "checkin_datetime"]
+    "required": ["member_name", "session_id"]
 }</field>
         <field name="allowed_roles">instructor,admin</field>
         <field name="requires_confirmation">True</field>
@@ -1013,15 +995,15 @@ Record Test8's check-in at 3:30pm</field>
     <record id="intent_credit_transaction_create" model="dojo.ai.intent.schema">
         <field name="intent_type">credit_transaction_create</field>
         <field name="name">Create Credit Transaction</field>
-        <field name="description">Record a credit transaction (add, use, or adjust credits)</field>
+        <field name="description">Record a credit transaction (grant, hold, or adjust credits)</field>
         <field name="category">subscription</field>
         <field name="parameters_schema">{
     "type": "object",
     "properties": {
         "member_name": {"type": "string", "description": "Name of the member"},
-        "amount": {"type": "number", "description": "Number of credits"},
-        "transaction_type": {"type": "string", "enum": ["add", "use", "adjust"], "description": "Type of transaction"},
-        "description": {"type": "string", "description": "Reason or description"}
+        "subscription_id": {"type": "integer", "description": "ID of the member subscription"},
+        "amount": {"type": "integer", "description": "Number of credits (positive = add, negative = deduct)"},
+        "transaction_type": {"type": "string", "enum": ["grant", "hold", "expiry", "adjustment"], "description": "Type of transaction"}
     },
     "required": ["member_name", "amount", "transaction_type"]
 }</field>
@@ -1045,18 +1027,20 @@ Adjust Test8's credits for makeup class</field>
     "type": "object",
     "properties": {
         "name": {"type": "string", "description": "Campaign name"},
-        "campaign_type": {"type": "string", "enum": ["email", "sms", "social"], "description": "Type of campaign"},
-        "target_audience": {"type": "string", "description": "Who to target (e.g., all members, kids only)"},
-        "send_date": {"type": "string", "format": "date", "description": "When to send"}
+        "subject": {"type": "string", "description": "Email subject line"},
+        "schedule_type": {"type": "string", "enum": ["one_time", "recurring"], "description": "One-time or recurring campaign"},
+        "scheduled_date": {"type": "string", "format": "date", "description": "When to send (YYYY-MM-DD)"},
+        "send_email": {"type": "boolean", "description": "Send via email", "default": true},
+        "send_sms": {"type": "boolean", "description": "Send via SMS", "default": false}
     },
-    "required": ["name", "campaign_type"]
+    "required": ["name"]
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
         <field name="example_phrases">Create an email campaign for summer camp
-Start a social media campaign
+Start a recurring campaign called Monthly Newsletter
 Create an SMS blast for active members</field>
-        <field name="confirmation_template">Create {campaign_type} campaign "{name}"?</field>
+        <field name="confirmation_template">Create campaign "{name}"?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
         <field name="active">True</field>
@@ -1070,19 +1054,18 @@ Create an SMS blast for active members</field>
         <field name="parameters_schema">{
     "type": "object",
     "properties": {
-        "content": {"type": "string", "description": "Post content/message"},
+        "message": {"type": "string", "description": "Post message text"},
         "platform": {"type": "string", "enum": ["facebook", "instagram", "both"], "description": "Platform to post on"},
-        "post_date": {"type": "string", "format": "date-time", "description": "When to post (optional - now if not specified)"},
-        "published": {"type": "boolean", "description": "Post immediately or create as draft"}
+        "scheduled_date": {"type": "string", "format": "date-time", "description": "When to post (optional - draft if not specified)"}
     },
-    "required": ["content", "platform"]
+    "required": ["message"]
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
         <field name="example_phrases">Post about our new program on Facebook
 Create an Instagram post about belt testing
-Post a message to social media now</field>
-        <field name="confirmation_template">Post to {platform}: "{content}"?</field>
+Draft a social media post about our schedule</field>
+        <field name="confirmation_template">Create social post: "{message}"?</field>
         <field name="is_undoable">False</field>
         <field name="supports_bulk">False</field>
         <field name="active">True</field>
@@ -1097,9 +1080,9 @@ Post a message to social media now</field>
     "type": "object",
     "properties": {
         "instructor_name": {"type": "string", "description": "Name of the instructor"},
-        "speciality": {"type": "string", "description": "Area of expertise (e.g., BJJ, Karate)"},
+        "name": {"type": "string", "description": "New display name"},
         "bio": {"type": "string", "description": "Short biography"},
-        "years_experience": {"type": "integer", "description": "Years of teaching experience"}
+        "active": {"type": "boolean", "description": "Whether the profile is active"}
     },
     "required": ["instructor_name"]
 }</field>
@@ -1123,18 +1106,208 @@ Update Mike's bio to highlight his BJJ experience</field>
     "type": "object",
     "properties": {
         "member_name": {"type": "string", "description": "Name of the member"},
-        "contact_name": {"type": "string", "description": "Name of the emergency contact"},
+        "name": {"type": "string", "description": "Name of the emergency contact"},
         "phone": {"type": "string", "description": "Phone number"},
-        "relationship": {"type": "string", "description": "Relationship (parent, sibling, etc.)"}
+        "relationship": {"type": "string", "description": "Relationship (parent, sibling, etc.)"},
+        "email": {"type": "string", "format": "email", "description": "Email address (optional)"},
+        "is_primary": {"type": "boolean", "description": "Set as primary contact", "default": false}
     },
-    "required": ["member_name", "contact_name", "phone"]
+    "required": ["member_name", "name", "phone", "relationship"]
 }</field>
         <field name="allowed_roles">admin</field>
         <field name="requires_confirmation">True</field>
         <field name="example_phrases">Add Jane Smith as emergency contact for John
 Record his mother's phone number as backup contact
 Add Sarah's guardian contact information</field>
-        <field name="confirmation_template">Add {contact_name} as emergency contact for {member_name}?</field>
+        <field name="confirmation_template">Add {name} as emergency contact for {member_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- NEW MODEL CRUD Intents                                              -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_martial_art_style_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">martial_art_style_create</field>
+        <field name="name">Create Martial Art Style</field>
+        <field name="description">Add a new martial art style to the system</field>
+        <field name="category">system</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Name of the martial art style (e.g., Brazilian Jiu-Jitsu, Karate)"},
+        "code": {"type": "string", "description": "Short code (e.g., BJJ, KAR)"},
+        "description": {"type": "string", "description": "Description of the style"}
+    },
+    "required": ["name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Add Brazilian Jiu-Jitsu as a martial art style
+Create a new style called Muay Thai
+Add Taekwondo with code TKD</field>
+        <field name="confirmation_template">Create martial art style "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_subscription_plan_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">subscription_plan_create</field>
+        <field name="name">Create Subscription Plan</field>
+        <field name="description">Create a new subscription plan</field>
+        <field name="category">subscription</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Plan name (e.g., Monthly Unlimited)"},
+        "plan_type": {"type": "string", "enum": ["credits", "unlimited", "limited"], "description": "Type of plan"},
+        "program_name": {"type": "string", "description": "Program this plan is for"},
+        "price": {"type": "number", "description": "Monthly price"},
+        "billing_period": {"type": "string", "enum": ["monthly", "quarterly", "biannual", "annual"], "description": "Billing cycle"},
+        "description": {"type": "string", "description": "Plan description"}
+    },
+    "required": ["name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a monthly unlimited plan for $150
+Add a new credits-based plan called 10-Pack
+Set up an annual subscription plan for kids BJJ</field>
+        <field name="confirmation_template">Create subscription plan "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_program_enrollment_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">program_enrollment_create</field>
+        <field name="name">Enroll Member in Program</field>
+        <field name="description">Enroll a member into a martial arts program</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "program_name": {"type": "string", "description": "Name of the program"},
+        "enrolled_date": {"type": "string", "format": "date", "description": "Enrollment date (YYYY-MM-DD, defaults to today)"},
+        "notes": {"type": "string", "description": "Optional enrollment notes"}
+    },
+    "required": ["member_name", "program_name"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Enroll John in the Kids BJJ program
+Add Sarah to the Adult Karate program
+Sign up Test8 for Fundamentals starting today</field>
+        <field name="confirmation_template">Enroll {member_name} in {program_name}?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_belt_test_registration_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">belt_test_registration_create</field>
+        <field name="name">Register for Belt Test Event</field>
+        <field name="description">Register a member for a specific belt test event</field>
+        <field name="category">belt</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "test_id": {"type": "integer", "description": "ID of the belt test event"},
+        "rank_name": {"type": "string", "description": "Target belt rank"},
+        "program_name": {"type": "string", "description": "Name of the program"},
+        "notes": {"type": "string", "description": "Optional notes"}
+    },
+    "required": ["member_name", "test_id"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Register John for the Spring belt test
+Sign up Sarah for the upcoming grading event
+Add Test8 to belt test #5</field>
+        <field name="confirmation_template">Register {member_name} for belt test event?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_marketing_card_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">marketing_card_create</field>
+        <field name="name">Create Marketing Card</field>
+        <field name="description">Create a marketing card for kiosk or portal display</field>
+        <field name="category">marketing</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Card name/title"},
+        "card_type": {"type": "string", "description": "Type of card"},
+        "subtitle": {"type": "string", "description": "Card subtitle"},
+        "body": {"type": "string", "description": "Card body content"},
+        "publish_kiosk": {"type": "boolean", "description": "Show on kiosk", "default": true},
+        "publish_portal": {"type": "boolean", "description": "Show on member portal", "default": false}
+    },
+    "required": ["name"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a marketing card for summer camp
+Add a promo card for the kiosk about new classes
+Create a portal card about our belt testing schedule</field>
+        <field name="confirmation_template">Create marketing card "{name}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_kiosk_announcement_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">kiosk_announcement_create</field>
+        <field name="name">Create Kiosk Announcement</field>
+        <field name="description">Create an announcement to display on the kiosk</field>
+        <field name="category">system</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "title": {"type": "string", "description": "Announcement title"},
+        "body": {"type": "string", "description": "Announcement content"},
+        "active": {"type": "boolean", "description": "Whether announcement is active", "default": true}
+    },
+    "required": ["title", "body"]
+}</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Create a kiosk announcement about holiday hours
+Post a notice about the upcoming tournament
+Add an announcement about schedule changes</field>
+        <field name="confirmation_template">Create kiosk announcement "{title}"?</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_course_auto_enroll_create" model="dojo.ai.intent.schema">
+        <field name="intent_type">course_auto_enroll_create</field>
+        <field name="name">Set Up Auto-Enrollment</field>
+        <field name="description">Create an auto-enrollment rule for a member in a class template</field>
+        <field name="category">enrollment</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "member_name": {"type": "string", "description": "Name of the member"},
+        "class_name": {"type": "string", "description": "Name of the class template"},
+        "mode": {"type": "string", "enum": ["all", "next_only"], "description": "Auto-enroll in all future sessions or just the next one", "default": "all"}
+    },
+    "required": ["member_name", "class_name"]
+}</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="example_phrases">Auto-enroll John in all Fundamentals classes
+Set up Sarah for automatic enrollment in Kids BJJ
+Enable auto-enrollment for Test8 in Advanced Sparring</field>
+        <field name="confirmation_template">Set up auto-enrollment for {member_name} in {class_name} ({mode})?</field>
         <field name="is_undoable">True</field>
         <field name="supports_bulk">False</field>
         <field name="active">True</field>

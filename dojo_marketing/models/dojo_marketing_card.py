@@ -7,15 +7,12 @@ from odoo import api, fields, models
 _logger = logging.getLogger(__name__)
 
 CARD_TYPES = [
-    ("book_trial", "Book Trial"),
     ("donate", "Donate"),
     ("merch", "Buy Merch"),
     ("tournament", "Register Tournament"),
     ("badge", "Member Badge (Check-in QR)"),
 ]
 
-# Card types whose URL is computed automatically and don't need custom_url
-_AUTO_URL_TYPES = {"book_trial"}
 # Card types that have no static QR (generated per-member at runtime)
 _PERSONAL_TYPES = {"badge"}
 
@@ -37,8 +34,7 @@ class DojoMarketingCard(models.Model):
     # Custom target URL — only relevant for donate / merch / tournament
     custom_url = fields.Char(
         string="Target URL",
-        help="URL this card's QR code should point to. "
-             "Not used for 'Book Trial' (auto) or 'Member Badge' (per-member).",
+        help="URL this card's QR code should point to. Not used for 'Member Badge' (per-member).",
     )
 
     # Computed URL used to generate the QR
@@ -64,9 +60,7 @@ class DojoMarketingCard(models.Model):
             "web.base.url", default=""
         )
         for card in self:
-            if card.card_type == "book_trial":
-                card.target_url = f"{base_url}/dojo/book-trial"
-            elif card.card_type in _PERSONAL_TYPES:
+            if card.card_type in _PERSONAL_TYPES:
                 card.target_url = False
             else:
                 card.target_url = card.custom_url or False

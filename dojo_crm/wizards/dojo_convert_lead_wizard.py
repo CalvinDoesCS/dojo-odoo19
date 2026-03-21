@@ -104,14 +104,14 @@ class DojoConvertLeadWizard(models.TransientModel):
                 res["last_name"] = name_parts[1] if len(name_parts) > 1 else ""
                 res["email"] = partner.email or lead.email_from or ""
                 res["phone"] = partner.phone or lead.phone or ""
-                res["mobile"] = getattr(partner, 'mobile', None) or lead.mobile or ""
+                res["mobile"] = getattr(partner, 'mobile', None) or ""
             else:
                 name_parts = (lead.contact_name or lead.partner_name or "").split(" ", 1)
                 res["first_name"] = name_parts[0]
                 res["last_name"] = name_parts[1] if len(name_parts) > 1 else ""
                 res["email"] = lead.email_from or ""
                 res["phone"] = lead.phone or ""
-                res["mobile"] = lead.mobile or ""
+                res["mobile"] = ""
             res["lead_id"] = lead.id
         return res
 
@@ -137,7 +137,6 @@ class DojoConvertLeadWizard(models.TransientModel):
                     "name": full_name,
                     "email": self.email,
                     "phone": self.phone,
-                    "mobile": self.mobile,
                     "company_type": "person",
                 }
             )
@@ -147,7 +146,6 @@ class DojoConvertLeadWizard(models.TransientModel):
                     "name": full_name,
                     "email": self.email or partner.email,
                     "phone": self.phone or partner.phone,
-                    "mobile": self.mobile or partner.mobile,
                 }
             )
 
@@ -165,7 +163,7 @@ class DojoConvertLeadWizard(models.TransientModel):
                     {
                         "name": self.guardian_name,
                         "email": self.guardian_email,
-                        "mobile": self.guardian_mobile,
+                        "phone": self.guardian_mobile,
                         "company_type": "person",
                         "is_guardian": True,
                     }
@@ -237,9 +235,9 @@ class DojoConvertLeadWizard(models.TransientModel):
         lead.dojo_member_id = member.id if member else False
         lead.trial_attended = True
 
-        # ---- Move lead to Converted stage ----
+        # ---- Move lead to Won stage ----
         converted_stage = self.env["crm.stage"].search(
-            [("name", "=", "Converted")], limit=1
+            [("name", "=", "Won")], limit=1
         )
         if converted_stage:
             lead.stage_id = converted_stage.id

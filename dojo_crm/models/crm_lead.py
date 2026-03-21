@@ -1,4 +1,6 @@
+import base64
 import logging
+import uuid
 from datetime import timedelta
 
 from odoo import _, api, fields, models
@@ -6,11 +8,34 @@ from odoo import _, api, fields, models
 _logger = logging.getLogger(__name__)
 
 # Stage name constants — must match data/crm_stage.xml exactly
-STAGE_NEW_LEAD = "New Lead"
+STAGE_NEW_LEAD = "New"
+STAGE_QUALIFIED = "Qualified"
 STAGE_TRIAL_BOOKED = "Trial Booked"
-STAGE_TRIAL_ATTENDED = "Trial Attended"
-STAGE_OFFER_MADE = "Offer Made"
-STAGE_CONVERTED = "Converted"
+STAGE_TRIAL_IN_PROGRESS = "Trial-in-progress"
+STAGE_EVALUATION = "Evaluation"
+STAGE_WON = "Won"
+
+# Lead-scoring weights
+_SCORE_EMAIL = 10
+_SCORE_PHONE = 10
+_SCORE_SOURCE_REFERRAL = 20
+_SCORE_SOURCE_WALKIN = 15
+_SCORE_SOURCE_ONLINE = 10
+_SCORE_SOURCE_EVENT = 15
+_SCORE_INTEREST_TAG = 15
+_SCORE_AGE_TAG = 5
+_SCORE_BOOKING_CLICKED = 10
+_SCORE_TRIAL_ATTENDED = 15
+
+# Source tag names (must match data/crm_tag.xml)
+_SOURCE_SCORE_MAP = {
+    "Referral": _SCORE_SOURCE_REFERRAL,
+    "Walk-In": _SCORE_SOURCE_WALKIN,
+    "Online": _SCORE_SOURCE_ONLINE,
+    "Event": _SCORE_SOURCE_EVENT,
+}
+_INTEREST_TAGS = {"Adult BJJ", "Kids BJJ", "Muay Thai"}
+_AGE_TAGS = {"Adult", "Teen", "Child"}
 
 
 class CrmLead(models.Model):
@@ -71,6 +96,60 @@ class CrmLead(models.Model):
         store=True,
     )
 
+    # ── Trial booking tokens ─────────────────────────────────────────────
+    trial_booking_token = fields.Char(
+        string="Booking Token",
+        copy=False,
+        readonly=True,
+        index=True,
+        help="Unique token for the public trial-booking page.",
+    )
+    trial_cancel_token = fields.Char(
+        string="Manage Token",
+        copy=False,
+        readonly=True,
+        index=True,
+        help="Unique token for the public cancel/reschedule page.",
+    )
+    trial_token_expires = fields.Datetime(
+        string="Token Expires",
+        readonly=True,
+    )
+    trial_booking_url = fields.Char(
+        string="Booking URL",
+        compute="_compute_trial_urls",
+    )
+    trial_manage_url = fields.Char(
+        string="Manage URL",
+        compute="_compute_trial_urls",
+    )
+
+    # ── Engagement tracking ──────────────────────────────────────────────
+    booking_link_clicked = fields.Boolean(
+        string="Booking Link Clicked",
+        default=False,
+        help="Set when the lead visits the public trial booking page.",
+    )
+    last_engagement_date = fields.Datetime(
+        string="Last Engagement",
+        help="Updated on stage change, email opens, or booking link clicks.",
+    )
+
+    # ── Lead scoring ─────────────────────────────────────────────────────
+    dojo_lead_score = fields.Integer(
+        string="Lead Score",
+        compute="_compute_lead_score",
+        store=True,
+        help="Composite score 0–100 based on contact completeness, source, tags and engagement.",
+    )
+
+    # ── AI insights (populated when dojo_assistant is installed) ─────────
+    ai_summary = fields.Text(
+        string="AI Summary",
+        readonly=True,
+        help="Auto-generated lead summary from AI assistant.",
+    )
+
     # ------------------------------------------------------------------
     # Computed fields
     # ------------------------------------------------------------------
@@ -80,15 +159,136 @@ class CrmLead(models.Model):
         for rec in self:
             rec.is_converted = bool(rec.dojo_member_id)
 
+    @api.depends("trial_booking_token", "trial_cancel_token")
+    def _compute_trial_urls(self):
+        base = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "")
+        for rec in self:
+            rec.trial_booking_url = (
+                f"{base}/trial/book/{rec.trial_booking_token}"
+                if rec.trial_booking_token
+                else False
+            )
+            rec.trial_manage_url = (
+                f"{base}/trial/manage/{rec.trial_cancel_token}"
+                if rec.trial_cancel_token
+                else False
+            )
+
+    @api.depends(
+        "email_from", "phone", "tag_ids", "tag_ids.name",
+        "booking_link_clicked", "trial_attended",
+    )
+    def _compute_lead_score(self):
+        for rec in self:
+            score = 0
+            if rec.email_from:
+                score += _SCORE_EMAIL
+            if rec.phone:
+                score += _SCORE_PHONE
+            tag_names = set(rec.tag_ids.mapped("name"))
+            for src_name, src_score in _SOURCE_SCORE_MAP.items():
+                if src_name in tag_names:
+                    score += src_score
+                    break  # only one source tag counted
+            if tag_names & _INTEREST_TAGS:
+                score += _SCORE_INTEREST_TAG
+            if tag_names & _AGE_TAGS:
+                score += _SCORE_AGE_TAG
+            if rec.booking_link_clicked:
+                score += _SCORE_BOOKING_CLICKED
+            if rec.trial_attended:
+                score += _SCORE_TRIAL_ATTENDED
+            rec.dojo_lead_score = min(score, 100)
+
     # ------------------------------------------------------------------
-    # Override write — capture no_show_date when no_show is first set
+    # .ics calendar helpers
+    # ------------------------------------------------------------------
+
+    def _build_ics(self):
+        """Return a bytes object containing an .ics VCALENDAR for the trial session."""
+        self.ensure_one()
+        session = self.trial_session_id
+        if not session:
+            return None
+        # Format datetimes as iCal UTC strings
+        fmt = "%Y%m%dT%H%M%SZ"
+        dtstart = session.start_datetime.strftime(fmt) if session.start_datetime else ""
+        dtend = session.end_datetime.strftime(fmt) if session.end_datetime else ""
+        summary = f"Free Trial Class — {session.template_id.name or session.name}"
+        location = self.company_id.name or "Dojang"
+        uid = f"{self.trial_booking_token or self.id}@{location.replace(' ', '')}"
+        description = (
+            f"Your free trial class at {location}.\\n"
+            f"Arrive 10 minutes early. Wear comfortable workout clothes."
+        )
+        manage_url = self.trial_manage_url or ""
+        ics = (
+            "BEGIN:VCALENDAR\r\n"
+            "VERSION:2.0\r\n"
+            "PRODID:-//Dojang//CRM Trial//EN\r\n"
+            "CALSCALE:GREGORIAN\r\n"
+            "METHOD:REQUEST\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            f"DTSTART:{dtstart}\r\n"
+            f"DTEND:{dtend}\r\n"
+            f"SUMMARY:{summary}\r\n"
+            f"LOCATION:{location}\r\n"
+            f"DESCRIPTION:{description}\\nManage booking: {manage_url}\r\n"
+            "STATUS:CONFIRMED\r\n"
+            "BEGIN:VALARM\r\n"
+            "TRIGGER:-PT1H\r\n"
+            "ACTION:DISPLAY\r\n"
+            "DESCRIPTION:Trial class in 1 hour\r\n"
+            "END:VALARM\r\n"
+            "END:VEVENT\r\n"
+            "END:VCALENDAR\r\n"
+        )
+        return ics.encode("utf-8")
+
+    def _get_ics_attachment(self):
+        """Create a transient ir.attachment for the .ics file and return its id."""
+        self.ensure_one()
+        ics_data = self._build_ics()
+        if not ics_data:
+            return False
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": "trial-booking.ics",
+                "type": "binary",
+                "datas": base64.b64encode(ics_data).decode(),
+                "mimetype": "text/calendar",
+                "res_model": "crm.lead",
+                "res_id": self.id,
+            }
+        )
+        return attachment
+
+    # ------------------------------------------------------------------
+    # Token generation
+    # ------------------------------------------------------------------
+
+    def _generate_trial_tokens(self):
+        """Generate booking + manage tokens for the lead (idempotent)."""
+        for rec in self:
+            vals = {}
+            if not rec.trial_booking_token:
+                vals["trial_booking_token"] = str(uuid.uuid4())
+            if not rec.trial_cancel_token:
+                vals["trial_cancel_token"] = str(uuid.uuid4())
+            if not rec.trial_token_expires:
+                vals["trial_token_expires"] = fields.Datetime.now() + timedelta(days=7)
+            if vals:
+                rec.write(vals)
+
+    # ------------------------------------------------------------------
+    # Override write — stage change hooks
     # ------------------------------------------------------------------
 
     def write(self, vals):
+        # ── no_show date stamping ────────────────────────────────────────
         if vals.get("no_show") is True and "no_show_date" not in vals:
             today = fields.Date.today()
-            # Stamp no_show_date only on records transitioning False→True
-            # that don't already have a stored date, preserving historical values.
             needs_date = self.filtered(lambda r: not r.no_show and not r.no_show_date)
             has_date = self - needs_date
             if needs_date:
@@ -96,7 +296,103 @@ class CrmLead(models.Model):
             if has_date:
                 super(CrmLead, has_date).write(vals)
             return True
-        return super().write(vals)
+
+        # ── Detect stage transitions before super ────────────────────────
+        old_stage_map = {}
+        if "stage_id" in vals:
+            for rec in self:
+                old_stage_map[rec.id] = rec.stage_id.name
+
+        result = super().write(vals)
+
+        # ── Post-write stage-change hooks ────────────────────────────────
+        if "stage_id" in vals:
+            for rec in self:
+                old_name = old_stage_map.get(rec.id)
+                new_name = rec.stage_id.name
+                if old_name == new_name:
+                    continue
+                rec._on_stage_change(old_name, new_name)
+
+        # ── Engagement tracking ──────────────────────────────────────────
+        engagement_fields = {"stage_id", "booking_link_clicked", "trial_attended"}
+        if engagement_fields & set(vals.keys()):
+            now = fields.Datetime.now()
+            super(CrmLead, self).write({"last_engagement_date": now})
+
+        return result
+
+    def _on_stage_change(self, old_stage, new_stage):
+        """Dispatch per-stage hooks after a stage transition."""
+        if new_stage == STAGE_QUALIFIED:
+            self._generate_trial_tokens()
+        elif new_stage == STAGE_TRIAL_BOOKED:
+            self._create_call_activity()
+        elif new_stage == STAGE_TRIAL_IN_PROGRESS:
+            self._schedule_post_trial_followups()
+
+    # ------------------------------------------------------------------
+    # Automation helpers
+    # ------------------------------------------------------------------
+
+    def _create_call_activity(self):
+        """Create a 'Call' activity for the salesperson, due in 2 hours."""
+        call_type = self.env.ref("mail.mail_activity_data_call", raise_if_not_found=False)
+        if not call_type:
+            return
+        for rec in self:
+            salesperson = rec.user_id or self.env.user
+            session_info = ""
+            if rec.trial_session_id:
+                session_info = (
+                    f"\nTrial session: {rec.trial_session_id.name} "
+                    f"on {rec.trial_session_id.start_datetime}"
+                )
+            rec.activity_schedule(
+                "mail.mail_activity_data_call",
+                date_deadline=fields.Date.today(),
+                summary=_("Follow up on trial booking for %s", rec.contact_name or rec.partner_name or "lead"),
+                note=_(
+                    "Call the lead to confirm attendance and answer questions.%s",
+                    session_info,
+                ),
+                user_id=salesperson.id,
+            )
+
+    def _schedule_post_trial_followups(self):
+        """Schedule Day 1 / Day 3 / Day 5 follow-up activities after trial attended."""
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        call_type = self.env.ref("mail.mail_activity_data_call", raise_if_not_found=False)
+        today = fields.Date.today()
+        for rec in self:
+            salesperson = rec.user_id or self.env.user
+            # Day 1: email recap
+            if todo_type:
+                rec.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    date_deadline=today + timedelta(days=1),
+                    summary=_("Send recap email to %s", rec.contact_name or "lead"),
+                    note=_("Send a personalised recap of their trial experience. Follow up on any questions."),
+                    user_id=salesperson.id,
+                )
+            # Day 3: phone call
+            if call_type:
+                rec.activity_schedule(
+                    "mail.mail_activity_data_call",
+                    date_deadline=today + timedelta(days=3),
+                    summary=_("Day 3 call — %s", rec.contact_name or "lead"),
+                    note=_("Check in with the lead. Answer questions and present membership options."),
+                    user_id=salesperson.id,
+                )
+            # Day 5: final offer follow-up
+            if todo_type:
+                rec.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    date_deadline=today + timedelta(days=5),
+                    summary=_("Final offer follow-up — %s", rec.contact_name or "lead"),
+                    note=_("Last outreach before offer expires. Make the final pitch."),
+                    user_id=salesperson.id,
+                )
 
     # ------------------------------------------------------------------
     # Actions
@@ -167,8 +463,7 @@ class CrmLead(models.Model):
             if no_show_template and lead.partner_id:
                 try:
                     no_show_template.send_mail(lead.id, force_send=True)
-                    # SMS follow-up
-                    mobile = lead.mobile or (lead.partner_id.mobile if lead.partner_id else False)
+                    mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
                     if mobile:
                         body = _(
                             "We missed you! Reschedule your free trial at "
@@ -228,7 +523,7 @@ class CrmLead(models.Model):
             try:
                 if reminder_template and lead.email_from:
                     reminder_template.send_mail(lead.id, force_send=True)
-                mobile = lead.mobile or (lead.partner_id.mobile if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
                 if mobile and lead.trial_session_id:
                     session = lead.trial_session_id
                     body = _(
@@ -269,10 +564,10 @@ class CrmLead(models.Model):
         auto_lost_date = today - timedelta(days=7)
 
         offer_made_stage = self.env["crm.stage"].search(
-            [("name", "=", STAGE_OFFER_MADE)], limit=1
+            [("name", "=", STAGE_EVALUATION)], limit=1
         )
         attended_stage = self.env["crm.stage"].search(
-            [("name", "=", STAGE_TRIAL_ATTENDED)], limit=1
+            [("name", "=", STAGE_TRIAL_IN_PROGRESS)], limit=1
         )
 
         nudge_template = self.env.ref(
@@ -294,8 +589,7 @@ class CrmLead(models.Model):
             try:
                 if nudge_template and lead.email_from:
                     nudge_template.send_mail(lead.id, force_send=True)
-                # SMS nudge
-                mobile = lead.mobile or (lead.partner_id.mobile if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
                 if mobile:
                     body = _(
                         "Heads up — your special membership offer from %(company)s "
@@ -360,7 +654,7 @@ class CrmLead(models.Model):
         cutoff = today - timedelta(days=5)
 
         converted_stage = self.env["crm.stage"].search(
-            [("name", "=", STAGE_CONVERTED)], limit=1
+            [("name", "=", STAGE_WON)], limit=1
         )
 
         domain = [
@@ -383,7 +677,7 @@ class CrmLead(models.Model):
             try:
                 if followup_template and lead.email_from:
                     followup_template.send_mail(lead.id, force_send=True)
-                mobile = lead.mobile or (lead.partner_id.mobile if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
                 if mobile:
                     body = _(
                         "Hey! We'd still love to have you try a class at %(company)s. "
@@ -404,3 +698,252 @@ class CrmLead(models.Model):
                 )
 
         _logger.info("dojo_crm: sent no-show 2nd follow-up to %d lead(s)", len(leads))
+
+    # ------------------------------------------------------------------
+    # Cron: trial expiry — move expired trials to Trial Expired stage
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _cron_trial_expiry(self):
+        """
+        Daily cron: leads in Trial Booked whose trial session has passed
+        and trial_attended is still False → move to Evaluation, notify.
+        """
+        trial_booked_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_TRIAL_BOOKED)], limit=1
+        )
+        evaluation_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_EVALUATION)], limit=1
+        )
+        if not trial_booked_stage or not evaluation_stage:
+            return
+
+        now = fields.Datetime.now()
+        leads = self.search(
+            [
+                ("stage_id", "=", trial_booked_stage.id),
+                ("trial_attended", "=", False),
+                ("trial_session_id.start_datetime", "<", now),
+            ]
+        )
+
+        expired_template = self.env.ref(
+            "dojo_crm.mail_template_trial_expired", raise_if_not_found=False
+        )
+        owner_template = self.env.ref(
+            "dojo_crm.mail_template_trial_expired_owner", raise_if_not_found=False
+        )
+
+        for lead in leads:
+            try:
+                lead.write({
+                    "stage_id": evaluation_stage.id,
+                    "no_show": True,
+                    "no_show_date": fields.Date.today(),
+                })
+                lead.message_post(
+                    body=_("Trial session passed without attendance — moved to Evaluation."),
+                    subtype_xmlid="mail.mt_note",
+                )
+                # Re-engagement email to lead
+                if expired_template and lead.email_from:
+                    expired_template.send_mail(lead.id, force_send=True)
+                # Internal notification to salesperson
+                if owner_template and lead.user_id:
+                    owner_template.send_mail(lead.id, force_send=True)
+            except Exception as exc:  # noqa: BLE001
+                _logger.error(
+                    "dojo_crm: trial expiry failed for lead %s: %s", lead.id, exc
+                )
+
+        _logger.info("dojo_crm: expired %d trial lead(s)", len(leads))
+
+    # ------------------------------------------------------------------
+    # Cron: auto-qualify leads with score >= 60
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _cron_auto_qualify(self):
+        """
+        Every 2 hours: leads in New Lead with dojo_lead_score >= 60
+        auto-move to Qualified (triggers email automation with booking link).
+        """
+        new_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_NEW_LEAD)], limit=1
+        )
+        qualified_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_QUALIFIED)], limit=1
+        )
+        if not new_stage or not qualified_stage:
+            return
+
+        leads = self.search(
+            [
+                ("stage_id", "=", new_stage.id),
+                ("dojo_lead_score", ">=", 60),
+            ]
+        )
+        for lead in leads:
+            try:
+                lead.write({"stage_id": qualified_stage.id})
+                lead.message_post(
+                    body=_(
+                        "Auto-qualified with lead score %(score)s/100.",
+                        score=lead.dojo_lead_score,
+                    ),
+                    subtype_xmlid="mail.mt_note",
+                )
+            except Exception as exc:  # noqa: BLE001
+                _logger.error(
+                    "dojo_crm: auto-qualify failed for lead %s: %s", lead.id, exc
+                )
+
+        _logger.info("dojo_crm: auto-qualified %d lead(s)", len(leads))
+
+    # ------------------------------------------------------------------
+    # Cron: win-back campaign for Trial Expired (weekly)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _cron_winback(self):
+        """
+        Weekly: re-engage no-show leads in Evaluation stage (7–30 days old) with fresh booking link.
+        After 30 days → auto-Lost.
+        """
+        today = fields.Date.today()
+        evaluation_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_EVALUATION)], limit=1
+        )
+        if not evaluation_stage:
+            return
+
+        winback_template = self.env.ref(
+            "dojo_crm.mail_template_trial_expired", raise_if_not_found=False
+        )
+
+        # --- Re-engage 7–30 day old no-show Evaluation leads ---
+        cutoff_start = today - timedelta(days=30)
+        cutoff_end = today - timedelta(days=7)
+        leads = self.search(
+            [
+                ("stage_id", "=", evaluation_stage.id),
+                ("no_show", "=", True),
+                ("is_converted", "=", False),
+                ("date_last_stage_update", ">=", fields.Datetime.to_datetime(cutoff_start)),
+                ("date_last_stage_update", "<=", fields.Datetime.to_datetime(cutoff_end)),
+            ]
+        )
+        for lead in leads:
+            try:
+                # Refresh tokens for a new 7-day booking window
+                lead.write({
+                    "trial_booking_token": str(uuid.uuid4()),
+                    "trial_token_expires": fields.Datetime.now() + timedelta(days=7),
+                    "trial_session_id": False,
+                })
+                if winback_template and lead.email_from:
+                    winback_template.send_mail(lead.id, force_send=True)
+            except Exception as exc:  # noqa: BLE001
+                _logger.error(
+                    "dojo_crm: win-back failed for lead %s: %s", lead.id, exc
+                )
+
+        _logger.info("dojo_crm: sent win-back to %d lead(s)", len(leads))
+
+        # --- Auto-lost after 30 days ---
+        lost_cutoff = fields.Datetime.to_datetime(today - timedelta(days=30))
+        stale_expired = self.search(
+            [
+                ("stage_id", "=", evaluation_stage.id),
+                ("no_show", "=", True),
+                ("is_converted", "=", False),
+                ("date_last_stage_update", "<", lost_cutoff),
+            ]
+        )
+        for lead in stale_expired:
+            try:
+                lead.action_set_lost(lost_reason_id=False)
+                lead.message_post(
+                    body=_("Auto-lost: no-show lead in Evaluation over 30 days with no re-engagement."),
+                    subtype_xmlid="mail.mt_note",
+                )
+            except Exception as exc:  # noqa: BLE001
+                _logger.error(
+                    "dojo_crm: win-back auto-lost failed for lead %s: %s", lead.id, exc
+                )
+
+        _logger.info("dojo_crm: auto-lost %d stale no-show lead(s)", len(stale_expired))
+
+    # ------------------------------------------------------------------
+    # Cron: stale lead cleanup (weekly)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _cron_stale_leads(self):
+        """
+        Weekly: nudge salesperson at 14 days idle; auto-archive at 30 days.
+        Only targets leads in New Lead stage.
+        """
+        today = fields.Date.today()
+        new_stage = self.env["crm.stage"].search(
+            [("name", "=", STAGE_NEW_LEAD)], limit=1
+        )
+        if not new_stage:
+            return
+
+        # --- 14+ day nudge to salesperson ---
+        nudge_cutoff = fields.Datetime.to_datetime(today - timedelta(days=14))
+        archive_cutoff = fields.Datetime.to_datetime(today - timedelta(days=30))
+
+        nudge_leads = self.search(
+            [
+                ("stage_id", "=", new_stage.id),
+                ("date_last_stage_update", "<=", nudge_cutoff),
+                ("date_last_stage_update", ">", archive_cutoff),
+                ("is_converted", "=", False),
+            ]
+        )
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        for lead in nudge_leads:
+            if lead.user_id and todo_type:
+                # Only create nudge if no open activities already exist
+                existing = self.env["mail.activity"].search(
+                    [
+                        ("res_model", "=", "crm.lead"),
+                        ("res_id", "=", lead.id),
+                        ("activity_type_id", "=", todo_type.id),
+                    ],
+                    limit=1,
+                )
+                if not existing:
+                    lead.activity_schedule(
+                        "mail.mail_activity_data_todo",
+                        date_deadline=today,
+                        summary=_("Stale lead — %s idle for 14+ days", lead.contact_name or "lead"),
+                        note=_("This lead has been in New Lead stage for over 14 days. Follow up or qualify."),
+                        user_id=lead.user_id.id,
+                    )
+
+        _logger.info("dojo_crm: nudged salespeople for %d stale lead(s)", len(nudge_leads))
+
+        # --- 30+ day auto-archive ---
+        stale_leads = self.search(
+            [
+                ("stage_id", "=", new_stage.id),
+                ("date_last_stage_update", "<=", archive_cutoff),
+                ("is_converted", "=", False),
+            ]
+        )
+        for lead in stale_leads:
+            try:
+                lead.action_set_lost(lost_reason_id=False)
+                lead.message_post(
+                    body=_("Auto-lost: lead idle in New stage for over 30 days."),
+                    subtype_xmlid="mail.mt_note",
+                )
+            except Exception as exc:  # noqa: BLE001
+                _logger.error(
+                    "dojo_crm: stale lead archive failed for lead %s: %s", lead.id, exc
+                )
+
+        _logger.info("dojo_crm: auto-lost %d stale lead(s)", len(stale_leads))

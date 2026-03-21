@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- ================================================================
+         Website top-nav menu entry for the public trial sign-up form.
+         noupdate=1 so manual re-ordering in the website builder is kept.
+         ================================================================ -->
+    <record id="website_menu_free_trial" model="website.menu">
+        <field name="name">Free Trial</field>
+        <field name="url">/trial</field>
+        <field name="sequence">50</field>
+        <field name="website_id" ref="website.default_website"/>
+        <field name="parent_id" ref="website.main_menu"/>
+    </record>
+</odoo>

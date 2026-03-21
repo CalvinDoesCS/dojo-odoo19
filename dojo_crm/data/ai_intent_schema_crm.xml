@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        AI Intent Schema Data — CRM Pipeline Intents
+        Defines AI assistant intents for CRM operations.
+    -->
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Read-Only Intents (Auto-Execute)                                     -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_lead_lookup" model="dojo.ai.intent.schema">
+        <field name="intent_type">lead_lookup</field>
+        <field name="name">Lead Lookup</field>
+        <field name="description">Look up CRM lead/prospect information by name, email, or phone</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "lead_name": {"type": "string", "description": "Contact name of the lead"},
+        "email": {"type": "string", "description": "Email of the lead"},
+        "phone": {"type": "string", "description": "Phone number of the lead"}
+    }
+}</field>
+        <field name="example_phrases">Look up lead John Smith
+Find prospect Sarah
+Who is the lead with email john@example.com?
+Show me the lead named Mike
+Search leads for 555-1234</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_pipeline_summary" model="dojo.ai.intent.schema">
+        <field name="intent_type">pipeline_summary</field>
+        <field name="name">Pipeline Summary</field>
+        <field name="description">Get a summary of the CRM pipeline — counts by stage</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{}</field>
+        <field name="example_phrases">How many leads are in the pipeline?
+Show me the pipeline summary
+What's the CRM status?
+How many trials are booked?
+Pipeline overview</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_trial_schedule" model="dojo.ai.intent.schema">
+        <field name="intent_type">trial_schedule</field>
+        <field name="name">Upcoming Trials</field>
+        <field name="description">List upcoming trial sessions that leads are booked into</field>
+        <field name="category">read</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "date": {"type": "string", "format": "date", "description": "Date to check trials for (YYYY-MM-DD)"}
+    }
+}</field>
+        <field name="example_phrases">What trials are coming up?
+Who has trials today?
+Show upcoming trial bookings
+Any trials booked this week?
+List today's trial sessions</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">False</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- Write Intents (Require Confirmation)                                 -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+
+    <record id="intent_lead_qualify" model="dojo.ai.intent.schema">
+        <field name="intent_type">lead_qualify</field>
+        <field name="name">Qualify Lead</field>
+        <field name="description">Move a lead to the Qualified stage and generate a booking link</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "lead_name": {"type": "string", "description": "Contact name of the lead to qualify"},
+        "lead_id": {"type": "integer", "description": "ID of the lead to qualify"}
+    }
+}</field>
+        <field name="example_phrases">Qualify lead John Smith
+Move Sarah to qualified
+Send booking link to Mike
+Qualify the new lead</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_lead_mark_attended" model="dojo.ai.intent.schema">
+        <field name="intent_type">lead_mark_attended</field>
+        <field name="name">Mark Trial Attended</field>
+        <field name="description">Mark a lead's trial as attended and move to Trial Attended stage</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "lead_name": {"type": "string", "description": "Contact name of the lead"},
+        "lead_id": {"type": "integer", "description": "ID of the lead"}
+    }
+}</field>
+        <field name="example_phrases">Mark John's trial as attended
+John Smith attended his trial
+Trial attended for Sarah
+Mark trial complete for Mike</field>
+        <field name="allowed_roles">instructor,admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="is_undoable">True</field>
+        <field name="supports_bulk">True</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="intent_lead_convert" model="dojo.ai.intent.schema">
+        <field name="intent_type">lead_convert</field>
+        <field name="name">Convert Lead to Member</field>
+        <field name="description">Convert a CRM lead into a dojo member</field>
+        <field name="category">member</field>
+        <field name="parameters_schema">{
+    "type": "object",
+    "properties": {
+        "lead_name": {"type": "string", "description": "Contact name of the lead to convert"},
+        "lead_id": {"type": "integer", "description": "ID of the lead to convert"}
+    }
+}</field>
+        <field name="example_phrases">Convert John Smith to a member
+Make Sarah a member
+Convert lead to member
+Sign up Mike as a member</field>
+        <field name="allowed_roles">admin</field>
+        <field name="requires_confirmation">True</field>
+        <field name="is_undoable">False</field>
+        <field name="supports_bulk">False</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

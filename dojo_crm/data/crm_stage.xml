@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        Dojo CRM pipeline stages.
-        sequence values are spaced to allow insertion before/after without conflicts.
+        Dojo CRM pipeline stages (6-stage pipeline).
+        sequence values are spaced to allow insertion without conflicts.
     -->
     <record id="crm_stage_new_lead" model="crm.stage">
-        <field name="name">New Lead</field>
+        <field name="name">New</field>
         <field name="sequence">10</field>
+        <field name="is_won" eval="False"/>
+    </record>
+
+    <record id="crm_stage_qualified" model="crm.stage">
+        <field name="name">Qualified</field>
+        <field name="sequence">15</field>
         <field name="is_won" eval="False"/>
     </record>
 
@@ -17,19 +23,19 @@
     </record>
 
     <record id="crm_stage_trial_attended" model="crm.stage">
-        <field name="name">Trial Attended</field>
+        <field name="name">Trial-in-progress</field>
         <field name="sequence">30</field>
         <field name="is_won" eval="False"/>
     </record>
 
     <record id="crm_stage_offer_made" model="crm.stage">
-        <field name="name">Offer Made</field>
+        <field name="name">Evaluation</field>
         <field name="sequence">40</field>
         <field name="is_won" eval="False"/>
     </record>
 
     <record id="crm_stage_converted" model="crm.stage">
-        <field name="name">Converted</field>
+        <field name="name">Won</field>
         <field name="sequence">50</field>
         <field name="is_won" eval="True"/>
     </record>
