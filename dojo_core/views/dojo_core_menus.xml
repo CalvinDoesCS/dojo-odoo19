@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         DOJO MANAGEMENT — Unified Root App Menu
+         Actions that belong to modules with complex/optional
+         dependencies (dojo_instructor_dashboard → project, account)
+         are defined here directly or omitted to keep installation safe.
+    ════════════════════════════════════════════════════════════════ -->
+
+    <!-- Local action for CRM Leads (crm module may not expose crm_lead_all_leads externally) -->
+    <record id="action_dojo_core_crm_leads" model="ir.actions.act_window">
+        <field name="name">Leads &amp; Trials</field>
+        <field name="res_model">crm.lead</field>
+        <field name="view_mode">list,form,kanban</field>
+    </record>
+
+    <!-- Local action for Instructor Profiles (model lives in dojo_base) -->
+    <record id="action_dojo_core_instructor_profiles" model="ir.actions.act_window">
+        <field name="name">Instructor Profiles</field>
+        <field name="res_model">dojo.instructor.profile</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ── Root ───────────────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_root"
+        name="Dojo Management"
+        sequence="1"
+        groups="dojo_base.group_dojo_admin,dojo_base.group_dojo_instructor"/>
+
+    <!-- ── Front Desk ─────────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_frontdesk"
+        name="Front Desk"
+        parent="menu_dojo_core_root"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_kiosks"
+        name="Kiosks"
+        parent="menu_dojo_core_frontdesk"
+        action="dojo_kiosk.action_dojo_kiosk_config"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_attendance_log"
+        name="Attendance Log"
+        parent="menu_dojo_core_frontdesk"
+        action="dojo_attendance.action_dojo_attendance_logs"
+        sequence="20"/>
+
+    <!-- ── Members ────────────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_members"
+        name="Members"
+        parent="menu_dojo_core_root"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_all_members"
+        name="All Members"
+        parent="menu_dojo_core_members"
+        action="dojo_members.action_dojo_members"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_households"
+        name="Households"
+        parent="menu_dojo_core_members"
+        action="dojo_members.action_dojo_households"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_onboarding_new"
+        name="New Onboarding"
+        parent="menu_dojo_core_members"
+        action="dojo_onboarding.action_dojo_onboarding_wizard"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_dojo_core_onboarding_records"
+        name="Onboarding History"
+        parent="menu_dojo_core_members"
+        action="dojo_onboarding.action_dojo_onboarding_records"
+        sequence="40"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem
+        id="menu_dojo_core_emergency_contacts"
+        name="Emergency Contacts"
+        parent="menu_dojo_core_members"
+        action="dojo_members.action_dojo_emergency_contacts"
+        sequence="50"/>
+
+    <menuitem
+        id="menu_dojo_core_instructor_profiles"
+        name="Instructors"
+        parent="menu_dojo_core_members"
+        action="dojo_core.action_dojo_core_instructor_profiles"
+        sequence="60"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <!-- ── Pipeline (CRM) ─────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_pipeline"
+        name="Pipeline"
+        parent="menu_dojo_core_root"
+        sequence="30"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem
+        id="menu_dojo_core_leads"
+        name="Leads &amp; Trials"
+        parent="menu_dojo_core_pipeline"
+        action="dojo_core.action_dojo_core_crm_leads"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_book_trial"
+        name="Book a Trial"
+        parent="menu_dojo_core_pipeline"
+        action="dojo_crm.action_dojo_book_trial_wizard"
+        sequence="20"/>
+
+    <!-- ── Classes ────────────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_classes"
+        name="Classes"
+        parent="menu_dojo_core_root"
+        sequence="40"/>
+
+    <menuitem
+        id="menu_dojo_core_programs"
+        name="Programs"
+        parent="menu_dojo_core_classes"
+        action="dojo_classes.action_dojo_programs"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_courses"
+        name="Courses"
+        parent="menu_dojo_core_classes"
+        action="dojo_classes.action_dojo_class_templates"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_sessions"
+        name="Sessions"
+        parent="menu_dojo_core_classes"
+        action="dojo_classes.action_dojo_class_sessions"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_dojo_core_enrollments"
+        name="Enrollments"
+        parent="menu_dojo_core_classes"
+        action="dojo_classes.action_dojo_class_enrollments"
+        sequence="40"/>
+
+    <menuitem
+        id="menu_dojo_core_class_calendar"
+        name="Calendar"
+        parent="menu_dojo_core_classes"
+        action="dojo_calendar.action_dojo_class_calendar"
+        sequence="50"/>
+
+    <!-- ── Subscriptions &amp; Billing ───────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_billing"
+        name="Subscriptions &amp; Billing"
+        parent="menu_dojo_core_root"
+        sequence="50"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem
+        id="menu_dojo_core_member_subscriptions"
+        name="Member Subscriptions"
+        parent="menu_dojo_core_billing"
+        action="dojo_subscriptions.action_dojo_member_subscriptions"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_subscription_plans"
+        name="Subscription Plans"
+        parent="menu_dojo_core_billing"
+        action="dojo_subscriptions.action_dojo_subscription_plans"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_program_enrollments"
+        name="Program Enrollments"
+        parent="menu_dojo_core_billing"
+        action="dojo_subscriptions.action_dojo_program_enrollments"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_dojo_core_credits"
+        name="Credits"
+        parent="menu_dojo_core_billing"
+        action="dojo_credits.action_dojo_credit_transaction"
+        sequence="40"/>
+
+    <!-- ── Belt Progression ───────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_belts"
+        name="Belt Progression"
+        parent="menu_dojo_core_root"
+        sequence="60"/>
+
+    <menuitem
+        id="menu_dojo_core_belt_tests"
+        name="Belt Tests"
+        parent="menu_dojo_core_belts"
+        action="dojo_belt_progression.action_dojo_belt_tests"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_rank_history"
+        name="Rank History"
+        parent="menu_dojo_core_belts"
+        action="dojo_belt_progression.action_dojo_member_ranks"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_belt_ranks"
+        name="Belt Rank Config"
+        parent="menu_dojo_core_belts"
+        action="dojo_belt_progression.action_dojo_belt_ranks"
+        sequence="30"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <!-- ── Communications ────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_comms"
+        name="Communications"
+        parent="menu_dojo_core_root"
+        sequence="70"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem
+        id="menu_dojo_core_campaigns"
+        name="Campaigns"
+        parent="menu_dojo_core_comms"
+        action="dojo_marketing.action_dojo_marketing_campaign"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_marketing_cards"
+        name="Marketing Cards"
+        parent="menu_dojo_core_comms"
+        action="dojo_marketing.action_dojo_marketing_card"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_social_posts"
+        name="Social Media"
+        parent="menu_dojo_core_comms"
+        action="dojo_social.action_dojo_social_post"
+        sequence="30"/>
+
+    <!-- ── Configuration ─────────────────────────────────────── -->
+
+    <menuitem
+        id="menu_dojo_core_config"
+        name="Configuration"
+        parent="menu_dojo_core_root"
+        sequence="100"
+        groups="dojo_base.group_dojo_admin"/>
+
+    <menuitem
+        id="menu_dojo_core_config_kiosk"
+        name="Kiosk Settings"
+        parent="menu_dojo_core_config"
+        action="dojo_kiosk.action_dojo_kiosk_config"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_dojo_core_config_social_accounts"
+        name="Social Media Accounts"
+        parent="menu_dojo_core_config"
+        action="dojo_social.action_dojo_social_account"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_dojo_core_config_ai_logs"
+        name="AI Assistant Logs"
+        parent="menu_dojo_core_config"
+        action="dojo_assistant.action_dojo_ai_action_log"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_dojo_core_config_ai_intents"
+        name="AI Intent Schemas"
+        parent="menu_dojo_core_config"
+        action="dojo_assistant.action_dojo_ai_intent_schema"
+        sequence="40"/>
+
+    <menuitem
+        id="menu_dojo_core_config_bridge"
+        name="Bridge API Identities"
+        parent="menu_dojo_core_config"
+        action="dojo_bridge.action_bridge_identities"
+        sequence="50"/>
+
+    <menuitem
+        id="menu_dojo_core_config_checkout"
+        name="Checkout Config"
+        parent="menu_dojo_core_config"
+        action="dojo_checkout.action_dojo_checkout_config"
+        sequence="60"/>
+
+    <menuitem
+        id="menu_dojo_core_config_martial_art_styles"
+        name="Martial Art Styles"
+        parent="menu_dojo_core_config"
+        action="dojo_base.action_dojo_martial_art_styles"
+        sequence="70"/>
+
+    <menuitem
+        id="menu_dojo_core_config_migration"
+        name="Migration Tools"
+        parent="menu_dojo_core_config"
+        action="dojo_migration.action_migration_log"
+        sequence="90"/>
+
+</odoo>

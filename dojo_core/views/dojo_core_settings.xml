@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="res_config_settings_view_dojo_core" model="ir.ui.view">
+            <field name="name">res.config.settings.view.dojo.core</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form" position="inside">
+
+                    <div class="app_settings_block"
+                         data-string="Dojo Integrations"
+                         string="Dojo Integrations"
+                         data-key="dojo_core">
+
+                        <h2>Dojo Integration Status</h2>
+                        <p class="text-muted">
+                            Configure each external service below. All integrations must be active before go-live.
+                            See <strong>STATUS.md</strong> at the project root for the full feature status report.
+                        </p>
+
+                        <!-- External Services -->
+                        <div class="row mt16 o_settings_container">
+
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <span class="fa fa-credit-card fa-2x text-primary"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">Stripe Payments</span>
+                                    <div class="text-muted">
+                                        Handles member subscription billing and instructor virtual cards.
+                                        Go to <strong>Invoicing → Configuration → Payment Providers → Stripe</strong>
+                                        and enter your Publishable key and Secret key, then set to Published.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <span class="fa fa-comment fa-2x text-success"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">Twilio SMS</span>
+                                    <div class="text-muted">
+                                        Sends check-in notifications, class reminders, and campaign messages.
+                                        Go to <strong>Settings → Contacts → Send SMS → Switch to Twilio</strong>
+                                        and configure your Account SID and Auth Token.
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="row mt16 o_settings_container">
+
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <span class="fa fa-microphone fa-2x text-warning"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">ElevenLabs Voice AI</span>
+                                    <div class="text-muted">
+                                        Powers the voice assistant at the kiosk.
+                                        Go to <strong>Settings → ElevenLabs Voice Connector</strong>
+                                        and enter your ElevenLabs API key and AI provider key, then test the connection.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <span class="fa fa-facebook-square fa-2x text-primary"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">Facebook / Instagram</span>
+                                    <div class="text-muted">
+                                        Direct posting to Facebook Pages and Instagram Business.
+                                        Go to <strong>Social Media → Accounts</strong>
+                                        and connect your Facebook page via OAuth.
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- QA Checklist -->
+                        <h2 class="mt32">QA Testing Checklist</h2>
+                        <p class="text-muted">
+                            Verify each area before go-live. See STATUS.md for details on what is complete and what needs work.
+                        </p>
+
+                        <div class="row mt16 o_settings_container">
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">Onboarding &amp; CRM</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Public trial booking (/dojo/book-trial) creates a CRM lead</li>
+                                        <li>Staff books trial → links session to lead</li>
+                                        <li>Member checks into trial → lead advances stage</li>
+                                        <li>Offer email fires automatically on stage change</li>
+                                        <li>Convert Lead wizard creates member + household + subscription</li>
+                                        <li>Walk-in onboarding → auto-creates Won CRM lead</li>
+                                    </ul>
+                                    <span class="o_setting_name mt16 d-block">Members &amp; Households</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Guardian + household created via onboarding</li>
+                                        <li>Portal invite sent → guardian logs in → sees invoices</li>
+                                        <li>Student portal shows schedule, belt rank, attendance</li>
+                                    </ul>
+                                    <span class="o_setting_name mt16 d-block">Classes &amp; Attendance</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Recurring course generates sessions (60-day window)</li>
+                                        <li>Student enrolled → check-in via kiosk</li>
+                                        <li>Check-in triggers guardian SMS/email</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <span class="o_setting_name">Subscriptions &amp; Billing</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Subscription created → first invoice generated</li>
+                                        <li>Stripe charge succeeds → invoice paid</li>
+                                        <li>Failed payment → dunning email (failure 1)</li>
+                                        <li>2nd failure → member paused</li>
+                                        <li>3rd failure → expired → re-engagement CRM lead</li>
+                                    </ul>
+                                    <span class="o_setting_name mt16 d-block">Belt Progression</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Belt test created → members registered</li>
+                                        <li>Promotion confirmed → rank record created</li>
+                                        <li>Promotion logged on CRM lead</li>
+                                    </ul>
+                                    <span class="o_setting_name mt16 d-block">AI Assistant &amp; Social</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Text: "Check in [member] for [session]"</li>
+                                        <li>Voice at kiosk: "Add [name] to next BJJ session"</li>
+                                        <li>CRM: "What's the pipeline looking like?"</li>
+                                        <li>Undo: action → undo within 60 minutes</li>
+                                        <li>Social: connect Facebook → post → verify published</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
