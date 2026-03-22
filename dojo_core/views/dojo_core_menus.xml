@@ -8,6 +8,14 @@
          are defined here directly or omitted to keep installation safe.
     ════════════════════════════════════════════════════════════════ -->
 
+    <!-- Local Book Trial action — no active_id context (safe from top-level menu) -->
+    <record id="action_dojo_core_book_trial" model="ir.actions.act_window">
+        <field name="name">Book a Trial</field>
+        <field name="res_model">dojo.book.trial.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
     <!-- Local action for CRM Leads (crm module may not expose crm_lead_all_leads externally) -->
     <record id="action_dojo_core_crm_leads" model="ir.actions.act_window">
         <field name="name">Leads &amp; Trials</field>
@@ -124,7 +132,7 @@
         id="menu_dojo_core_book_trial"
         name="Book a Trial"
         parent="menu_dojo_core_pipeline"
-        action="dojo_crm.action_dojo_book_trial_wizard"
+        action="dojo_core.action_dojo_core_book_trial"
         sequence="20"/>
 
     <!-- ── Classes ────────────────────────────────────────────── -->
