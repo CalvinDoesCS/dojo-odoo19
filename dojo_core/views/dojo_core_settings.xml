@@ -14,10 +14,6 @@
                          data-key="dojo_core">
 
                         <h2>Dojo Integration Status</h2>
-                        <p class="text-muted">
-                            Configure each external service below. All integrations must be active before go-live.
-                            See <strong>STATUS.md</strong> at the project root for the full feature status report.
-                        </p>
 
                         <!-- External Services -->
                         <div class="row mt16 o_settings_container">
@@ -86,62 +82,121 @@
 
                         <!-- QA Checklist -->
                         <h2 class="mt32">QA Testing Checklist</h2>
-                        <p class="text-muted">
-                            Verify each area before go-live. See STATUS.md for details on what is complete and what needs work.
-                        </p>
 
                         <div class="row mt16 o_settings_container">
+
+                            <!-- LEFT COLUMN -->
                             <div class="col-12 col-lg-6 o_setting_box">
                                 <div class="o_setting_right_pane">
+
                                     <span class="o_setting_name">Onboarding &amp; CRM</span>
                                     <ul class="text-muted mt4">
-                                        <li>Public trial booking (/dojo/book-trial) creates a CRM lead</li>
-                                        <li>Staff books trial → links session to lead</li>
-                                        <li>Member checks into trial → lead advances stage</li>
-                                        <li>Offer email fires automatically on stage change</li>
-                                        <li>Convert Lead wizard creates member + household + subscription</li>
-                                        <li>Walk-in onboarding → auto-creates Won CRM lead</li>
-                                    </ul>
-                                    <span class="o_setting_name mt16 d-block">Members &amp; Households</span>
-                                    <ul class="text-muted mt4">
-                                        <li>Guardian + household created via onboarding</li>
-                                        <li>Portal invite sent → guardian logs in → sees invoices</li>
+                                        <li>Onboarding wizard opens → completes all 10 steps without error</li>
+                                        <li>Guardian + household created (Phase 1)</li>
+                                        <li>Student record + dojo.member created (Phase 2)</li>
+                                        <li>Portal invite sent → guardian logs in → sees invoices + household</li>
                                         <li>Student portal shows schedule, belt rank, attendance</li>
+                                        <li>"Add Another Student" reuses existing household</li>
+                                        <li>Public trial booking (/dojo/book-trial) creates a CRM lead</li>
+                                        <li>Staff books trial via wizard → session linked to lead</li>
+                                        <li>Lead advances stage when trial member checks in</li>
+                                        <li>Confirmation email fires automatically on stage change</li>
+                                        <li>Convert Lead wizard → member + household + subscription created</li>
+                                        <li>Walk-in onboarding → Won CRM lead auto-created</li>
                                     </ul>
+
                                     <span class="o_setting_name mt16 d-block">Classes &amp; Attendance</span>
                                     <ul class="text-muted mt4">
+                                        <li>Program → Course → Subscription Plan structure created</li>
                                         <li>Recurring course generates sessions (60-day window)</li>
-                                        <li>Student enrolled → check-in via kiosk</li>
-                                        <li>Check-in triggers guardian SMS/email</li>
+                                        <li>Student enrolled → session appears on kiosk today</li>
+                                        <li>Student check-in via kiosk → attendance recorded</li>
+                                        <li>Check-out flow works after check-in</li>
+                                        <li>Check-in triggers guardian SMS/email notification</li>
+                                        <li>Auto-enroll creates future session enrollments on schedule</li>
                                     </ul>
+
+                                    <span class="o_setting_name mt16 d-block">Kiosk</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Kiosk URL loads (student view — idle screen)</li>
+                                        <li>Student name search returns member tiles</li>
+                                        <li>Student taps tile → enrolled sessions for today appear</li>
+                                        <li>Session tap → check-in recorded → success screen</li>
+                                        <li>Instructor mode PIN (123456) unlocks instructor view</li>
+                                        <li>Instructor can view roster per session</li>
+                                        <li>Hold student icon → profile modal opens</li>
+                                        <li>Profile modal: attendance, belt promo, contact guardian, add/remove sessions</li>
+                                        <li>Checkmark on student tile marks attendance directly</li>
+                                        <li>AI voice assistant (bottom-right) processes a command</li>
+                                    </ul>
+
+                                    <span class="o_setting_name mt16 d-block">Marketing Cards &amp; Campaigns</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Book Trial card QR → /dojo/book-trial resolves</li>
+                                        <li>Donate / Merch / Tournament cards → custom URL QR works</li>
+                                        <li>Member Badge QR → kiosk check-in works</li>
+                                        <li>Cards show on kiosk and/or portal as configured</li>
+                                        <li>Campaign created → sends email/SMS to correct audience filter</li>
+                                        <li>Recurring campaign advances next send date after dispatch</li>
+                                    </ul>
+
                                 </div>
                             </div>
+
+                            <!-- RIGHT COLUMN -->
                             <div class="col-12 col-lg-6 o_setting_box">
                                 <div class="o_setting_right_pane">
-                                    <span class="o_setting_name">Subscriptions &amp; Billing</span>
+
+                                    <span class="o_setting_name">Members &amp; Households</span>
                                     <ul class="text-muted mt4">
-                                        <li>Subscription created → first invoice generated</li>
-                                        <li>Stripe charge succeeds → invoice paid</li>
-                                        <li>Failed payment → dunning email (failure 1)</li>
-                                        <li>2nd failure → member paused</li>
-                                        <li>3rd failure → expired → re-engagement CRM lead</li>
+                                        <li>Household record shows Primary Guardian</li>
+                                        <li>Family members flagged: Is Student, Is Guardian, Is Minor</li>
+                                        <li>Payment Methods stat button visible on household</li>
+                                        <li>Stripe card saved against primary guardian</li>
+                                        <li>Off-session charge fires on billing date</li>
+                                        <li>Portal access: guardian sees only their household</li>
                                     </ul>
-                                    <span class="o_setting_name mt16 d-block">Belt Progression</span>
+
+                                    <span class="o_setting_name mt16 d-block">Subscriptions &amp; Billing</span>
                                     <ul class="text-muted mt4">
-                                        <li>Belt test created → members registered</li>
-                                        <li>Promotion confirmed → rank record created</li>
-                                        <li>Promotion logged on CRM lead</li>
+                                        <li>Subscription created → first invoice generated same day</li>
+                                        <li>Stripe charge succeeds → invoice marked paid</li>
+                                        <li>Failed payment → failure counter increments + dunning email (1st)</li>
+                                        <li>2nd failure → member status set to Paused</li>
+                                        <li>3rd failure → subscription Expired → re-engagement CRM lead</li>
+                                        <li>Payment received → failure counter reset, member reactivated</li>
+                                        <li>Subscription end date passes → status auto-set to Expired</li>
+                                        <li>30-day and 7-day renewal reminder emails sent</li>
                                     </ul>
-                                    <span class="o_setting_name mt16 d-block">AI Assistant &amp; Social</span>
+
+                                    <span class="o_setting_name mt16 d-block">Belt Progression &amp; Instructor Setup</span>
                                     <ul class="text-muted mt4">
-                                        <li>Text: "Check in [member] for [session]"</li>
-                                        <li>Voice at kiosk: "Add [name] to next BJJ session"</li>
-                                        <li>CRM: "What's the pipeline looking like?"</li>
-                                        <li>Undo: action → undo within 60 minutes</li>
-                                        <li>Social: connect Facebook → post → verify published</li>
+                                        <li>Belt test created → members registered for test</li>
+                                        <li>Promotion confirmed → rank record created on member</li>
+                                        <li>Promotion logged on CRM lead chatter</li>
+                                        <li>Instructor user created with Dojo Instructor role</li>
+                                        <li>Instructor Profile created → Employee record auto-created</li>
+                                        <li>Stripe virtual card issued to instructor (if Stripe configured)</li>
                                     </ul>
+
+                                    <span class="o_setting_name mt16 d-block">Integrations &amp; AI</span>
+                                    <ul class="text-muted mt4">
+                                        <li>Stripe: Publishable + Secret key set, status = Published</li>
+                                        <li>Twilio: configured in Settings → Contacts → Send SMS</li>
+                                        <li>ElevenLabs: credentials entered, connection test passes</li>
+                                        <li>Facebook OAuth: page connected, test connection passes</li>
+                                        <li>Social post created → Post Now publishes successfully</li>
+                                        <li>Social post scheduled → cron picks up and publishes</li>
+                                        <li>AI text: "Check in [member] for [session]" → executes</li>
+                                        <li>AI voice at kiosk: "Add [name] to next BJJ session" → confirm popup</li>
+                                        <li>AI CRM: "What's the pipeline looking like?" → responds</li>
+                                        <li>Undo: action → undo within 60 minutes works</li>
+                                        <li>Action log visible in Settings → AI Assistant</li>
+                                    </ul>
+
                                 </div>
                             </div>
+
                         </div>
 
                     </div>
