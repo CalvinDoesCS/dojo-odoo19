@@ -1024,7 +1024,7 @@ class AiAssistantService(models.AbstractModel):
         if household and household.is_household and household.primary_guardian_id:
             gp = household.primary_guardian_id
             email_part = " email:{}".format(gp.email) if gp.email else ""
-            phone_part = " phone:{}".format(gp.phone or gp.mobile or "") if (gp.phone or gp.mobile) else ""
+            phone_part = " phone:{}".format(gp.phone) if gp.phone else ""
             return " guardian:{}{}{}".format(gp.name, email_part, phone_part)
         return ""
 
@@ -1170,7 +1170,7 @@ class AiAssistantService(models.AbstractModel):
                     resolved["guardian_id"] = g.id
                     resolved["guardian_name"] = g.name
                     resolved["guardian_email"] = g.email
-                    resolved["guardian_phone"] = g.phone or g.mobile
+                    resolved["guardian_phone"] = g.phone
 
         elif params.get("member_id"):
             member = self.env["dojo.member"].browse(int(params["member_id"]))

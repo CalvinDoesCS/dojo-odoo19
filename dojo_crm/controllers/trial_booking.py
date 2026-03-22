@@ -360,11 +360,11 @@ class DojoTrialBooking(http.Controller):
         if not partner:
             partner_vals = {"name": name, "email": email, "company_type": "person"}
             if phone:
-                partner_vals["mobile"] = phone
+                partner_vals["phone"] = phone
             partner = Partner.create(partner_vals)
         else:
-            if phone and not partner.mobile:
-                partner.write({"mobile": phone})
+            if phone and not partner.phone:
+                partner.write({"phone": phone})
 
         vals = {
             "name": f"Free Trial — {name}",

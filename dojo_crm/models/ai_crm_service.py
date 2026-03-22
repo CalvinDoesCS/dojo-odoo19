@@ -48,7 +48,7 @@ class AiAssistantServiceCrm(models.AbstractModel):
                 "name": lead.name,
                 "contact_name": lead.contact_name,
                 "email": lead.email_from,
-                "phone": lead.phone or (lead.partner_id.mobile if lead.partner_id else None),
+                "phone": lead.phone,
                 "stage": lead.stage_id.name,
                 "score": lead.dojo_lead_score,
                 "trial_attended": lead.trial_attended,
@@ -106,7 +106,7 @@ class AiAssistantServiceCrm(models.AbstractModel):
                 "lead": lead.contact_name or lead.partner_name or lead.name,
                 "session": lead.trial_session_id.name,
                 "datetime": str(lead.trial_session_id.start_datetime),
-                "phone": lead.phone or (lead.partner_id.mobile if lead.partner_id else "") or "",
+                "phone": lead.phone or "",
             })
 
         return {

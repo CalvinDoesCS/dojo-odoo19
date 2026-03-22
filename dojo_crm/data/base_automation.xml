@@ -26,7 +26,7 @@ for rec in records:
     if template and rec.email_from:
         template.send_mail(rec.id, force_send=True)
     # SMS with booking link
-    mobile = rec.phone or (rec.partner_id.mobile or rec.partner_id.phone if rec.partner_id else False)
+    mobile = rec.phone or (rec.partner_id.phone if rec.partner_id else False)
     if mobile and rec.trial_booking_url:
         body = f"Hi {rec.contact_name or 'there'}! Book your free trial at {rec.company_id.name or 'the Dojang'}: {rec.trial_booking_url}"
         env['sms.sms'].create({
@@ -66,7 +66,7 @@ for rec in records:
             'attachment_ids': [(6, 0, attachment_ids)],
         })
     # SMS with manage link
-    mobile = rec.phone or (rec.partner_id.mobile or rec.partner_id.phone if rec.partner_id else False)
+    mobile = rec.phone or (rec.partner_id.phone if rec.partner_id else False)
     if mobile:
         session_info = ''
         if rec.trial_session_id:

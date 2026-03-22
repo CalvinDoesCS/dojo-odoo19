@@ -463,7 +463,7 @@ class CrmLead(models.Model):
             if no_show_template and lead.partner_id:
                 try:
                     no_show_template.send_mail(lead.id, force_send=True)
-                    mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
+                    mobile = lead.phone or (lead.partner_id.phone if lead.partner_id else False)
                     if mobile:
                         body = _(
                             "We missed you! Reschedule your free trial at "
@@ -523,7 +523,7 @@ class CrmLead(models.Model):
             try:
                 if reminder_template and lead.email_from:
                     reminder_template.send_mail(lead.id, force_send=True)
-                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.phone if lead.partner_id else False)
                 if mobile and lead.trial_session_id:
                     session = lead.trial_session_id
                     body = _(
@@ -589,7 +589,7 @@ class CrmLead(models.Model):
             try:
                 if nudge_template and lead.email_from:
                     nudge_template.send_mail(lead.id, force_send=True)
-                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.phone if lead.partner_id else False)
                 if mobile:
                     body = _(
                         "Heads up — your special membership offer from %(company)s "
@@ -677,7 +677,7 @@ class CrmLead(models.Model):
             try:
                 if followup_template and lead.email_from:
                     followup_template.send_mail(lead.id, force_send=True)
-                mobile = lead.phone or (lead.partner_id.mobile or lead.partner_id.phone if lead.partner_id else False)
+                mobile = lead.phone or (lead.partner_id.phone if lead.partner_id else False)
                 if mobile:
                     body = _(
                         "Hey! We'd still love to have you try a class at %(company)s. "
