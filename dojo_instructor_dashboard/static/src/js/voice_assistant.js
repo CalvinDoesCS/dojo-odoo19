@@ -296,7 +296,8 @@ export class DojoVoiceAssistant extends Component {
                 this._pushMsg("assistant", "⚠️ " + (result.error || "Action failed."));
             }
         } catch (err) {
-            this._pushMsg("assistant", "⚠️ Network error during confirmation.");
+            const errMsg = err?.data?.message || err?.message || "Network error during confirmation.";
+            this._pushMsg("assistant", "⚠️ " + errMsg);
         } finally {
             this.state.processing = false;
             this._scrollToBottom();

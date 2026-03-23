@@ -80,35 +80,52 @@ You are a helpful AI assistant for a martial arts dojo. You help instructors and
 {db_context}
 
 Always be helpful, concise, and accurate. Use the database context to provide real information.
-When you need to perform an action (not just answer a question), output a structured intent.
+When you need to perform an action (not just answer a question), output a structured intent block.
 
-Valid intent_type values (use EXACTLY these strings — do not invent variants):
-  member_lookup, class_list, belt_lookup, subscription_lookup, attendance_history,
-  schedule_today, member_enroll, member_unenroll, belt_promote,
-  subscription_create, subscription_cancel, contact_parent,
-  attendance_checkin, attendance_checkout, member_create, member_update,
-  class_create, class_cancel, course_enroll, belt_test_register, undo_action
+═══════════════════════════════════════════════════════════
+AVAILABLE INTENTS — descriptions, parameters, and examples
+═══════════════════════════════════════════════════════════
+{intent_definitions}
 
-CRITICAL INTENT DISAMBIGUATION — read carefully:
+═══════════════════════════════════════════════════════════
+CRITICAL INTENT DISAMBIGUATION — read carefully
+═══════════════════════════════════════════════════════════
   • member_enroll      = reserve a spot in ONE specific class SESSION (e.g. "enroll in today's 6pm class")
   • course_enroll      = add to the PERMANENT ROSTER of a course template (e.g. "add to roster", "add to the course")
-  • belt_lookup        = look up what belt rank someone currently has (e.g. "what belt is John?", "show belt ranks")
-  • belt_test_register = REGISTER a member to take a belt promotion TEST (e.g. "register for a belt test", "sign up for blue belt test", "schedule a belt promotion")
+  • belt_lookup        = look up what belt rank someone currently HAS (e.g. "what belt is John?", "show belt ranks")
+  • belt_test_register = REGISTER a member to TAKE a belt promotion TEST (e.g. "register for a belt test", "sign up for blue belt test")
+  • subscription_pause   = temporarily pause an EXISTING active subscription
+  • subscription_resume  = resume a paused subscription
+  • subscription_cancel  = permanently cancel a subscription
 
-KEYWORD RULES:
-  - "roster", "course roster", "permanent roster", "add to the course" → ALWAYS use course_enroll
-  - "today's class", "this session", "session at 6pm", "book for class today" → use member_enroll
-  - "register for a belt test", "sign up for belt test", "schedule belt test", "belt test" + register/sign up → ALWAYS use belt_test_register (NOT belt_lookup)
-  - "what belt is", "what rank", "belt rank" without register/test action → use belt_lookup
+KEYWORD RULES (override any other reasoning):
+  - "roster", "course roster", "permanent roster", "add to the course" → ALWAYS course_enroll
+  - "today's class", "this session", "session at Xpm", "book for class today" → member_enroll
+  - "register for a belt test", "sign up for belt test", "schedule belt test", "belt test" + register/sign up → ALWAYS belt_test_register (NOT belt_lookup)
+  - "what belt is", "what rank", "belt rank" without register/test action → belt_lookup
+  - "pause", "put on hold", "hold subscription" → subscription_pause
+  - "resume", "reactivate subscription" → subscription_resume
 
-For actions, include at the very end of your response (ALWAYS use REAL values, NOT template placeholders like {{member_name}}):
+═══════════════════════════════════════════════════════════
+OUTPUT FORMAT FOR ACTIONS
+═══════════════════════════════════════════════════════════
+For actions, include at the very end of your response (ALWAYS use REAL values from the user's message,
+NEVER template placeholders like {{{{member_name}}}}, {{{{class_name}}}} etc.):
 {intent_start}
-{{"intent_type": "course_enroll", "parameters": {{"member_name": "Mary Smith", "class_name": "Adult Fundamentals"}}, "confidence": 0.9}}
+{{"intent_type": "attendance_checkin", "parameters": {{"member_name": "john smith"}}, "confidence": 0.95}}
 {intent_end}
 
-Never put {{member_name}}, {{class_name}} etc. as parameter values. Always use the actual names from the user's message.
+Confidence guide:
+  0.95+ = exact keyword match or very clear phrasing
+  0.85  = clear but slightly ambiguous
+  0.70  = probable but uncertain — still emit the intent block
 
-Only include the intent block for actions, not for informational questions.
+Only include the intent block for ACTIONS. Do NOT emit an intent block for purely informational questions
+(member_lookup, belt_lookup, schedule_today, class_list, attendance_history, subscription_lookup — these
+are informational and auto-execute without confirmation).
+
+IMPORTANT: informational intents still need an intent block so the system can fetch real data. Always
+emit the intent block even for read-only queries.
 """
 
 
@@ -217,9 +234,15 @@ class AIProcessorIntentExt(models.AbstractModel):
         if db_context is None:
             db_context = self._build_dojo_db_context(text)
 
+        # Fetch intent definitions from DB (same source as process_intent_query)
+        IntentSchema = self.env["dojo.ai.intent.schema"]
+        intent_defs = IntentSchema.get_intent_definitions_for_llm(role)
+        intent_defs_str = self._format_intent_definitions(intent_defs) if intent_defs else "(none configured)"
+
         # Build system prompt for conversational mode
         system_prompt = _CONVERSATION_SYSTEM_PROMPT.format(
             db_context=db_context or "No specific context available.",
+            intent_definitions=intent_defs_str,
             intent_start=_INTENT_START,
             intent_end=_INTENT_END,
         )
@@ -640,17 +663,38 @@ class AIProcessorIntentExt(models.AbstractModel):
         return "\n".join(context_parts) if context_parts else "No specific context available."
 
     def _extract_name_tokens(self, text):
-        """Heuristic: extract a 1-3 word capitalised sequence from text."""
+        """
+        Heuristic: extract likely name tokens from text.
+
+        Case-insensitive so voice/STT input (all-lowercase) still matches
+        members in the DB.  Action/stop-words are filtered out.
+        """
         if not text:
             return ""
+        _STOP = {
+            "is", "has", "what", "show", "check", "enroll", "unenroll", "belt",
+            "class", "the", "in", "for", "to", "a", "an", "at", "of", "and",
+            "or", "me", "my", "do", "did", "can", "was", "are", "his", "her",
+            "their", "who", "how", "when", "today", "now", "please", "up",
+            "out", "add", "remove", "get", "let", "find", "look", "rank",
+            "session", "schedule", "roster", "promote", "pause", "cancel",
+            "subscription", "register", "test", "membership", "contact",
+            "parent", "guardian", "send", "message", "create", "update",
+            "next", "last", "this", "from", "with", "about", "sign",
+        }
         words = text.split()
-        caps = [re.sub(r"[^a-zA-Z]", "", w) for w in words if w and w[0].isupper() and len(w) > 1]
-        return " ".join(caps[:3])
+        tokens = [
+            re.sub(r"[^a-zA-Z]", "", w)
+            for w in words
+            if len(w) > 2 and w.lower().rstrip("s") not in _STOP
+        ]
+        tokens = [t for t in tokens if len(t) > 1]
+        return " ".join(tokens[:3])
 
     def _search_dojo_members(self, name_tokens, limit=5):
-        """Search dojo members by name tokens."""
+        """Search dojo members by name tokens (includes archived/inactive members)."""
         try:
-            return self.env["dojo.member"].search([("name", "ilike", name_tokens)], limit=limit)
+            return self.env["dojo.member"].with_context(active_test=False).search([("name", "ilike", name_tokens)], limit=limit)
         except Exception:
             return []
 

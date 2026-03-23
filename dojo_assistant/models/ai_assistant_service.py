@@ -96,12 +96,8 @@ _INTENT_HANDLER_CONFIG = {
         "fields": ["id", "template_id", "start_datetime", "capacity", "state", "seats_taken"],
         "limit": 20,
     },
-    "belt_lookup": {
-        "model": "dojo.belt.rank",
-        "domain": [("active", "=", True)],
-        "fields": ["id", "name", "sequence"],
-        "limit": 15,
-    },
+    # belt_lookup is handled by _handle_belt_lookup (custom handler) because
+    # the response model changes: member-specific → dojo.member; all ranks → dojo.belt.rank
     "subscription_lookup": {
         "model": "dojo.member.subscription",
         "domain_builder": "_domain_subscription_lookup",
@@ -506,7 +502,15 @@ class AiAssistantService(models.AbstractModel):
             #  - conversational intent is "unknown"
             #  - conversational intent is not a recognised handler key
             #    (the AI sometimes invents variants like "member_enrollment")
-            if not intent_data or conv_intent_type not in _KNOWN_INTENT_TYPES or conv_intent_type == "unknown":
+            #  - conversational intent confidence is below threshold
+            #    (low-confidence first-pass → let the JSON-mode call resolve it)
+            conv_confidence = intent_data.get("confidence", 1.0) if intent_data else 0.0
+            if (
+                not intent_data
+                or conv_intent_type not in _KNOWN_INTENT_TYPES
+                or conv_intent_type == "unknown"
+                or conv_confidence < _MIN_CONFIDENCE
+            ):
                 db_ctx = self._build_db_context(text)
                 intent_result = ai_proc.process_intent_query(text, role, db_ctx)
                 if intent_result.get("confidence", 0) >= _MIN_CONFIDENCE:
@@ -562,7 +566,7 @@ class AiAssistantService(models.AbstractModel):
                         _logger.info("Recovered target_belt from user text: %s", params["target_belt"])
                 # Recover member name from user text if missing
                 if not params.get("member_name") and not params.get("member_id"):
-                    members = self.env["dojo.member"].search([], limit=200, order="name asc")
+                    members = self.env["dojo.member"].with_context(active_test=False).search([], limit=200, order="name asc")
                     for m in members:
                         if m.name.lower() in text_lower:
                             params["member_name"] = m.name
@@ -614,7 +618,7 @@ class AiAssistantService(models.AbstractModel):
             if intent_type in _MEMBER_INTENTS and intent_data is not None:
                 params = intent_data.setdefault("parameters", {})
                 if not params.get("member_name") and not params.get("member_id"):
-                    members = self.env["dojo.member"].search([], limit=200, order="name asc")
+                    members = self.env["dojo.member"].with_context(active_test=False).search([], limit=200, order="name asc")
                     for m in members:
                         if m.name.lower() in text_lower:
                             params["member_name"] = m.name
@@ -1005,17 +1009,48 @@ class AiAssistantService(models.AbstractModel):
 
     @api.model
     def _extract_name_tokens(self, text):
-        """Heuristic: extract a 1-3 word capitalised sequence from text."""
+        """
+        Heuristic: extract likely name tokens from text.
+
+        Intentionally case-insensitive so voice/STT input (which often arrives
+        as all-lowercase) still produces useful search tokens.  Stop-words and
+        dojo-action verbs are filtered so common command words don't pollute
+        the member search.
+        """
         if not text:
             return ""
+        _STOP = {
+            "is", "has", "what", "show", "check", "enroll", "unenroll", "belt",
+            "class", "the", "in", "for", "to", "a", "an", "at", "of", "and",
+            "or", "me", "my", "do", "did", "can", "was", "are", "his", "her",
+            "their", "who", "how", "when", "today", "now", "please", "up",
+            "out", "add", "remove", "get", "let", "find", "look", "rank",
+            "session", "schedule", "roster", "promote", "pause", "cancel",
+            "subscription", "register", "test", "membership", "contact",
+            "parent", "guardian", "send", "message", "create", "update",
+            "next", "last", "this", "from", "with", "about", "sign",
+        }
         words = text.split()
-        caps = [re.sub(r"[^a-zA-Z]", "", w) for w in words if w and w[0].isupper() and len(w) > 1]
-        return " ".join(caps[:3])
+        tokens = [
+            re.sub(r"[^a-zA-Z]", "", w)
+            for w in words
+            if len(w) > 2 and w.lower().rstrip("s") not in _STOP
+        ]
+        # Remove empty strings left after stripping punctuation
+        tokens = [t for t in tokens if len(t) > 1]
+        return " ".join(tokens[:3])
 
     @api.model
     def _search_members(self, name, limit=6):
-        """Case-insensitive ilike search on member name."""
-        return self.env["dojo.member"].search([["name", "ilike", name]], limit=limit)
+        """Case-insensitive ilike search on member name.
+
+        Uses active_test=False so migrated/archived members are still findable
+        by the AI assistant — the ORM's default active=True filter would silently
+        exclude them otherwise.
+        """
+        return self.env["dojo.member"].with_context(active_test=False).search(
+            [["name", "ilike", name]], limit=limit
+        )
 
     @api.model
     def _guardian_summary(self, member):
@@ -1190,11 +1225,45 @@ class AiAssistantService(models.AbstractModel):
 
         if raw_class_name or raw_session_id:
             session = None
-            from datetime import date as _date
-            today = _date.today().isoformat()
+            from datetime import date as _date, timedelta as _timedelta
+            today = _date.today()
+
+            # Resolve a date hint from intent params (AI may provide "date" field
+            # with values like "2026-03-25", "tomorrow", "thursday", etc.)
+            raw_date_param = params.get("date") or (intent_data.get("parameters", {}) or {}).get("date")
+            target_date = today
+            if raw_date_param:
+                try:
+                    target_date = _date.fromisoformat(str(raw_date_param))
+                except (ValueError, TypeError):
+                    # Relative keywords — rough mapping
+                    rdp = str(raw_date_param).lower().strip()
+                    if rdp == "tomorrow":
+                        target_date = today + _timedelta(days=1)
+                    elif rdp in ("yesterday",):
+                        target_date = today - _timedelta(days=1)
+                    else:
+                        # Day-of-week: "monday", "tuesday", ...
+                        _DOW = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                                "friday": 4, "saturday": 5, "sunday": 6}
+                        dow = _DOW.get(rdp)
+                        if dow is not None:
+                            days_ahead = (dow - today.weekday()) % 7 or 7
+                            target_date = today + _timedelta(days=days_ahead)
+
+            # Use a ±7-day window centred on the target date so phrases like
+            # "Thursday's class" or "next week's session" resolve correctly.
+            window_start = (target_date - _timedelta(days=7)).isoformat()
+            window_end = (target_date + _timedelta(days=7)).isoformat()
+            search_domain = [
+                ("start_datetime", ">=", window_start + " 00:00:00"),
+                ("start_datetime", "<=", window_end + " 23:59:59"),
+            ]
+            # For "today" queries keep a tight same-day window for faster / more
+            # accurate matches; only widen when a specific non-today date is implied.
             today_domain = [
-                ("start_datetime", ">=", today + " 00:00:00"),
-                ("start_datetime", "<=", today + " 23:59:59"),
+                ("start_datetime", ">=", today.isoformat() + " 00:00:00"),
+                ("start_datetime", "<=", today.isoformat() + " 23:59:59"),
             ]
 
             if raw_session_id:
@@ -1206,20 +1275,25 @@ class AiAssistantService(models.AbstractModel):
                     session = None
 
             if not session and raw_class_name:
-                # 1. Try exact ilike on the full name
+                # 1. Try exact ilike on the full name — today first, then wider window
                 sessions = self.env["dojo.class.session"].search(
                     [("template_id.name", "ilike", raw_class_name)] + today_domain,
                     limit=5,
                 )
+                if not sessions:
+                    sessions = self.env["dojo.class.session"].search(
+                        [("template_id.name", "ilike", raw_class_name)] + search_domain,
+                        limit=5, order="start_datetime asc",
+                    )
                 if sessions:
                     session = sessions[0]
 
             if not session and raw_class_name:
-                # 2. Word-by-word fallback: score each today-session by how many
-                #    significant words from the user query appear in its name.
+                # 2. Word-by-word fallback: score sessions in the search window by how
+                #    many significant words from the user query appear in the name.
                 #    Weighted by character length so longer/more-specific words
                 #    win ties (e.g. "fundamental" beats "advanced").
-                all_today = self.env["dojo.class.session"].search(today_domain, limit=50)
+                all_today = self.env["dojo.class.session"].search(search_domain, limit=50)
                 query_words = [
                     w.lower() for w in re.split(r"\W+", raw_class_name)
                     if len(w) > 2
@@ -1314,27 +1388,51 @@ class AiAssistantService(models.AbstractModel):
                 return "No classes scheduled for today."
             lines = ["Here's today's schedule:"]
             for s in data:
-                enrolled = s.get("enrolled", 0)
+                # Generic read handler returns raw field names; handle both formats.
+                # name: may come as "name" (legacy) or from template_id many2one tuple
+                name = s.get("name")
+                if not name:
+                    tmpl = s.get("template_id")
+                    if isinstance(tmpl, (list, tuple)) and len(tmpl) > 1:
+                        name = tmpl[1]
+                    elif isinstance(tmpl, str):
+                        name = tmpl
+                name = name or "Class"
+
+                # time: may come as "time" (legacy) or from start_datetime
+                time_val = s.get("time")
+                if not time_val:
+                    dt = s.get("start_datetime")
+                    if dt and hasattr(dt, "strftime"):
+                        time_val = dt.strftime("%H:%M")
+                    elif dt:
+                        time_val = str(dt)[11:16]
+                time_val = time_val or "?"
+
+                # enrolled count: may come as "enrolled" or "seats_taken"
+                enrolled = s.get("enrolled") if s.get("enrolled") is not None else s.get("seats_taken", 0)
                 capacity = s.get("capacity", 0)
-                lines.append("  • {} at {} — {}/{} enrolled".format(
-                    s.get("name", "Class"),
-                    s.get("time", "?"),
-                    enrolled,
-                    capacity,
-                ))
+                lines.append("  • {} at {} — {}/{} enrolled".format(name, time_val, enrolled, capacity))
             return "\n".join(lines)
 
         if intent_type == "member_lookup":
             if not data:
                 return msg
-            lines = ["{} — {}".format(data.get("name", "Member"), data.get("state", "unknown"))]
-            if data.get("rank"):
-                lines.append("  Rank: {}".format(data["rank"]))
-            sub = data.get("subscription")
-            if sub:
-                lines.append("  Subscription: {} ({})".format(sub.get("plan", "?"), sub.get("status", "?")))
-            if data.get("guardian"):
-                lines.append("  Guardian: {}".format(data["guardian"]))
+            # Generic read handler returns a list; take the first record
+            record = data[0] if isinstance(data, list) else data
+            if not record:
+                return msg
+            # many2one fields come back as [id, "Name"] tuples from .read()
+            rank_val = record.get("current_rank_id")
+            rank_str = rank_val[1] if isinstance(rank_val, (list, tuple)) and len(rank_val) > 1 else None
+            state_val = record.get("membership_state", record.get("state", "unknown"))
+            lines = ["{} — {}".format(record.get("name", "Member"), state_val)]
+            if rank_str:
+                lines.append("  Rank: {}".format(rank_str))
+            if record.get("email"):
+                lines.append("  Email: {}".format(record["email"]))
+            if record.get("phone"):
+                lines.append("  Phone: {}".format(record["phone"]))
             return "\n".join(lines)
 
         if intent_type == "belt_lookup":
@@ -1345,7 +1443,22 @@ class AiAssistantService(models.AbstractModel):
             return "Belt: {}".format(data.get("name", msg))
 
         if intent_type == "subscription_lookup":
-            return msg
+            if not data:
+                return msg
+            record = data[0] if isinstance(data, list) else data
+            if not record:
+                return msg
+            member_val = record.get("member_id")
+            member_name = member_val[1] if isinstance(member_val, (list, tuple)) and len(member_val) > 1 else "Member"
+            plan_val = record.get("plan_id")
+            plan_name = plan_val[1] if isinstance(plan_val, (list, tuple)) and len(plan_val) > 1 else "Unknown plan"
+            state = record.get("state", "unknown")
+            lines = ["{} — {} ({})".format(member_name, plan_name, state)]
+            if record.get("start_date"):
+                lines.append("  Started: {}".format(record["start_date"]))
+            if record.get("end_date"):
+                lines.append("  Ends: {}".format(record["end_date"]))
+            return "\n".join(lines)
 
         if intent_type == "attendance_history":
             if not data:
@@ -1393,6 +1506,9 @@ class AiAssistantService(models.AbstractModel):
         
         # Priority 3: Fall back to custom handlers for special intents
         handlers = {
+            # Read-only intents with member-context-dependent logic
+            "belt_lookup": self._handle_belt_lookup,
+
             # Mutating intents (complex business logic - cannot be generalized)
             "member_enroll": self._handle_member_enroll,
             "member_unenroll": self._handle_member_unenroll,
@@ -1906,6 +2022,51 @@ class AiAssistantService(models.AbstractModel):
         if name:
             return [("name", "ilike", name)]
         return [("id", "=", -1)]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Intent Handlers: Read-Only (Custom Logic)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @api.model
+    def _handle_belt_lookup(self, intent_data, resolved_data, action_log):
+        """
+        Look up belt rank information.
+
+        - If a member is in context → return that member's current rank + stripe count.
+        - Otherwise → return all belt ranks in sequence order.
+        """
+        member_id = resolved_data.get("member_id")
+
+        if member_id:
+            member = self.env["dojo.member"].browse(member_id)
+            if not member.exists():
+                return {"success": False, "error": "Member not found."}
+
+            rank = member.current_rank_id if hasattr(member, "current_rank_id") else None
+            stripe_count = getattr(member, "current_stripe_count", 0) or 0
+            max_stripes = (getattr(rank, "max_stripes", 0) or 0) if rank else 0
+
+            rank_name = rank.name if rank else "No rank assigned"
+            stripe_str = f" ({stripe_count}/{max_stripes} stripes)" if max_stripes > 0 else ""
+
+            return {
+                "success": True,
+                "message": f"{member.name} is currently ranked: {rank_name}{stripe_str}",
+                "data": {
+                    "name": rank_name + stripe_str,
+                    "member_name": member.name,
+                    "rank_id": rank.id if rank else None,
+                },
+            }
+
+        # No member in context — return all belt ranks
+        ranks = self.env["dojo.belt.rank"].search([("active", "=", True)], order="sequence")
+        data = [{"id": r.id, "name": r.name, "sequence": r.sequence} for r in ranks]
+        return {
+            "success": True,
+            "message": f"Found {len(data)} belt ranks",
+            "data": data,
+        }
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Intent Handlers: Mutating (Require Confirmation)

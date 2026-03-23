@@ -78,18 +78,22 @@ What do we have today?</field>
     <record id="intent_belt_lookup" model="dojo.ai.intent.schema">
         <field name="intent_type">belt_lookup</field>
         <field name="name">Belt Lookup</field>
-        <field name="description">Look up belt rank information</field>
+        <field name="description">Look up a member's current belt rank. Use member_name to get a specific member's rank; omit it to list all belt ranks.</field>
         <field name="category">read</field>
         <field name="parameters_schema">{
     "type": "object",
     "properties": {
-        "belt_name": {"type": "string", "description": "Name of the belt rank to look up"}
+        "member_name": {"type": "string", "description": "Name of the member whose belt rank to look up"},
+        "member_id": {"type": "integer", "description": "ID of the member whose belt rank to look up"},
+        "belt_name": {"type": "string", "description": "Name of a specific belt rank to look up (omit to get member's rank)"}
     }
 }</field>
         <field name="example_phrases">What belt is John on?
 Show me Sarah's belt rank
 What rank is Test8?
-What color belt does Mike have?</field>
+What color belt does Mike have?
+What belt does john smith have?
+Show all belt ranks</field>
         <field name="allowed_roles">kiosk,instructor,admin</field>
         <field name="requires_confirmation">False</field>
         <field name="is_undoable">False</field>
