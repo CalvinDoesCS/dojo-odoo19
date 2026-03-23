@@ -10,7 +10,7 @@
             <form string="Book Trial Class">
                 <group>
                     <group string="Lead">
-                        <field name="lead_id" readonly="1"/>
+                        <field name="lead_id" readonly="context.get('default_lead_id', False)"/>
                     </group>
                     <group string="Session">
                         <field name="session_id"
